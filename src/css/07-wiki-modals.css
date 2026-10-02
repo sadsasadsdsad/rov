@@ -1,0 +1,86 @@
+/* ==========================================================================
+ * 07-wiki-modals.css — ВИКИ-МОДАЛКИ, veil и keyframes
+ * Проект: «Черновик» — веб-редактор рукописей. tests/ — разобранная копия
+ *   src/index.html: 8 CSS-файлов, порядок правил = каскаду оригинала.
+ * Раздел оригинала: src/index.html, строки 674–750 (файл 7 из 8).
+ * Что описывает: модалки вики (#wikiViewModal, #wikiModal), #askModal, затемняющий слой #veil (лежит ВНУТРИ #workspace — важно для порядка наложения на сайдбаре), общие @keyframes (viewIn, pop…).
+ * Ключевое: #veil, #wikiViewModal, #wikiModal, @keyframes viewIn.
+ * Порядок: после 06.
+ * ========================================================================== */
+.wv-cols2{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
+.wv-rel{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);border-radius:99px;padding:5px 12px;font-size:12px;color:var(--ink2);transition:.15s;background:transparent}
+.wv-rel:hover{border-color:var(--accent);color:var(--accent)}
+.wv-rel b{font-family:var(--f-ui);font-size:9px;color:var(--ink3);font-weight:500}
+.wv-rel .wv-rel-d{width:7px;height:7px;transform:rotate(45deg);flex:0 0 auto}
+.wv-alias{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:10px}
+.wv-alias span{font-family:var(--f-ui);font-size:9.5px;color:var(--ink2);border:1px dashed var(--line);border-radius:99px;padding:3px 9px}
+#wikiViewModal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:var(--veil-glass);backdrop-filter:blur(18px) saturate(1.15);-webkit-backdrop-filter:blur(18px) saturate(1.15);opacity:0;visibility:hidden;pointer-events:none;transition:.28s}
+#wikiViewModal.on{opacity:1;visibility:visible;pointer-events:auto}
+.wv-inner{width:min(1180px,96vw);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;transform:translateY(12px) scale(.985);transition:.28s cubic-bezier(.2,.7,.2,1)}
+#wikiViewModal.on .wv-inner{transform:none}
+.wv-head{position:relative;display:flex;align-items:center;justify-content:center;gap:12px}
+.wv-head > .sibtn{position:absolute;right:0;top:50%;transform:translateY(-50%)}
+#wvName{font-size:clamp(22px,3.2vw,30px);font-weight:700;letter-spacing:-.01em}
+#wvDesc{max-width:760px;margin:12px auto 0;color:var(--ink2);line-height:1.65;font-size:14px;text-align:center}
+.wv-tl{width:min(520px,86%);margin:14px auto 0}
+#wvQuotes{flex:1;min-height:0;overflow-y:auto;margin-top:8px}
+.wv-single{display:flex;flex-direction:column;gap:8px;max-width:760px;width:100%;margin:0 auto;padding:4px 6px}
+#wvQuotes.cols{padding:10px 4px 14px}
+.wv-cols-wrap{display:flex;flex-wrap:wrap;justify-content:center;align-items:stretch;gap:14px;width:100%;max-width:1140px;margin:0 auto;padding:0 4px}
+.wv-col{flex:0 1 276px;width:276px;max-width:100%;min-height:250px;max-height:430px;display:flex;flex-direction:column;background:var(--card-glass);border:1px solid var(--line2);border-radius:var(--r-lg);padding:12px;animation:rise .45s cubic-bezier(.2,.7,.2,1) both;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .18s,box-shadow .18s,border-color .18s}
+.wv-col:hover{transform:translateY(-3px);border-color:var(--line);box-shadow:var(--shadow-sm)}
+.wv-col .wc-h{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink3);display:flex;justify-content:space-between;align-items:baseline;gap:8px;cursor:pointer;transition:color .15s}
+.wv-col .wc-h:hover{color:var(--accent)}
+.wv-col .wc-h b{color:var(--accent);font-weight:500}
+.wv-col .col-body{overflow-y:auto;display:flex;flex-direction:column;gap:7px;margin-top:10px;padding:2px 2px 2px 0;max-height:330px;min-height:150px}
+.wv-q{display:flex;gap:8px;align-items:flex-start;text-align:left;width:100%;border:1px dashed var(--line);border-radius:var(--r-md);padding:8px 10px;font-family:var(--f-serif);font-size:12px;line-height:1.55;color:var(--ink2);transition:border-color .15s,color .15s,background .15s;flex:0 0 auto;background:transparent}
+.wv-q:hover{border-color:var(--accent);border-style:solid;color:var(--ink);background:var(--card)}
+.wv-q em{font-style:normal;font-family:var(--f-ui);font-size:8px;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:1px 6px;flex:0 0 auto;margin-top:2px}
+#wvHint{font-family:var(--f-ui);font-size:8.5px;letter-spacing:.16em;color:var(--ink3);text-transform:uppercase;text-align:center;margin-top:8px;flex:0 0 auto}
+#wikiModal{position:fixed;inset:0;z-index:101;display:flex;align-items:center;justify-content:center;background:var(--veil-glass);backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);opacity:0;pointer-events:none;transition:.28s}
+#wikiModal.on{opacity:1;pointer-events:auto}
+.wm-card{width:min(600px,94vw);max-height:calc(100dvh - 56px);overflow-y:auto;background:var(--card-glass);backdrop-filter:blur(24px) saturate(1.2);-webkit-backdrop-filter:blur(24px) saturate(1.2);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:22px 24px 14px;transform:translateY(12px) scale(.985);transition:.28s cubic-bezier(.2,.7,.2,1)}
+#wikiModal.on .wm-card{transform:none}
+.wm-card.dragging{transition:none}
+.wm-head{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;cursor:grab;user-select:none;padding-bottom:14px;border-bottom:1px solid var(--line2);margin-bottom:16px}
+.wm-head:active{cursor:grabbing}
+.wm-head > .sibtn{position:absolute;right:0;top:0}
+#wmTitle{font-size:clamp(18px,2.6vw,23px);font-weight:700;letter-spacing:-.01em;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-field{margin-bottom:13px}
+.m-field .lbl{display:block;margin-bottom:6px}
+.m-field input,.m-field textarea{width:100%;background:transparent;border:1px solid var(--line);border-radius:10px;padding:9px 13px;font-family:var(--f-serif);font-size:14px;color:var(--ink);outline:none;transition:border-color .2s}
+.m-field input:focus,.m-field textarea:focus{border-color:var(--accent)}
+.m-field textarea{height:72px;resize:none;line-height:1.55}
+.wm-sec{border-top:1px solid var(--line2);padding-top:12px;margin-top:2px}
+.type-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.type-chip{position:relative;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);border-radius:99px;padding:6px 12px;font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;color:var(--ink2);cursor:pointer;transition:border-color .15s,color .15s,background .15s;text-transform:uppercase;background:transparent}
+.type-chip::before{content:'';width:6px;height:6px;flex:0 0 auto;background:var(--tc,var(--ink3));transform:rotate(45deg);transition:background .15s}
+.type-chip:hover{border-color:var(--line);color:var(--ink)}
+.type-chip.on{border-color:var(--ink3);color:var(--ink);background:var(--hover)}
+.type-chip.add{border-style:dashed;color:var(--ink3)}
+.type-chip.add::before{display:none}
+.type-chip.add:hover{border-color:var(--accent);color:var(--accent)}
+.type-chip .tc-del{width:15px;height:15px;margin-left:-1px;padding:0;display:grid;place-items:center;border:0;background:transparent;font-size:12px;line-height:1;color:var(--ink3);opacity:.55;cursor:pointer;transition:opacity .15s,color .15s}
+.type-chip .tc-del:hover{opacity:1;color:var(--accent)}
+#veil{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:35;opacity:0;pointer-events:none;transition:.3s}
+#printBook{display:none}
+#askModal{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:var(--veil-glass);backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);opacity:0;visibility:hidden;pointer-events:none;transition:.24s}
+#askModal.on{opacity:1;visibility:visible;pointer-events:auto}
+.am-card{width:min(430px,92vw);background:var(--card-glass);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:22px 24px 16px;transform:translateY(10px) scale(.98);transition:.26s cubic-bezier(.2,.7,.2,1);backdrop-filter:blur(24px) saturate(1.2);-webkit-backdrop-filter:blur(24px) saturate(1.2)}
+#askModal.on .am-card{transform:none}
+.am-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.am-head b{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.am-msg{font-size:13px;color:var(--ink2);line-height:1.6;margin:-4px 0 14px}
+#amInput{width:100%;background:transparent;border:1px solid var(--line);border-radius:10px;padding:10px 13px;font-family:var(--f-serif);font-size:15px;color:var(--ink);outline:none;transition:border-color .2s}
+#amInput:focus{border-color:var(--accent)}
+.am-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
+#editor h1{letter-spacing:-.02em;text-wrap:balance}
+#editor blockquote{border-radius:0 var(--r-sm) var(--r-sm) 0}
+#editor .wiki{border-radius:3px;padding:0 1px}
+.wm-card{animation:pop .3s cubic-bezier(.2,.75,.2,1) both}
+#wikiViewModal.on .wv-inner{animation:pop .34s cubic-bezier(.2,.75,.2,1) both}
+#dayModal.on .dm-card{animation:pop .3s cubic-bezier(.2,.75,.2,1) both}
+@keyframes viewIn{from{opacity:0}to{opacity:1}}
+.view-in{animation:viewIn .45s ease both}
