@@ -168,6 +168,7 @@ function askPasswordForUser(u){
       authError('');
       u.lastLogin=Date.now();saveAccounts();
       enterApp(u);
+      syncLogin(u,p);
     });
   });
 }
@@ -231,6 +232,16 @@ function doSignup(){
     saveAccounts();
     if(isFirst)migrateLegacyData(u.id);
     enterApp(u);
+    if(pass)syncLogin(u,pass);
+  });
+}
+/* серверный вход/регистрация (20-sync.js); при недоступности сервера — тихий переход в локальный режим */
+function syncLogin(u,pass){
+  if(typeof Sync==='undefined'||!Sync||!Sync.join)return;
+  Sync.join(u.login,u.name||u.login,pass).then(function(r){
+    if(r.ok){Sync.afterStart();return}
+    if(r.reason==='offline')toast('Сервер недоступен — книги сохраняются локально');
+    else toast('Сервер не принял @'+u.login+' — работаем локально');
   });
 }
 function enterApp(u){
@@ -258,6 +269,7 @@ function openAccMenu(anchor){
     '<div class="acc-head"><div class="an"></div><div class="al"></div></div>'+
     '<div class="acc-stat"><span>книг</span><b>'+fmt(nb)+'</b></div>'+
     '<div class="acc-stat"><span>слов всего</span><b>'+fmt(tw)+'</b></div>'+
+    '<div class="acc-stat"><span>синхронизация</span><b>'+((typeof Sync!=='undefined'&&Sync.mode==='server')?'вкл':'локально')+'</b></div>'+
     '<button class="bm-item" data-a="pass"><span class="bm-badge">✱</span><span class="t">Сменить пароль</span></button>'+
     '<button class="bm-item" data-a="switch"><span class="bm-badge">⇄</span><span class="t">Сменить профиль</span></button>'+
     '<button class="bm-item" data-a="logout"><span class="bm-badge">⎋</span><span class="t">Выйти</span></button>'+
@@ -277,6 +289,7 @@ function accAction(a){
   if(a==='logout'||a==='switch'){
     try{commitNow()}catch(e){}
     try{persist()}catch(e){}
+    try{if(typeof Sync!=='undefined'&&Sync.logout)Sync.logout()}catch(e){}
     accounts.session=null;saveAccounts();
     setTimeout(function(){location.reload()},60);
     return;

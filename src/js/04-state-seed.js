@@ -91,7 +91,7 @@ function load(){
   }catch(e){}
   return seed();
 }
-function persist(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(e){}}
+function persist(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(e){}if(typeof Sync!=='undefined'&&Sync.markDirty)Sync.markDirty()}
 
 function initState(){
   state=load();
@@ -169,7 +169,9 @@ function normalizeState(s){
   };
 }
 
-function book(){return state.books.find(function(b){return b.id===state.activeBookId})}
+/* foreignDoc — чужая книга ВНЕ state.books: не попадает в persist/экспорт/бэкап */
+var foreignDoc=null,foreignMeta={};
+function book(){if(foreignDoc)return foreignDoc;return state.books.find(function(b){return b.id===state.activeBookId})}
 function currentCh(){var b=book();if(!b||!b.chapters.length)return null;return b.chapters.find(function(c){return c.id===b.current})||b.chapters[0]}
 function chapterTitle(ch){var h=tmp(ch.html).querySelector('h1');var t=h?h.textContent.trim():'';return t||(isNotesCh(ch)?'Заметки':'Без названия')}
 function chapterWords(ch){return countWords(tmp(ch.html).textContent)}

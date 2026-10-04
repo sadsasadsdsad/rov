@@ -309,6 +309,7 @@ function renderWiki(){
   });
 }
 function openWikiModal(id,prefill){
+  if(isReadOnly()){toast('Чужая книга — только чтение');return}
   editingWikiId=id||null;
   var en=id?wikiById(id):null;
   if($('#wikiModal')._dragReset)$('#wikiModal')._dragReset();

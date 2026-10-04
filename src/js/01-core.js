@@ -27,6 +27,7 @@ var WIKI_TYPES=[
 ];
 function $(s){return document.querySelector(s)}
 function isReader(){return document.body.classList.contains('reader')}
+function isReadOnly(){return document.body.classList.contains('ro')}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 var editor=$('#editor'), scroller=$('#scroller'), list=$('#chlist'),
     selbar=$('#selbar'), synbar=$('#synbar'), menu=$('#blockmenu'),

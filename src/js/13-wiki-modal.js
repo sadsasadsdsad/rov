@@ -15,6 +15,7 @@ $('#wikiModal').addEventListener('click',function(e){if(e.target===this)closeWik
 $('#wmName').addEventListener('input',updateWikiPreview);
 $('#wmAliases').addEventListener('input',updateWikiPreview);
 $('#wmSave').addEventListener('click',function(){
+  if(isReadOnly())return;
   var b=book();if(!b)return;
   b.wiki=Array.isArray(b.wiki)?b.wiki:[];
   var name=$('#wmName').value.trim();
@@ -32,6 +33,7 @@ $('#wmSave').addEventListener('click',function(){
   toast('Статья сохранена');
 });
 $('#wmDelete').addEventListener('click',function(){
+  if(isReadOnly())return;
   var b=book();if(!b||!editingWikiId)return;
   var en=wikiById(editingWikiId);
   uiConfirm('Удалить статью?','«'+(en?en.name:'')+'» исчезнет из энциклопедии.',true).then(function(ok){

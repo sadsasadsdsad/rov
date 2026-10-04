@@ -144,6 +144,7 @@ function jumpToNote(n){
   },120);
 }
 function editNote(n){
+  if(isReadOnly())return;
   var b=book();if(!b)return;
   var ch=b.chapters.filter(function(c){return c.id===n.chId})[0];if(!ch)return;
   uiAsk({title:'Заметка',value:n.text,placeholder:'текст заметки',input:true,ok:'СОХРАНИТЬ'}).then(function(v){
@@ -160,6 +161,7 @@ function editNote(n){
   });
 }
 function deleteNote(n){
+  if(isReadOnly())return;
   var b=book();if(!b)return;
   var ch=b.chapters.filter(function(c){return c.id===n.chId})[0];if(!ch)return;
   uiConfirm('Удалить заметку?','Текст врезки будет стёрт безвозвратно.',true).then(function(ok){
@@ -175,6 +177,7 @@ function deleteNote(n){
   });
 }
 function insertNoteAtCursor(){
+  if(isReadOnly())return;
   var b=book(),ch=currentCh();
   if(!b||!ch){toast('Откройте главу');return}
   var block=null;

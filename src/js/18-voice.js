@@ -283,7 +283,7 @@ function micStop(){
   micSetUI(false);
   if(wasOn)toast('Диктовка остановлена');
 }
-function micToggle(){(micOn||micWanted)?micStop():micStart()}
+function micToggle(){if(isReadOnly()){toast('Чужая книга — только чтение');return}(micOn||micWanted)?micStop():micStart()}
 
 btnVoice.addEventListener('mousedown',function(e){e.preventDefault()});
 btnVoice.addEventListener('click',micToggle);

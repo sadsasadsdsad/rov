@@ -104,6 +104,7 @@ var selbarButtons=selbar.querySelectorAll('.sb-row button');
 selbarButtons.forEach(function(b){
   b.addEventListener('mousedown',function(e){e.preventDefault()});
   b.addEventListener('click',function(){
+    if(isReadOnly())return;
     if(b.dataset.cmd==='wiki'){
       var t=getSelection().toString().replace(/\s+/g,' ').trim().slice(0,60);
       if(t)openWikiModal(null,t);
@@ -123,7 +124,7 @@ function captureSelectionRange(){
   return false;
 }
 function replaceSelectionWith(word){
-  if(!activeSelRange)return;
+  if(!activeSelRange||isReadOnly())return;
   try{
     var r=activeSelRange.cloneRange();
     r.deleteContents();
@@ -282,7 +283,7 @@ document.addEventListener('selectionchange',function(){
 scroller.addEventListener('scroll',function(){selbar.classList.remove('on');hideSynbar()});
 
 editor.addEventListener('keydown',function(e){
-  if(isReader())return;
+  if(isReader()||isReadOnly())return;
   if(selectedSep&&(e.key==='Delete'||e.key==='Backspace')){
     e.preventDefault();selectedSep.remove();selectedSep=null;scheduleSave();return;
   }
@@ -354,6 +355,7 @@ editor.addEventListener('input',function(){
 
 editor.addEventListener('paste',function(e){
   e.preventDefault();
+  if(isReadOnly())return;
   var t=(e.clipboardData||window.clipboardData).getData('text/plain');
   if(t)document.execCommand('insertText',false,t);
 });
@@ -361,7 +363,7 @@ editor.addEventListener('paste',function(e){
 editor.addEventListener('click',function(e){
   var wsp=e.target.closest('.wiki');
   if(wsp){openWikiView(wsp.dataset.wiki);return}
-  if(isReader())return;
+  if(isReader()||isReadOnly())return;
   var s=e.target.closest('.sep');
   if(selectedSep){selectedSep.classList.remove('selected');selectedSep=null}
   if(s){
@@ -372,7 +374,7 @@ editor.addEventListener('click',function(e){
   }
 });
 scroller.addEventListener('click',function(e){
-  if(isReader())return;
+  if(isReader()||isReadOnly())return;
   if(e.target!==scroller&&e.target!==editor)return;
   caretEnd(ensureLastP());editor.focus();
 });
@@ -399,21 +401,28 @@ function updateStats(){
 }
 function rememberPos(){var b=book();if(!b)return;var ch=currentCh();if(ch)ch.pos=scroller.scrollTop}
 function commitNow(){
+  if(isReadOnly())return;
   var b=book();
   if(b&&workspace.hidden===false){
+    var ch=currentCh();
+    var oldHtml=ch?ch.html:null;
     rememberPos();
-    var ch=currentCh();if(ch)ch.html=cleanHtml();
-    b.updated=Date.now();snapshotStats();persist();
+    if(ch){ch.html=cleanHtml();if(ch.html!==oldHtml)b.updated=Date.now()}
+    snapshotStats();persist();
   }
 }
 function scheduleSave(){
+  if(isReadOnly()){saveTxt.textContent='Только чтение';return}
   saveTxt.textContent='Сохранение…';
   clearTimeout(saveTimer);
   saveTimer=setTimeout(function(){
     var b=book();if(!b)return;
     rememberPos();
-    var ch=currentCh();if(ch)ch.html=cleanHtml();
-    b.updated=Date.now();snapshotStats();
+    var ch=currentCh();
+    var oldHtml=ch?ch.html:null;
+    if(ch)ch.html=cleanHtml();
+    if(ch&&ch.html!==oldHtml)b.updated=Date.now();
+    snapshotStats();
     persist();invalidateCo();renderList(false);
     if($('#wikiPanel').classList.contains('on')){
       if(panelTab==='world')renderWiki();
@@ -484,7 +493,7 @@ function clearDropMarks(){
   list.classList.remove('drop-end');
 }
 function moveChapter(id,dir){
-  var b=book();if(!b)return;
+  var b=book();if(!b||isReadOnly())return;
   var arr=b.chapters;
   var i=arr.findIndex(function(x){return x.id===id});
   var j=i+dir;if(i<0||j<0||j>=arr.length)return;
@@ -492,7 +501,7 @@ function moveChapter(id,dir){
   persist();renderList(false);updateStats();
 }
 function dropAtEnd(){
-  var b=book();if(!b||!dragChId)return;
+  var b=book();if(!b||!dragChId||isReadOnly())return;
   var arr=b.chapters;
   var from=arr.findIndex(function(x){return x.id===dragChId});
   if(from>=0&&from<arr.length-1){
@@ -546,9 +555,9 @@ function renderList(animate){
     var el=mk('div');
     el.className='ch'+(ch.id===b.current?' active':'')+(animate?' boot':'')+(isNotes?' notes-ch':'');
     if(animate)el.style.animationDelay=(i*35)+'ms';
-    el.draggable=true;
+    el.draggable=!isReadOnly();
     el.innerHTML='<span class="num">'+(isNotes?'✎':String(i+1).padStart(2,'0'))+'</span><span class="ttl"></span><span class="wc"></span>'+
-      (isNotes?'':'<button class="del" title="Удалить главу">×</button>');
+      (isNotes||isReadOnly()?'':'<button class="del" title="Удалить главу">×</button>');
     el.querySelector('.ttl').textContent=chapterTitle(ch);
     el.querySelector('.wc').textContent=isNotes?'—':fmt(w);
     el.addEventListener('click',function(){openChapter(ch.id)});
@@ -673,7 +682,7 @@ function loadChapter(c){
 }
 function openChapter(id,skipSave){
   var b=book();if(!b)return;
-  if(!skipSave){var prev=currentCh();if(prev){prev.html=cleanHtml();prev.pos=scroller.scrollTop}}
+  if(!skipSave){var prev=currentCh();if(prev){if(!isReadOnly())prev.html=cleanHtml();prev.pos=scroller.scrollTop}}
   closeMenu();selbar.classList.remove('on');hideSynbar();
   b.current=id;
   loadChapter(currentCh());
@@ -682,6 +691,7 @@ function openChapter(id,skipSave){
   updatePanelTabs();
 }
 $('#addCh').addEventListener('click',function(){
+  if(isReadOnly())return;
   var b=book();if(!b)return;
   var ch=currentCh();if(ch){ch.html=cleanHtml();ch.pos=scroller.scrollTop}
   var n={id:uid(),html:'<h1></h1><p></p>',pos:0,marks:[]};
@@ -689,6 +699,7 @@ $('#addCh').addEventListener('click',function(){
   editor.focus();caretStart(editor.querySelector('h1'));
 });
 $('#bookTitle').addEventListener('input',function(){
+  if(isReadOnly())return;
   var b=book();if(!b)return;
   b.title=$('#bookTitle').value;updateCrumb();scheduleSave();
 });
@@ -717,7 +728,11 @@ function renderBookView(){
   if(w)pills+='<span class="bv-pill">≈ <b>'+min+'</b> '+plural(min,'минута','минуты','минут')+' чтения</span>';
   if(notesCount)pills+='<span class="bv-pill">✎ <b>'+notesCount+'</b> '+plural(notesCount,'заметка','заметки','заметок')+'</span>';
   $('#bvDesc').innerHTML=pills;
-  $('#bvStats').textContent=b.updated?('изменено '+timeAgo(b.updated)):'';
+  $('#bvStats').innerHTML=isReadOnly()
+    ? '<span class="ro-badge">чтение</span>'+esc((foreignMeta&&foreignMeta.line)||'автор не указан')
+    :(b.updated?esc('изменено '+timeAgo(b.updated)):'');
+  var bvOpenBtn=$('#bvOpen');
+  if(bvOpenBtn)bvOpenBtn.title=isReadOnly()?'Читать':'Открыть в редакторе';
   bvGrid.innerHTML='';
   var displayIdx=0;
   b.chapters.forEach(function(ch,i){
@@ -748,19 +763,22 @@ function renderBookView(){
     card.addEventListener('keydown',function(e){if(e.key==='Enter')enterEditor(ch.id)});
     bvGrid.appendChild(card);
   });
-  var nc=mk('button');
-  nc.className='bv-card new';
-  nc.style.animationDelay=(b.chapters.length*45)+'ms';
-  nc.innerHTML='<span class="nc-dia"></span><span class="nc-t">Новая глава</span>';
-  nc.addEventListener('click',function(){
-    var b2=book();if(!b2)return;
-    var n={id:uid(),html:'<h1></h1><p></p>',pos:0,marks:[]};
-    b2.chapters.push(n);persist();
-    enterEditor(n.id);
-    editor.focus();caretStart(editor.querySelector('h1'));
-  });
-  bvGrid.appendChild(nc);
+  if(!isReadOnly()){
+    var nc=mk('button');
+    nc.className='bv-card new';
+    nc.style.animationDelay=(b.chapters.length*45)+'ms';
+    nc.innerHTML='<span class="nc-dia"></span><span class="nc-t">Новая глава</span>';
+    nc.addEventListener('click',function(){
+      var b2=book();if(!b2||isReadOnly())return;
+      var n={id:uid(),html:'<h1></h1><p></p>',pos:0,marks:[]};
+      b2.chapters.push(n);persist();
+      enterEditor(n.id);
+      editor.focus();caretStart(editor.querySelector('h1'));
+    });
+    bvGrid.appendChild(nc);
+  }
   document.title=(b.title||'Без названия')+' — Черновик';
+  if(typeof renderBookAccess==='function')renderBookAccess();
 }
 function chapterExcerpt(ch,maxBlocks){
   var d=tmp(ch.html),out=[];
@@ -780,22 +798,24 @@ function enterEditor(chId){
   var b=book();if(!b)return;
   b.wiki=Array.isArray(b.wiki)?b.wiki:[];
   b.customTypes=Array.isArray(b.customTypes)?b.customTypes:[];
-  if(!b.chapters.length){
+  if(!b.chapters.length&&!isReadOnly()){
     var c0={id:uid(),html:'<h1></h1><p></p>',pos:0,marks:[]};
     b.chapters.push(c0);b.current=c0.id;
   }
   if(chId)b.current=chId;
-  if(!b.chapters.some(function(c){return c.id===b.current}))b.current=b.chapters[0].id;
+  if(!b.chapters.some(function(c){return c.id===b.current})&&b.chapters.length)b.current=b.chapters[0].id;
   $('#bookTitle').value=b.title||'';
   library.hidden=true;bookView.hidden=true;
   setWorkspaceVisible(true);
   viewIn(workspace);
-  loadChapter(currentCh());
+  loadChapter(currentCh()||{id:null,html:'<p></p>',pos:0,marks:[]});
   renderList(false);updateCrumb();updateStats();persist();
   setTimeout(positionEdRz,60);
-  if(isReader())showReaderUi();else editor.focus();
+  if(isReadOnly()){editor.contentEditable='false';saveTxt.textContent='Только чтение';hideSynbar();selbar.classList.remove('on')}
+  else if(isReader())showReaderUi();else editor.focus();
 }
 $('#bvBack').addEventListener('click',function(){
+  if(typeof closeForeignBook==='function')closeForeignBook();
   bookView.hidden=true;library.hidden=false;library.scrollTop=0;viewIn(library);renderLibrary();
   renderMarksRail();
 });
@@ -874,6 +894,7 @@ function createBook(){
 }
 function viewIn(el){el.classList.remove('view-in');void el.offsetWidth;el.classList.add('view-in')}
 function toLibrary(){
+  if(typeof closeForeignBook==='function')closeForeignBook();
   commitNow();
   closeMenu();selbar.classList.remove('on');hideSynbar();clearSearch();
   toggleWikiPanel(false);hideMarkTip();
@@ -1125,7 +1146,7 @@ document.addEventListener('keydown',function(e){
     if(searchOpen){hideSearchResults();return}
     if(document.activeElement===$('#spInput')){clearSearch();$('#spInput').blur();return}
     if($('#wikiPanel').classList.contains('on')){toggleWikiPanel(false);return}
-    if(!bookView.hidden){bookView.hidden=true;library.hidden=false;viewIn(library);renderLibrary();renderMarksRail();return}
+    if(!bookView.hidden){if(typeof closeForeignBook==='function')closeForeignBook();bookView.hidden=true;library.hidden=false;viewIn(library);renderLibrary();renderMarksRail();return}
     if(menuOpen){closeMenu();return}
     if(document.body.classList.contains('zen'))toggleZen();
   }

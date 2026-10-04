@@ -38,6 +38,7 @@ function resolveMarkPos(ch,mark){
   return Math.min(Math.max(0,mark.pos|0),text.length);
 }
 function createMarkAtCursor(){
+  if(isReadOnly())return;
   var b=book();if(!b)return;
   var ch=currentCh();if(!ch)return;
   var pos=null;
@@ -65,6 +66,7 @@ function createMarkAtCursor(){
   });
 }
 function deleteMark(chapterId,markId){
+  if(isReadOnly())return;
   var b=book();if(!b)return;
   var ch=b.chapters.find(function(c){return c.id===chapterId});if(!ch||!ch.marks)return;
   var mark=ch.marks.find(function(m){return m.id===markId});if(!mark)return;

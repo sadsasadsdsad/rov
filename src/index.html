@@ -4,21 +4,22 @@
   веб-редактор рукописей). Полный обзор структуры — в README.md рядом.
 
   Структура файла:
-    <head>  — мета-теги, шрифты и 8 <link href="css/NN-*.css">;
+    <head>  — мета-теги, шрифты и 11 <link href="css/NN-*.css">;
               порядок подключения = порядок каскада оригинала;
-    <body>  — та же разметка, что в src/index.html: библиотека, карточка
-              книги, рабочая область (aside/#topbar/#editor/#statusbar),
-              модалки, экран авторизации;
-    перед </body> — 19 последовательных классических <script src="js/NN-*.js">
+    <body>  — библиотека (+ вкладки «Мои книги»/«Общие книги»), карточка
+              книги (+ блок «Доступ»), рабочая область, модалки, авторизация;
+    перед </body> — 22 последовательных классических <script src="js/NN-*.js">
               (строгий режим в каждом, подключаются строго по номеру):
-              01-ядро … 15-редактор, 16-аккаунты, 17-boot,
-              18-voice — диктовка, 19-mobile-reader — режим чтения
-              на телефоне (добавлены в tests/, в оригинале нет).
+              01-ядро … 15-редактор, 16-аккаунты, 17-boot, 18-voice,
+              19-mobile-reader — читалка ≤880px, 20-sync — серверная
+              синхронизация, 21-shared — чужие книги (только чтение),
+              доступ и hash-роут #/read/.
 
   Добавлено относительно src: #btnVoice/#micPill (голосовой ввод),
-  <div id="veil"> перенесён внутрь #workspace (корректное наложение
-  шторки глав), js/18-voice.js, читалка для ≤880px: #rdTop/#rdHud/
-  #rdSheet/#rdScrim + css/09-mobile-reader.css, js/19-mobile-reader.js.
+  <div id="veil"> перенесён внутрь #workspace, js/18-voice.js,
+  читалка для ≤880px, общий доступ (css/10-shared.css, js/21-shared.js),
+  синхронизация (js/20-sync.js), каталог чужих книг и доступ к своей
+  книге (css/11-access.css).
 -->
 <html lang="ru" data-theme="light">
 <head>
@@ -39,6 +40,8 @@
 <link rel="stylesheet" href="css/07-wiki-modals.css">
 <link rel="stylesheet" href="css/08-responsive-auth.css">
 <link rel="stylesheet" href="css/09-mobile-reader.css">
+<link rel="stylesheet" href="css/10-shared.css">
+<link rel="stylesheet" href="css/11-access.css">
 </head>
 <body>
 
@@ -150,6 +153,14 @@
       </div>
       <div class="chart-legend" id="statsLegend"></div>
     </div>
+    <div class="lib-tabs" id="libTabs">
+      <button type="button" class="on" data-t="mine">Мои книги</button>
+      <button type="button" data-t="shared">Общие книги</button>
+    </div>
+    <div class="shared-box" id="sharedBox" hidden>
+      <input id="sharedSearch" type="search" placeholder="Поиск по названию или автору" autocomplete="off">
+      <div class="shared-list" id="sharedList"></div>
+    </div>
     <div class="shelf" id="shelf"></div>
     <div class="lib-foot">
       все рукописи хранятся локально · делайте резервные копии
@@ -183,6 +194,18 @@
       <div class="bv-title-row"><span class="wv-dia"></span><h1 id="bvTitle"></h1><span class="bv-type">книга</span></div>
       <div class="bv-desc" id="bvDesc"></div>
       <div class="bv-stats" id="bvStats"></div>
+      <div class="bv-access" id="bvAccess" hidden>
+        <span class="lbl lbl-acc">Доступ</span>
+        <div class="vis-seg" id="bvVis">
+          <button type="button" data-v="private">закрыта</button>
+          <button type="button" data-v="unlisted">по ссылке</button>
+          <button type="button" data-v="public">публичная</button>
+        </div>
+        <div class="share-row" id="bvShareRow" hidden>
+          <input id="bvShareLink" readonly spellcheck="false">
+          <button type="button" class="m-btn" id="bvShareCopy">Копировать</button>
+        </div>
+      </div>
     </div>
     <div class="bv-sec"><span class="lbl lbl-acc">Главы и их начало</span></div>
     <div class="bv-grid" id="bvGrid"></div>
@@ -211,7 +234,7 @@
         <button class="ibtn" id="btnSide" title="Скрыть панель глав">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
         </button>
-        <div class="crumb"><b id="crumbBook"></b><span class="cd"></span><span id="crumbCh"></span></div>
+        <div class="crumb"><b id="crumbBook"></b><span class="cd"></span><span id="crumbCh"></span><span class="ro-badge" id="roBadge" hidden>чтение</span></div>
       </div>
       <div class="tb-center">
         <label class="tb-search" id="tbSearch">
@@ -550,5 +573,7 @@
 <script src="js/17-start.js"></script>
 <script src="js/18-voice.js"></script>
 <script src="js/19-mobile-reader.js"></script>
+<script src="js/20-sync.js"></script>
+<script src="js/21-shared.js"></script>
 </body>
 </html>
