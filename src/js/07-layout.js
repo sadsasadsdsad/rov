@@ -23,6 +23,7 @@ function positionEdRz(){
 }
 function setWorkspaceVisible(v){
   workspace.hidden=!v;
+  if(!v&&typeof hideReaderUi==='function')hideReaderUi();
 }
 function dragX(handle,onMove){
   var active=false,lx=0;

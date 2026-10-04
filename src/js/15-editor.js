@@ -216,6 +216,7 @@ synRetry.addEventListener('click',function(e){
 });
 
 function refreshFloats(){
+  if(isReader()){selbar.classList.remove('on');hideSynbar();return}
   var s=getSelection(),showBar=false;
   if(s.rangeCount&&editor.contains(s.anchorNode)&&!s.isCollapsed){
     var txt=s.toString().trim();
@@ -281,6 +282,7 @@ document.addEventListener('selectionchange',function(){
 scroller.addEventListener('scroll',function(){selbar.classList.remove('on');hideSynbar()});
 
 editor.addEventListener('keydown',function(e){
+  if(isReader())return;
   if(selectedSep&&(e.key==='Delete'||e.key==='Backspace')){
     e.preventDefault();selectedSep.remove();selectedSep=null;scheduleSave();return;
   }
@@ -359,6 +361,7 @@ editor.addEventListener('paste',function(e){
 editor.addEventListener('click',function(e){
   var wsp=e.target.closest('.wiki');
   if(wsp){openWikiView(wsp.dataset.wiki);return}
+  if(isReader())return;
   var s=e.target.closest('.sep');
   if(selectedSep){selectedSep.classList.remove('selected');selectedSep=null}
   if(s){
@@ -369,6 +372,7 @@ editor.addEventListener('click',function(e){
   }
 });
 scroller.addEventListener('click',function(e){
+  if(isReader())return;
   if(e.target!==scroller&&e.target!==editor)return;
   caretEnd(ensureLastP());editor.focus();
 });
@@ -665,6 +669,7 @@ function loadChapter(c){
   applyMarks(false);
   scroller.scrollTop=(typeof c.pos==='number')?c.pos:0;
   positionEdRz();
+  updateReaderChrome();
 }
 function openChapter(id,skipSave){
   var b=book();if(!b)return;
@@ -788,7 +793,7 @@ function enterEditor(chId){
   loadChapter(currentCh());
   renderList(false);updateCrumb();updateStats();persist();
   setTimeout(positionEdRz,60);
-  editor.focus();
+  if(isReader())showReaderUi();else editor.focus();
 }
 $('#bvBack').addEventListener('click',function(){
   bookView.hidden=true;library.hidden=false;library.scrollTop=0;viewIn(library);renderLibrary();
@@ -922,13 +927,17 @@ function toggleZen(){
 function setTheme(t){
   document.documentElement.dataset.theme=t;state.theme=t;
   document.querySelectorAll('.ic-sun').forEach(function(i){i.style.display=(t==='light')?'':'none'});
+  document.querySelectorAll('.ic-sepia').forEach(function(i){i.style.display=(t==='sepia')?'':'none'});
   document.querySelectorAll('.ic-moon').forEach(function(i){i.style.display=(t==='dark')?'':'none'});
+  var tt={light:'Тема: день',dark:'Тема: ночь',sepia:'Тема: сепия'}[t];
+  if(tt)document.querySelectorAll('.btn-theme').forEach(function(b){b.title=tt});
   persist();renderStats();
   if(!$('#paneGraph').hidden)scheduleGraph();
 }
+var THEME_NEXT={light:'dark',dark:'sepia',sepia:'light'};
 document.querySelectorAll('.btn-theme').forEach(function(b){
   b.addEventListener('click',function(){
-    setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');
+    setTheme(THEME_NEXT[document.documentElement.dataset.theme]||'dark');
   });
 });
 
@@ -1098,6 +1107,7 @@ document.addEventListener('keydown',function(e){
   if($('#dayModal').classList.contains('on')){
     if(e.key==='Escape'){e.preventDefault();closeDayModal()}return;
   }
+  if(isReader()&&(e.ctrlKey||e.metaKey||e.altKey))return;
   if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')){e.preventDefault();scheduleSave()}
   if((e.ctrlKey||e.metaKey)&&e.altKey&&(e.key==='m'||e.key==='M')&&!workspace.hidden){e.preventDefault();createMarkAtCursor();return}
   if((e.ctrlKey||e.metaKey)&&e.altKey&&(e.key==='n'||e.key==='N')&&!workspace.hidden){e.preventDefault();insertNoteAtCursor();return}

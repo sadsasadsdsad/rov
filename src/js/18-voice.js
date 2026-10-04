@@ -289,7 +289,7 @@ btnVoice.addEventListener('mousedown',function(e){e.preventDefault()});
 btnVoice.addEventListener('click',micToggle);
 micPill.addEventListener('click',micStop);
 document.addEventListener('keydown',function(e){
-  if((e.ctrlKey||e.metaKey)&&e.altKey&&(e.key==='r'||e.key==='R')){e.preventDefault();micToggle();return}
+  if((e.ctrlKey||e.metaKey)&&e.altKey&&(e.key==='r'||e.key==='R')){if(isReader())return;e.preventDefault();micToggle();return}
   if(e.key==='Escape'&&micOn)micStop();
 });
 document.addEventListener('visibilitychange',function(){if(document.hidden&&micOn)micFatal('')});

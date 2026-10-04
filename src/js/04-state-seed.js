@@ -143,7 +143,7 @@ function ensureMarksOnChapters(st){
 function normalizeState(s){
   if(!s||!Array.isArray(s.books))return null;
   return {
-    v:2,theme:(s.theme==='dark')?'dark':'light',zen:false,spell:false,
+    v:2,theme:(s.theme==='dark'||s.theme==='sepia')?s.theme:'light',zen:false,spell:false,
     activeBookId:null,heroes:Array.isArray(s.heroes)?s.heroes:[],
     ui:(s.ui&&typeof s.ui==='object')?s.ui:{},
     stats:(s.stats&&typeof s.stats==='object')?s.stats:{},

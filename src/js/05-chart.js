@@ -18,6 +18,7 @@ function niceMaxFor(v){
   return Math.ceil(v/500)*500;
 }
 function renderStats(){
+  if(!state||!Array.isArray(state.books))return;   /* чистый профиль: до входа state не создан */
   var svg=$('#statsSvg'),plot=$('#statsPlot');
   var svgLines=$('#statsLines'),
       grid=$('#statsGrid'),legend=$('#statsLegend'),

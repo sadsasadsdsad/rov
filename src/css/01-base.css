@@ -3,7 +3,7 @@
  * Проект: «Черновик» — веб-редактор рукописей. tests/ — разобранная копия
  *   src/index.html: 8 CSS-файлов, порядок правил = каскаду оригинала.
  * Раздел оригинала: src/index.html, строки 13–80 (файл 1 из 8).
- * Что описывает: токены :root (цвета, шрифты, тени, радиусы), тёмная тема [data-theme=dark], сброс, скроллбары, подписи .lbl, логотип .brand, кнопки .ibtn/.sibtn.
+ * Что описывает: токены :root (цвета, шрифты, тени, радиусы), тёмная тема [data-theme=dark], сепия [data-theme=sepia], сброс, скроллбары, подписи .lbl, логотип .brand, кнопки .ibtn/.sibtn.
  * Ключевое: :root, [data-theme=dark], .ibtn, .ibtn.on, #btnVoice.on/.unsup, .sibtn, .lbl, .brand.
  * Порядок: подключается ПЕРВЫМ — все переменные отсюда.
  * ========================================================================== */
@@ -37,6 +37,19 @@
   --card-glass:rgba(32,29,24,.82);
   --panel-glass:rgba(19,17,16,.92);
   --veil-glass:rgba(10,9,7,.52);
+}
+[data-theme="sepia"]{
+  --bg:#f2e6cf; --panel:#ebdcc2; --card:#f8eedb; --glow:rgba(255,250,238,.55);
+  --ink:#3a3024; --ink2:#6b5c46; --ink3:#9b8a70;
+  --line:rgba(58,48,36,.2); --line2:rgba(58,48,36,.11);
+  --accent:#b0642c; --sel:rgba(176,100,44,.18);
+  --hover:rgba(58,48,36,.07);
+  --neg:#4d7a4a;
+  --shadow:0 14px 34px rgba(58,48,36,.18);
+  --shadow-sm:0 1px 2px rgba(58,48,36,.08),0 8px 20px -14px rgba(58,48,36,.35);
+  --card-glass:rgba(248,238,219,.85);
+  --panel-glass:rgba(235,220,194,.94);
+  --veil-glass:rgba(242,230,207,.55);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 *[hidden]{display:none!important}

@@ -25,6 +25,7 @@ function startApp(user){
   setLayoutVars();
   setTheme(state.theme||'light');
   if(state.zen){document.body.classList.add('zen');$('#btnZen').classList.add('on')}
+  if(typeof applyReaderMode==='function')applyReaderMode();
   snapshotStats();persist();
   library.hidden=false;
   setWorkspaceVisible(false);

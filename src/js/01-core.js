@@ -26,6 +26,7 @@ var WIKI_TYPES=[
   {k:'other',t:'Другое',s:'Другое',color:'#6a5f4c'}
 ];
 function $(s){return document.querySelector(s)}
+function isReader(){return document.body.classList.contains('reader')}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 var editor=$('#editor'), scroller=$('#scroller'), list=$('#chlist'),
     selbar=$('#selbar'), synbar=$('#synbar'), menu=$('#blockmenu'),
