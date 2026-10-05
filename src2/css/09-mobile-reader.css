@@ -1,0 +1,157 @@
+/* ==========================================================================
+ * 09-mobile-reader.css — ЧИТАЛКА для телефона (≤880px)
+ * Проект: «Черновик» — веб-редактор рукописей. tests/ — разобранная копия
+ *   src/index.html: 9 CSS-файлов, порядок правок = каскаду оригинала.
+ * Что описывает: мобильную версию как читалку (по образцу Яндекс Книг):
+ *   упрощённая библиотека и оглавление, скрытие всего редакторского хрома,
+ *   панели #rdTop/#rdHud (появляются по тапу, гаснут при скролле), шит
+ *   настроек #rdSheet (тема/шрифт/интерлиньяж/поля/выравнивание),
+ *   типографика чтения.
+ * Ключевое: @media (max-width:880px), body.reader, #rdTop, #rdHud, #rdSheet,
+ *   #rdSeek, --rd-fs / --rd-lh / --rd-pad / --rd-align / --rd-hyph.
+ * Порядок: подключается ПОСЛЕДНИМ (после 08) — перекрывает более ранние правила.
+ * ========================================================================== */
+
+/* вне мобильного брейкпоинта читалка не показывается вовсе */
+#rdTop,#rdHud,#rdSheet,#rdScrim{display:none}
+
+@media (max-width:880px){
+
+  /* ===== библиотека: только полка, без статистики и мишуры ===== */
+  .stats-panel{display:none}
+  .cv-tools{display:none}
+  .cover.new{display:none}
+  .lib-foot .path{display:none}
+  .lib-body{padding:26px 18px 56px}
+  .lib-head{padding-bottom:18px}
+
+  /* ===== оглавление книги: чистый список глав ===== */
+  .bv-body{padding:24px 16px 48px}
+  .bv-desc,.bv-stats,.bv-ex,.bv-meta,.bv-card.new,#bvOpen{display:none}
+  .bv-sec{margin-top:20px}
+  .bv-grid{grid-template-columns:1fr;gap:8px;margin-top:12px}
+  .bv-card{padding:12px 14px 11px;gap:3px}
+  .bv-ct{font-size:14.5px}
+
+  /* ===== режим чтения: редакторский хром выключен ===== */
+  body.reader #topbar,
+  body.reader #statusbar,
+  body.reader aside,
+  body.reader #veil,
+  body.reader #edRz,
+  body.reader #marksRail,
+  body.reader #selbar,
+  body.reader #synbar,
+  body.reader #blockmenu,
+  body.reader #zenpill,
+  body.reader #micPill,
+  body.reader #spResults,
+  body.reader #exportMenu,
+  body.reader #wikiPanel{display:none!important}
+
+  body.reader #scroller{scrollbar-width:none}
+  body.reader #scroller::-webkit-scrollbar{width:0;height:0}
+
+  /* ===== типографика чтения ===== */
+  body.reader #editor{
+    max-width:42rem;
+    padding-top:calc(54px + env(safe-area-inset-top));
+    padding-bottom:calc(124px + env(safe-area-inset-bottom));
+    padding-left:var(--rd-pad,22px);
+    padding-right:var(--rd-pad,22px);
+    font-size:var(--rd-fs,17px);
+    line-height:var(--rd-lh,1.85);
+    text-align:var(--rd-align,left);
+    -webkit-hyphens:var(--rd-hyph,manual);hyphens:var(--rd-hyph,manual);
+  }
+  body.reader #editor p:only-child:empty::before{content:none}
+  body.reader #editor .sep:hover{background:transparent}
+  body.reader #editor .wiki:hover{background:transparent}
+  body.reader #editor h1{font-size:1.72em}
+
+  /* ===== верхняя панель ===== */
+  body.reader #rdTop{
+    display:flex;align-items:center;gap:8px;
+    position:fixed;top:0;left:0;right:0;z-index:64;
+    height:calc(50px + env(safe-area-inset-top));
+    padding:env(safe-area-inset-top) 8px 0;
+    background:var(--panel-glass);
+    -webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2);
+    border-bottom:1px solid var(--line2);
+    transform:translateY(-102%);opacity:0;
+    transition:transform .28s cubic-bezier(.2,.7,.2,1),opacity .2s;
+    pointer-events:none;user-select:none;
+  }
+  body.reader.rd-ui #rdTop{transform:none;opacity:1;pointer-events:auto}
+  .rd-tt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;text-align:center}
+  .rd-tt b{font-family:var(--f-ui);font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rd-tt span{font-family:var(--f-ui);font-size:9px;letter-spacing:.06em;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rd-sp{width:34px;flex:0 0 34px}
+
+  /* ===== нижняя панель (hud) ===== */
+  body.reader #rdHud{
+    display:flex;flex-direction:column;gap:6px;
+    position:fixed;left:0;right:0;bottom:0;z-index:64;
+    padding:8px 14px calc(12px + env(safe-area-inset-bottom));
+    background:var(--panel-glass);
+    -webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2);
+    border-top:1px solid var(--line2);
+    transform:translateY(102%);opacity:0;
+    transition:transform .28s cubic-bezier(.2,.7,.2,1),opacity .2s;
+    pointer-events:none;user-select:none;
+  }
+  body.reader.rd-ui #rdHud{transform:none;opacity:1;pointer-events:auto}
+
+  #rdSeek{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin:0;display:block;padding:0}
+  #rdSeek:focus-visible{outline:none;box-shadow:0 0 0 3px var(--sel)}
+  #rdSeek:focus-visible::-webkit-slider-thumb{box-shadow:var(--shadow-sm),0 0 0 4px var(--sel)}
+  #rdSeek:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px var(--sel)}
+  #rdSeek::-webkit-slider-runnable-track{height:3px;border-radius:99px;background:linear-gradient(90deg,var(--accent) 0 var(--p,0%),var(--line2) var(--p,0%) 100%)}
+  #rdSeek::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-5.5px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);box-shadow:var(--shadow-sm)}
+  #rdSeek::-moz-range-track{height:3px;border-radius:99px;background:var(--line2)}
+  #rdSeek::-moz-range-progress{height:3px;border-radius:99px;background:var(--accent)}
+  #rdSeek::-moz-range-thumb{width:12px;height:12px;border:2px solid var(--bg);border-radius:50%;background:var(--accent)}
+
+  .rd-ctrl input[type=range]{-webkit-appearance:none;appearance:none;height:22px;background:transparent;margin:0;padding:0}
+  .rd-ctrl input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:99px;background:linear-gradient(90deg,var(--accent) 0 var(--p,0%),var(--line2) var(--p,0%) 100%)}
+  .rd-ctrl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;margin-top:-6.5px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:var(--shadow-sm)}
+  .rd-ctrl input[type=range]::-moz-range-track{height:3px;border-radius:99px;background:var(--line2)}
+  .rd-ctrl input[type=range]::-moz-range-progress{height:3px;border-radius:99px;background:var(--accent)}
+  .rd-ctrl input[type=range]::-moz-range-thumb{width:14px;height:14px;border:2px solid var(--panel);border-radius:50%;background:var(--accent)}
+
+  .rd-times{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-ui);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);padding:0 2px}
+  .rd-row{display:flex;align-items:center;gap:6px}
+  .rd-nav{flex:1;display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
+  .rd-btn{width:38px;height:34px;flex:0 0 auto;display:grid;place-items:center;border-radius:10px;color:var(--ink2);transition:background .15s,color .15s}
+  .rd-btn:active{background:var(--hover);color:var(--ink)}
+  .rd-btn svg{width:19px;height:19px;display:block}
+  .rd-btn[disabled]{opacity:.26;pointer-events:none}
+  .rd-aa{font-family:var(--f-ui);font-size:13px;font-weight:500;letter-spacing:.02em}
+  .rd-pos{flex:1;min-width:0;text-align:center;font-family:var(--f-ui);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+
+  /* ===== шит настроек «Aa» ===== */
+  #rdScrim{display:block;position:fixed;inset:0;z-index:78;background:rgba(18,15,10,.42);opacity:0;visibility:hidden;transition:opacity .25s,visibility .25s}
+  body.reader.rd-sheet #rdScrim{opacity:1;visibility:visible}
+  #rdSheet{
+    display:block;position:fixed;left:0;right:0;bottom:0;z-index:79;
+    background:var(--panel);border-top:1px solid var(--line);
+    border-radius:20px 20px 0 0;
+    padding:10px 18px calc(22px + env(safe-area-inset-bottom));
+    max-height:84vh;overflow-y:auto;overscroll-behavior:contain;
+    box-shadow:0 -20px 46px -24px rgba(0,0,0,.55);
+    transform:translateY(110%);visibility:hidden;
+    transition:transform .3s cubic-bezier(.2,.7,.2,1),visibility .3s;
+    user-select:none;
+  }
+  body.reader.rd-sheet #rdSheet{transform:none;visibility:visible}
+  .rd-handle{width:38px;height:4px;border-radius:99px;background:var(--line2);margin:2px auto 16px}
+  .rd-sec + .rd-sec{margin-top:16px}
+  .rd-sec .lbl{display:block;margin-bottom:9px}
+  .rd-seg{display:flex;gap:4px;padding:4px;background:var(--hover);border-radius:12px}
+  .rd-seg button{flex:1;padding:10px 4px;border-radius:9px;font-family:var(--f-ui);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);transition:background .16s,color .16s}
+  .rd-seg button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow-sm)}
+  .rd-ctrl{display:flex;align-items:center;gap:12px}
+  .rd-ctrl input[type=range]{flex:1;min-width:0}
+  .rd-step{flex:0 0 auto;min-width:54px;height:36px;padding:0 12px;border:1px solid var(--line2);border-radius:10px;font-family:var(--f-ui);font-size:12px;color:var(--ink2);transition:border-color .16s,color .16s,background .16s}
+  .rd-step:active{border-color:var(--accent);color:var(--accent);background:var(--sel)}
+}

@@ -1,0 +1,108 @@
+/* ==========================================================================
+ * 01-base.css — БАЗА — токены, тема, кнопки
+ * Проект: «Черновик» — веб-редактор рукописей. tests/ — разобранная копия
+ *   src/index.html: 8 CSS-файлов, порядок правил = каскаду оригинала.
+ * Раздел оригинала: src/index.html, строки 13–80 (файл 1 из 8).
+ * Что описывает: токены :root (цвета, шрифты, тени, радиусы), тёмная тема [data-theme=dark], сепия [data-theme=sepia], сброс, скроллбары, подписи .lbl, логотип .brand, кнопки .ibtn/.sibtn.
+ * Ключевое: :root, [data-theme=dark], .ibtn, .ibtn.on, #btnVoice.on/.unsup, .sibtn, .lbl, .brand.
+ * Порядок: подключается ПЕРВЫМ — все переменные отсюда.
+ * ========================================================================== */
+:root{
+  color-scheme:light;
+  -webkit-tap-highlight-color:rgba(0,0,0,0);
+  --bg:#f4f2ec; --panel:#edeadf; --card:#fbfaf5; --glow:rgba(255,255,255,.55);
+  --ink:#191712; --ink2:#57534a; --ink3:#6f6a5c;
+  --line:rgba(25,23,18,.16); --line2:rgba(25,23,18,.08);
+  --accent:#c93a2b; --sel:rgba(201,58,43,.16);
+  --hover:rgba(25,23,18,.06);
+  --neg:#3f7a52;
+  --shadow:0 14px 34px rgba(25,23,18,.16);
+  --shadow-sm:0 1px 2px rgba(25,23,18,.06),0 8px 20px -14px rgba(25,23,18,.35);
+  --card-glass:rgba(251,250,245,.82);
+  --panel-glass:rgba(237,234,223,.93);
+  --veil-glass:rgba(244,242,236,.5);
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:18px;
+  --side-w:272px; --wiki-w:390px; --ed-w:660px;
+  --f-serif:'Literata',Georgia,'Times New Roman',serif;
+  --f-ui:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --f-disp:'Unbounded',var(--f-ui);
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#161411; --panel:#1b1815; --card:#221e19; --glow:rgba(255,255,255,.03);
+  --ink:#ece7d8; --ink2:#b8b1a1; --ink3:#8d8778;
+  --line:rgba(233,228,214,.2); --line2:rgba(233,228,214,.1);
+  --accent:#ff6a52; --sel:rgba(255,106,82,.24);
+  --hover:rgba(233,228,214,.08);
+  --neg:#5da678;
+  --shadow:0 16px 40px rgba(0,0,0,.55);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4),0 10px 24px -14px rgba(0,0,0,.6);
+  --card-glass:rgba(32,29,24,.82);
+  --panel-glass:rgba(19,17,16,.92);
+  --veil-glass:rgba(10,9,7,.52);
+}
+[data-theme="sepia"]{
+  color-scheme:light;
+  --bg:#f2e6cf; --panel:#ebdcc2; --card:#f8eedb; --glow:rgba(255,250,238,.55);
+  --ink:#3a3024; --ink2:#6b5c46; --ink3:#766a52;
+  --line:rgba(58,48,36,.2); --line2:rgba(58,48,36,.11);
+  --accent:#b0642c; --sel:rgba(176,100,44,.18);
+  --hover:rgba(58,48,36,.07);
+  --neg:#4d7a4a;
+  --shadow:0 14px 34px rgba(58,48,36,.18);
+  --shadow-sm:0 1px 2px rgba(58,48,36,.08),0 8px 20px -14px rgba(58,48,36,.35);
+  --card-glass:rgba(248,238,219,.85);
+  --panel-glass:rgba(235,220,194,.94);
+  --veil-glass:rgba(242,230,207,.55);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+*[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-serif);overflow:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;transition:background-color .4s,color .4s}
+::selection{background:var(--sel)}
+body::after{content:"";position:fixed;inset:0;z-index:200;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")}
+body::before{content:"";position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity .9s ease;background:radial-gradient(130% 85% at 50% 45%,transparent 22%,var(--bg) 82%)}
+body.zen::before{opacity:.9}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.cover:focus-visible,.bv-card:focus-visible,.wk-card:focus-visible,.ch:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+/* редактор: обводка всей области выглядит громоздко — фокус показываем
+   тонкой акцентной линией снизу (caret сам по себе не виден скринридеру) */
+#editor:focus-visible{outline:none;box-shadow:inset 0 -2px 0 var(--accent)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px;border:2px solid transparent;background-clip:content-box}
+*{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.wm-card::-webkit-scrollbar,.sp-col-body::-webkit-scrollbar,.wv-col .col-body::-webkit-scrollbar,#wvQuotes::-webkit-scrollbar,.bv-card .bv-ex::-webkit-scrollbar,.sb-chips::-webkit-scrollbar{width:5px;height:5px}
+.wm-card::-webkit-scrollbar-thumb,.sp-col-body::-webkit-scrollbar-thumb,.wv-col .col-body::-webkit-scrollbar-thumb,#wvQuotes::-webkit-scrollbar-thumb,.bv-card .bv-ex::-webkit-scrollbar-thumb,.sb-chips::-webkit-scrollbar-thumb{background:var(--line);border:none;border-radius:5px}
+.fadebox{--ft:16px;--fb:16px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--ft),#000 calc(100% - var(--fb)),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 var(--ft),#000 calc(100% - var(--fb)),transparent 100%)}
+.fadebox:not(.f-top){--ft:0px}
+.fadebox:not(.f-bot){--fb:0px}
+.lbl{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3)}
+.lbl-acc{color:var(--accent)}
+.lbl-btn{cursor:pointer;letter-spacing:.14em;transition:color .15s}
+.lbl-btn:hover{color:var(--accent)}
+.brand{display:flex;align-items:center;gap:9px}
+.brand .dia{width:8px;height:8px;background:var(--accent);transform:rotate(45deg);flex:0 0 auto}
+.brand b{font-family:var(--f-disp);font-weight:500;font-size:12px;letter-spacing:.32em}
+.brand small{font-family:var(--f-ui);font-size:9px;color:var(--ink3);letter-spacing:.1em;margin-top:2px}
+.ibtn{width:34px;height:34px;display:grid;place-items:center;color:var(--ink2);transition:color .18s;flex:0 0 auto;border:0;background:transparent;padding:0}
+.ibtn:hover{color:var(--ink)}
+.ibtn:active{transform:scale(.94)}
+.ibtn.on{color:var(--accent)}
+#btnVoice.on{background:var(--sel)}
+#btnVoice.unsup{opacity:.45}
+.ibtn svg{width:18px;height:18px;display:block}
+.sibtn{width:26px;height:26px;display:grid;place-items:center;color:var(--ink3);transition:color .15s;flex:0 0 auto;border:0;background:transparent;padding:0}
+.sibtn:hover{color:var(--accent)}
+.sibtn svg{width:14px;height:14px;display:block}
+.hit-flash{color:var(--accent);background:var(--sel);border-radius:3px;padding:0 2px;box-shadow:0 0 0 2px var(--sel);transition:color .35s,background .35s,box-shadow .35s}
+
+/* пропустить навигацию — только при фокусе с клавиатуры */
+.skip-link{position:fixed;top:10px;left:10px;z-index:900;padding:10px 16px;background:var(--card);border:1px solid var(--accent);border-radius:10px;box-shadow:var(--shadow);font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;color:var(--ink);text-decoration:none;transform:translateY(-260%);transition:transform .16s}
+.skip-link:focus{transform:none}
+
+/* прокрутка внутри модалок, панелей и карточек не должна уводить страницу */
+.wm-card,.wv-inner,.dm-card,.am-card,.auth-profiles,.wp-body,.sp-col-body,.bv-card .bv-ex,.wv-col .col-body,#wvQuotes{overscroll-behavior:contain}
+
+h1{text-wrap:balance}
+.bv-stats,.lib-stats,#totalWords,.ch .wc{font-variant-numeric:tabular-nums}

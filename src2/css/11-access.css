@@ -1,0 +1,138 @@
+/* ==========================================================================
+ * 11-access.css — ОБЩИЙ ДОСТУП — доступ к своей книге и каталог чужих книг
+ * Проект: «Черновик» — веб-редактор рукописей.
+ * Что делает: оформляет блок «Доступ» в обзоре книги (сегменты
+ *   закрыта/по ссылке/публичная + строка share-ссылки) и вкладку
+ *   «Общие книги» в библиотеке (поиск + список публичных книг).
+ * Ключевое: .lib-tabs, .shared-*, .bv-access, .vis-seg, .share-row.
+ * Зависимости: 01-base (токены), подключается после 10-shared.
+ * ========================================================================== */
+
+/* ===== вкладки библиотеки: «Мои книги» / «Общие книги» ===== */
+.lib-tabs{
+  display:flex;gap:6px;margin-top:28px;
+}
+.lib-tabs button{
+  font-family:var(--f-ui);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink2);background:transparent;border:1px solid var(--line2);
+  border-radius:var(--r-sm);padding:8px 14px;cursor:pointer;
+  transition:color .2s,border-color .2s,background .2s;
+}
+.lib-tabs button:hover{color:var(--ink);border-color:var(--line)}
+.lib-tabs button.on{
+  color:var(--accent);border-color:rgba(201,58,43,.35);
+  background:rgba(201,58,43,.08);
+}
+/* .shelf{display:grid} перебивает UA-[hidden] — прячем вручную */
+.shelf[hidden]{display:none!important}
+
+/* ===== каталог: поиск + список ===== */
+.shared-box{margin-top:20px}
+.shared-box[hidden]{display:none!important}
+#sharedSearch{
+  width:100%;max-width:520px;display:block;
+  font-family:var(--f-ui);font-size:13px;color:var(--ink);
+  background:var(--card);border:1px solid var(--line2);
+  border-radius:var(--r-md);padding:11px 14px;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+#sharedSearch:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
+#sharedSearch::placeholder{color:var(--ink3)}
+.shared-list{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:14px;margin-top:18px;
+}
+.shared-empty{
+  grid-column:1/-1;
+  font-family:var(--f-ui);font-size:11px;letter-spacing:.08em;
+  color:var(--ink3);padding:26px 4px;
+}
+.shared-card{
+  display:flex;flex-direction:column;gap:8px;text-align:left;
+  background:var(--card);border:1px solid var(--line2);
+  border-radius:var(--r-md);padding:16px 18px;cursor:pointer;
+  box-shadow:var(--shadow-sm);
+  transition:transform .25s cubic-bezier(.2,.7,.2,1),border-color .25s,box-shadow .25s;
+}
+.shared-card:hover{transform:translateY(-3px);border-color:var(--line);box-shadow:var(--shadow)}
+.shared-card .st{
+  font-family:var(--f-serif);font-size:17px;font-weight:600;
+  color:var(--ink);line-height:1.3;
+}
+.shared-card .sa{
+  font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;color:var(--ink2);
+}
+.shared-card .sa:empty{display:none}
+.shared-card .sd{
+  font-family:var(--f-ui);font-size:9px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink3);
+}
+.shared-card .st:empty::after{content:"Без названия";color:var(--ink3)}
+
+/* ===== блок «Доступ» в обзоре книги ===== */
+.bv-access{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;
+  margin-top:16px;padding-top:14px;border-top:1px dashed var(--line2);
+}
+.bv-access[hidden]{display:none!important}
+body.ro .bv-access{display:none!important}
+.vis-seg{display:inline-flex;border:1px solid var(--line2);border-radius:var(--r-sm);overflow:hidden}
+.vis-seg button{
+  font-family:var(--f-ui);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink2);background:transparent;border:0;
+  border-right:1px solid var(--line2);
+  padding:8px 13px;cursor:pointer;transition:color .2s,background .2s;
+}
+.vis-seg button:last-child{border-right:0}
+.vis-seg button:hover{color:var(--ink);background:var(--hover)}
+.vis-seg button.on{color:var(--accent);background:rgba(201,58,43,.1)}
+.share-row{display:flex;gap:8px;flex:1 1 320px;min-width:260px}
+.share-row[hidden]{display:none!important}
+#bvShareLink{
+  flex:1;min-width:0;
+  font-family:var(--f-ui);font-size:11px;color:var(--ink2);
+  background:var(--card);border:1px solid var(--line2);
+  border-radius:var(--r-sm);padding:8px 11px;outline:none;
+}
+#bvShareLink:focus-visible{border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
+.share-row .m-btn{
+  font-family:var(--f-ui);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  padding:8px 13px;white-space:nowrap;
+  background:transparent;color:var(--ink2);
+}
+.share-row .m-btn:hover{color:var(--accent)}
+
+/* ===== значок доступа на обложке книги ===== */
+.cv-vis{
+  margin-left:auto;
+  font-family:var(--f-ui);font-size:8px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);border:1px solid var(--line2);border-radius:99px;
+  padding:3px 8px;background:var(--card-glass);white-space:nowrap;
+}
+.cv-vis[hidden]{display:none}
+.cv-vis[data-v="public"]{color:var(--accent);border-color:rgba(201,58,43,.4)}
+.cv-vis[data-v="unlisted"]{color:var(--ink2);border-color:var(--line)}
+
+/* ===== поле «Автор» в обзоре книги ===== */
+.bv-author{
+  display:block;margin:13px auto 0;
+  width:min(420px,92%);
+  font-family:var(--f-ui);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink2);text-align:center;
+  background:transparent;border:1px solid transparent;border-radius:99px;
+  padding:6px 14px;outline:none;
+  transition:border-color .2s,background .2s,color .2s;
+}
+.bv-author:hover:not(:disabled){border-color:var(--line2)}
+.bv-author:focus{border-color:var(--accent);background:var(--card-glass)}
+.bv-author:disabled{color:var(--ink3);cursor:default;letter-spacing:.1em}
+.bv-author[hidden]{display:none}
+
+/* ===== узкие экраны ===== */
+@media (max-width:880px){
+  .lib-tabs{margin-top:20px}
+  .lib-tabs button{font-size:10px;padding:7px 11px}
+  .shared-list{grid-template-columns:1fr}
+  .bv-access{flex-direction:column;align-items:flex-start}
+  .share-row{width:100%;flex:1 1 auto}
+}

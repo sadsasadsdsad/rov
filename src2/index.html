@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<!--
+  tests/index.html — разобранная копия src/index.html (проект «Черновик»,
+  веб-редактор рукописей). Полный обзор структуры — в README.md рядом.
+
+  Структура файла:
+    <head>  — мета-теги, шрифты и 11 <link href="css/NN-*.css">;
+              порядок подключения = порядок каскада оригинала;
+    <body>  — библиотека (+ вкладки «Мои книги»/«Общие книги»), карточка
+              книги (+ блок «Доступ»), рабочая область, модалки, авторизация;
+    перед </body> — 22 последовательных классических <script src="js/NN-*.js">
+              (строгий режим в каждом, подключаются строго по номеру):
+              01-ядро … 15-редактор, 16-аккаунты, 17-boot, 18-voice,
+              19-mobile-reader — читалка ≤880px, 20-sync — серверная
+              синхронизация, 21-shared — чужие книги (только чтение),
+              доступ и hash-роут #/read/.
+
+  Добавлено относительно src: #btnVoice/#micPill (голосовой ввод),
+  <div id="veil"> перенесён внутрь #workspace, js/18-voice.js,
+  читалка для ≤880px, общий доступ (css/10-shared.css, js/21-shared.js),
+  синхронизация (js/20-sync.js), каталог чужих книг и доступ к своей
+  книге (css/11-access.css).
+-->
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Черновик — минималистичное приложение для написания книг">
+<meta name="theme-color" content="#f4f2ec">
+<title>Черновик — библиотека v0.02</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23191712'/%3E%3Crect x='11' y='11' width='10' height='10' fill='%23c93a2b' transform='rotate(45 16 16)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Unbounded:wght@300;400;500;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/01-base.css">
+<link rel="stylesheet" href="css/02-library.css">
+<link rel="stylesheet" href="css/03-bookview-workspace.css">
+<link rel="stylesheet" href="css/04-editor.css">
+<link rel="stylesheet" href="css/05-modals-notes.css">
+<link rel="stylesheet" href="css/06-graph.css">
+<link rel="stylesheet" href="css/07-wiki-modals.css">
+<link rel="stylesheet" href="css/08-responsive-auth.css">
+<link rel="stylesheet" href="css/09-mobile-reader.css">
+<link rel="stylesheet" href="css/10-shared.css">
+<link rel="stylesheet" href="css/11-access.css">
+</head>
+<body>
+
+<a class="skip-link" id="skipLink" href="#editor">Перейти к содержимому</a>
+
+<div id="authScreen" class="off">
+  <div class="auth-card">
+    <div class="auth-brand"><span class="dia"></span><b>ЧЕРНОВИК</b></div>
+    <div class="auth-sub" id="authSub">выберите профиль</div>
+    <div class="auth-tabs">
+      <button class="auth-tab on" type="button" data-mode="login">Профили</button>
+      <button class="auth-tab" type="button" data-mode="signin">Вход</button>
+      <button class="auth-tab" type="button" data-mode="signup">Новый профиль</button>
+    </div>
+
+    <div class="auth-err" id="authErr" role="alert" hidden></div>
+
+    <div id="authProfiles" class="auth-profiles"></div>
+
+    <form id="authForm" autocomplete="off" hidden>
+      <label class="auth-field" id="authNameField">
+        <span class="lbl">Имя автора</span>
+        <input id="authName" name="name" maxlength="40" autocomplete="nickname" spellcheck="false" placeholder="Как вас показывать">
+      </label>
+      <label class="auth-field">
+        <span class="lbl">Логин</span>
+        <input id="authLogin" name="login" maxlength="32" autocomplete="username" spellcheck="false" placeholder="латиница, цифры, _ - .">
+        <span class="auth-hint" id="authLoginHint"></span>
+      </label>
+      <label class="auth-field">
+        <span class="lbl">Пароль <span class="auth-optional" id="authPassOpt">— необязательно</span></span>
+        <div class="auth-pass-wrap">
+          <input id="authPass" name="password" type="password" autocomplete="new-password" placeholder="оставьте пустым, если не нужен">
+          <button type="button" class="auth-pass-toggle" id="authPassToggle" title="Показать пароль" aria-label="Показать пароль" aria-pressed="false">👁</button>
+        </div>
+        <div class="auth-strength" id="authStrength"><i></i><i></i><i></i><i></i></div>
+      </label>
+      <label class="auth-field" id="authPass2Field" hidden>
+        <span class="lbl">Повторите пароль</span>
+        <input id="authPass2" name="password_confirm" type="password" autocomplete="new-password">
+      </label>
+      <button class="m-btn primary auth-submit" id="authSubmit" type="submit">СОЗДАТЬ ПРОФИЛЬ</button>
+    </form>
+
+    <div class="auth-foot">
+      рукописи хранятся <b>локально в этом браузере</b><br>
+      пароль нужен только для защиты профиля при удалении
+    </div>
+  </div>
+</div>
+
+<section id="library">
+  <header class="lib-top">
+    <div class="brand"><span class="dia"></span><b>ЧЕРНОВИК</b><small>для книг</small></div>
+    <div class="lib-actions">
+      <button class="acc-btn" type="button" title="Аккаунт"><span class="ava">?</span><span class="nm"></span></button>
+      <button class="ibtn" id="btnBackup" title="Резервная копия: скачать все книги">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+      </button>
+      <button class="ibtn" id="btnRestore" title="Резервная копия: загрузить из файла">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13V4m0 0 3.5 3.5M12 4 8.5 7.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+      </button>
+      <button class="ibtn btn-theme" title="Тема">
+        <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
+        <svg class="ic-sepia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 6.7C10.6 5.3 8.6 4.7 4.5 4.7v13c4.1 0 6.1.6 7.5 2 1.4-1.4 3.4-2 7.5-2v-13c-4.1 0-6.1.6-7.5 2z"/><path d="M12 6.7v13"/></svg>
+        <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5Z"/></svg>
+      </button>
+    </div>
+  </header>
+  <div class="lib-body">
+    <div class="lib-head">
+      <div>
+        <div class="lbl lbl-acc">Библиотека</div>
+        <h1 class="lib-title">Ваши книги</h1>
+      </div>
+      <div class="lib-stats" id="libStats"></div>
+    </div>
+    <div class="stats-panel">
+      <div class="stats-head">
+        <div>
+          <div class="lbl lbl-acc">Написано сегодня</div>
+          <div class="stats-big"><b id="statsToday">0</b><span>слов</span></div>
+        </div>
+        <div class="stats-totals">
+          <div><span class="lbl">За неделю</span><b id="statsWeek">0</b></div>
+          <div><span class="lbl">За 30 дней</span><b id="stats30">0</b></div>
+          <div><span class="lbl">Среднее в день</span><b id="statsAvg">0</b></div>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-grid" id="statsGrid"></div>
+        <div class="chart-plot" id="statsPlot">
+          <svg class="chart-svg" id="statsSvg" aria-hidden="true">
+            <g id="statsLines"></g>
+          </svg>
+          <div class="chart-crosshair" id="statsCrosshair"></div>
+          <div class="chart-dots" id="statsDots"></div>
+          <div class="chart-hit" id="statsHit"></div>
+          <div class="chart-tip" id="statsTip"></div>
+        </div>
+      </div>
+      <div class="chart-axis"><span>30 дней</span><span>15 дней</span><span>сегодня</span></div>
+      <div class="git-head">
+        <span class="lbl">История · клик по дню — открыть все изменения</span>
+        <span class="git-hint" id="gitHint"></span>
+      </div>
+      <div class="chart-heat" id="statsHeat"></div>
+      <div class="git-legend">
+        <span class="sc"><i class="p"></i>прирост</span>
+        <span class="sc"><i class="n"></i>убыль</span>
+        <span class="sc"><i class="s"></i>без изменений</span>
+      </div>
+      <div class="chart-legend" id="statsLegend"></div>
+    </div>
+    <div class="lib-tabs" id="libTabs">
+      <button type="button" class="on" data-t="mine">Мои книги</button>
+      <button type="button" data-t="shared">Общие книги</button>
+    </div>
+    <div class="shared-box" id="sharedBox" hidden>
+      <input id="sharedSearch" type="search" placeholder="Поиск по названию или автору" aria-label="Поиск по общим книгам" autocomplete="off">
+      <div class="shared-list" id="sharedList"></div>
+    </div>
+    <div class="shelf" id="shelf"></div>
+    <div class="lib-foot">
+      все рукописи хранятся локально · делайте резервные копии
+      <span class="path">Данные в <code>localStorage</code>: книги — <code>chernovik.v2</code>, снапшоты — <code>chernovik.snapshots.v1</code></span>
+    </div>
+  </div>
+</section>
+
+<section id="bookView" hidden>
+  <header class="bv-top">
+    <div class="left">
+      <button class="ibtn" id="bvBack" title="К списку книг">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5 8 12l7.5 7.5"/></svg>
+      </button>
+      <div class="brand"><span class="dia"></span><b>ЧЕРНОВИК</b><small>обзор книги</small></div>
+    </div>
+    <div class="lib-actions">
+      <button class="acc-btn" type="button" title="Аккаунт"><span class="ava">?</span><span class="nm"></span></button>
+      <button class="ibtn" id="bvOpen" title="Открыть в редакторе">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 6.2C10 4.5 7.3 3.8 4 3.8v14c3.3 0 6 .7 8 2.4 2-1.7 4.7-2.4 8-2.4v-14c-3.3 0-6 .7-8 2.4Z"/><path d="M12 6.2v14"/></svg>
+      </button>
+      <button class="ibtn btn-theme" title="Тема">
+        <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
+        <svg class="ic-sepia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 6.7C10.6 5.3 8.6 4.7 4.5 4.7v13c4.1 0 6.1.6 7.5 2 1.4-1.4 3.4-2 7.5-2v-13c-4.1 0-6.1.6-7.5 2z"/><path d="M12 6.7v13"/></svg>
+        <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5Z"/></svg>
+      </button>
+    </div>
+  </header>
+  <div class="bv-body">
+    <div class="bv-head enter">
+      <div class="bv-title-row"><span class="wv-dia"></span><h1 id="bvTitle"></h1><span class="bv-type">книга</span></div>
+      <input id="bvAuthor" class="bv-author" maxlength="80" placeholder="Автор" aria-label="Автор книги" spellcheck="false" hidden>
+      <div class="bv-desc" id="bvDesc"></div>
+      <div class="bv-stats" id="bvStats"></div>
+      <div class="bv-access" id="bvAccess" hidden>
+        <span class="lbl lbl-acc">Доступ</span>
+        <div class="vis-seg" id="bvVis">
+          <button type="button" data-v="private">закрыта</button>
+          <button type="button" data-v="unlisted">по ссылке</button>
+          <button type="button" data-v="public">публичная</button>
+        </div>
+        <div class="share-row" id="bvShareRow" hidden>
+          <input id="bvShareLink" readonly spellcheck="false" aria-label="Ссылка для доступа к книге">
+          <button type="button" class="m-btn" id="bvShareCopy">Копировать</button>
+        </div>
+      </div>
+    </div>
+    <div class="bv-sec"><span class="lbl lbl-acc">Главы и их начало</span></div>
+    <div class="bv-grid" id="bvGrid"></div>
+  </div>
+</section>
+
+<div id="workspace" hidden>
+  <aside id="side">
+    <div class="brand"><span class="dia"></span><b>ЧЕРНОВИК</b><small>для книг</small></div>
+    <div class="bookbox">
+      <label class="lbl" for="bookTitle">Книга</label>
+      <input id="bookTitle" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="chapters-label"><span class="lbl">Главы</span><span class="lbl" id="chCount"></span></div>
+    <div id="chlist"></div>
+    <button id="addCh">+&nbsp;&nbsp;НОВАЯ ГЛАВА</button>
+    <div class="side-foot"><span id="totalWords">0 слов</span><span id="totalRead"></span></div>
+  </aside>
+
+  <div id="main">
+    <header id="topbar">
+      <div class="tb-left">
+        <button class="ibtn" id="btnShelf" title="К списку книг">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4.5 4h4v16h-4zM10.5 4h4v16h-4zM16.6 5.4l3.9 1.1-4.1 13.9-3.9-1.1z"/></svg>
+        </button>
+        <button class="ibtn" id="btnSide" title="Скрыть панель глав">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        </button>
+        <div class="crumb"><b id="crumbBook"></b><span class="cd"></span><span id="crumbCh"></span><span class="ro-badge" id="roBadge" hidden>чтение</span></div>
+      </div>
+      <div class="tb-center">
+        <label class="tb-search" id="tbSearch">
+          <svg class="tb-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.2"/><path d="m15.5 15.5 4.5 4.5"/></svg>
+          <input id="spInput" autocomplete="off" placeholder="Поиск: текст, мир, заметки…" aria-label="Поиск по книге">
+          <span class="tb-cnt" id="spCount"></span>
+          <button class="tb-clr" id="spClose" type="button" title="Очистить">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </label>
+      </div>
+      <div class="tb-right">
+        <span class="chip" id="wcTop">0 слов</span>
+        <span class="tb-sep"></span>
+        <button class="ibtn" id="btnNote" title="Вставить заметку · Ctrl+Alt+N">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16.5 4.5a1.8 1.8 0 0 1 2.6 0l.4.4a1.8 1.8 0 0 1 0 2.6L8 19l-4 1Z"/><path d="M14 7l3 3"/></svg>
+        </button>
+        <button class="ibtn" id="btnNotesPanel" title="Все заметки">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h9L19 7.5v13H6z"/><path d="M9 9h6M9 12.5h6M9 16h4"/></svg>
+        </button>
+        <button class="ibtn" id="btnVoice" title="Диктовка голосом · Ctrl+Alt+R" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9.3" y="3" width="5.4" height="11" rx="2.7"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/></svg>
+        </button>
+        <button class="ibtn" id="btnBookmark" title="Поставить метку · Ctrl+Alt+M">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.6L6 20V5a1 1 0 0 1 1-1Z"/></svg>
+        </button>
+        <button class="ibtn" id="btnZen" title="Режим фокуса">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="ibtn" id="btnWiki" title="Энциклопедия мира">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.6 2.3 3.9 5.1 3.9 8.5s-1.3 6.2-3.9 8.5c-2.6-2.3-3.9-5.1-3.9-8.5s1.3-6.2 3.9-8.5z"/></svg>
+        </button>
+        <button class="ibtn btn-theme" title="Тема">
+          <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
+          <svg class="ic-sepia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 6.7C10.6 5.3 8.6 4.7 4.5 4.7v13c4.1 0 6.1.6 7.5 2 1.4-1.4 3.4-2 7.5-2v-13c-4.1 0-6.1.6-7.5 2z"/><path d="M12 6.7v13"/></svg>
+        <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5Z"/></svg>
+        </button>
+        <button class="ibtn" id="btnExport" title="Скачать рукопись · TXT / MD / HTML">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+        </button>
+        <button class="acc-btn" type="button" title="Аккаунт"><span class="ava">?</span><span class="nm"></span></button>
+      </div>
+    </header>
+    <div id="scroller">
+      <main id="editor" contenteditable="true" spellcheck="false" lang="ru"></main>
+    </div>
+    <div id="edRz" class="rz" title="Потяните, чтобы изменить ширину текста"></div>
+    <footer id="statusbar">
+      <span class="savebox"><span id="saveDot"></span><span id="saveTxt">Сохранено</span></span>
+      <span id="statRight"></span>
+    </footer>
+  </div>
+  <div id="veil"></div>
+</div>
+
+<div id="spResults"><div class="sp-cols" id="spCols"></div></div>
+
+<div id="wikiPanel">
+  <div class="wp-head">
+    <span class="wp-title"><span class="dia"></span><span id="wpTitleText">Энциклопедия</span> <span class="wp-count" id="wpCount"></span></span>
+    <button class="lbl lbl-btn" id="wpAdd">+ статья</button>
+    <button class="sibtn" id="wpFull" title="Во весь экран">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+    <button class="sibtn" id="wpClose" title="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
+  <div class="wp-tabs">
+    <span class="wp-tabs-indicator" id="wpTabsInd"></span>
+    <button class="wp-tab on" data-tab="world" type="button">Мир</button>
+    <button class="wp-tab" data-tab="notes" type="button">Заметки <span class="wt-cnt" data-cnt="notes"></span></button>
+    <button class="wp-tab" data-tab="graph" type="button">Карта</button>
+  </div>
+
+  <div class="wp-pane" id="paneWorld">
+    <input id="wpSearch" autocomplete="off" placeholder="Поиск по миру книги…" aria-label="Поиск по миру книги">
+    <div class="wp-filters" id="wpFilters"></div>
+    <div class="wp-body" id="wpBody"></div>
+  </div>
+
+  <div class="wp-pane" id="paneNotes" hidden>
+    <div class="np-bar">
+      <input id="npSearch" autocomplete="off" placeholder="Поиск по заметкам…" aria-label="Поиск по заметкам">
+      <button class="lbl lbl-btn" id="npAdd">+ заметка</button>
+    </div>
+    <div class="wp-filters" id="npFilters"></div>
+    <div class="wp-body" id="npBody"></div>
+  </div>
+
+  <div class="wp-pane" id="paneGraph" hidden>
+    <div class="gp-bar">
+      <button class="gp-mode on" data-mode="radial">Радиальная</button>
+      <button class="gp-mode" data-mode="circle">Круг</button>
+      <button class="gp-mode" data-mode="force">Силы</button>
+      <span class="gp-sp"></span>
+      <button class="gp-toggle" id="gpLabels">подписи</button>
+      <button class="gp-toggle" id="gpPeople">только персонажи</button>
+      <button class="sibtn" id="gpRebuild" title="Пересобрать схему">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.6"/><path d="M20 5v6h-6"/></svg>
+      </button>
+      <button class="sibtn" id="gpExport" title="Скачать схему SVG">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+      </button>
+    </div>
+    <div class="gp-sliders">
+      <label class="gp-slider" title="Сколько шагов от главного узла показывать">
+        <span>Глубина</span>
+        <input type="range" id="gpDepth" min="1" max="4" step="1" value="2">
+        <span class="gp-val" id="gpDepthVal">2</span>
+      </label>
+      <label class="gp-slider" title="Минимальная сила совместных упоминаний">
+        <span>Связь</span>
+        <input type="range" id="gpWeight" min="1" max="10" step="1" value="1">
+        <span class="gp-val" id="gpWeightVal">1</span>
+      </label>
+    </div>
+    <div class="gp-typebar" id="gpTypes"></div>
+    <div class="wp-body" id="gpBody">
+      <div id="graphCanvas">
+        <svg id="graphSvg"></svg>
+        <div class="gp-hint">колесо — зум · фон — сдвиг · узел — тащить · 2×клик — фокус</div>
+        <div class="gp-tip" id="gpTip"></div>
+        <div class="gp-node-tip" id="gpNodeTip"></div>
+        <div class="gp-zoom">
+          <button type="button" id="gpZoomIn" title="Приблизить">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button type="button" id="gpZoomOut" title="Отдалить">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+          </button>
+          <button type="button" id="gpFit" title="Вписать и сбросить фокус">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="gp-legend" id="gpLegend"></div>
+      <div class="gp-rank" id="gpRank"></div>
+    </div>
+  </div>
+</div>
+
+<div id="rdTop">
+  <button class="ibtn" id="rdBack" title="К списку книг">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5 8 12l7.5 7.5"/></svg>
+  </button>
+  <div class="rd-tt"><b id="rdBook"></b><span id="rdCh"></span></div>
+  <span class="rd-sp"></span>
+</div>
+
+<div id="rdHud">
+  <input type="range" id="rdSeek" min="0" max="1000" step="1" value="0" aria-label="Прогресс главы">
+  <div class="rd-times"><span id="rdPct">0%</span><span id="rdLeft">—</span></div>
+  <div class="rd-row">
+    <button class="rd-btn rd-aa" id="rdAa" title="Настройки чтения">Aa</button>
+    <div class="rd-nav">
+      <button class="rd-btn" id="rdPrev" title="Предыдущая глава">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+      </button>
+      <span class="rd-pos" id="rdPos"></span>
+      <button class="rd-btn" id="rdNext" title="Следующая глава">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+      </button>
+    </div>
+    <button class="rd-btn" id="rdToc" title="Оглавление">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </div>
+</div>
+
+<div id="rdScrim"></div>
+<div id="rdSheet">
+  <div class="rd-handle"></div>
+  <div class="rd-sec">
+    <span class="lbl">Оформление</span>
+    <div class="rd-seg" id="rdTheme">
+      <button type="button" data-t="light">День</button>
+      <button type="button" data-t="dark">Ночь</button>
+      <button type="button" data-t="sepia">Сепия</button>
+    </div>
+  </div>
+  <div class="rd-sec">
+    <span class="lbl">Размер шрифта</span>
+    <div class="rd-ctrl">
+      <button type="button" class="rd-step" id="rdFsMinus" title="Мельче">Аа−</button>
+      <input type="range" id="rdFs" min="0" max="4" step="1" value="2" aria-label="Размер шрифта">
+      <button type="button" class="rd-step" id="rdFsPlus" title="Крупнее">Аа+</button>
+    </div>
+  </div>
+  <div class="rd-sec">
+    <span class="lbl">Интерлиньяж</span>
+    <div class="rd-seg" id="rdLh">
+      <button type="button" data-i="0">Плотно</button>
+      <button type="button" data-i="1">Обычно</button>
+      <button type="button" data-i="2">Свободно</button>
+    </div>
+  </div>
+  <div class="rd-sec">
+    <span class="lbl">Отступ от стенок</span>
+    <div class="rd-seg" id="rdPad">
+      <button type="button" data-i="0">Мало</button>
+      <button type="button" data-i="1">Обычно</button>
+      <button type="button" data-i="2">Много</button>
+    </div>
+  </div>
+  <div class="rd-sec">
+    <span class="lbl">Выравнивание</span>
+    <div class="rd-seg" id="rdAlign">
+      <button type="button" data-i="0">Слева</button>
+      <button type="button" data-i="1">По ширине</button>
+    </div>
+  </div>
+</div>
+
+<button id="zenpill">РЕЖИМ ФОКУСА — ESC, ЧТОБЫ ВЫЙТИ</button>
+<button id="micPill" type="button" title="Остановить диктовку"><span class="mp-dot"></span><span class="mp-txt">Слушаю…</span><span class="mp-hint">нажмите, чтобы остановить</span></button>
+<input type="file" id="restoreInput" accept=".json,application/json" aria-label="Файл резервной копии">
+
+<div id="wikiModal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
+  <div class="wm-card">
+    <div class="wm-head">
+      <span class="wv-dia"></span>
+      <b id="wmTitle">Новая статья</b>
+      <span class="wv-type" id="wmTypeBadge"></span>
+      <button class="sibtn" id="wmClose" style="color:var(--ink2)" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="m-field"><label class="lbl" for="wmName">Название</label><input id="wmName" autocomplete="off" placeholder="Туманная Гавань"></div>
+    <div class="m-field"><label class="lbl" for="wmAliases">Другие имена <span class="auth-optional">— через запятую</span></label><input id="wmAliases" autocomplete="off" placeholder="Аня, Аннушка, госпожа Верн"></div>
+    <div class="m-field"><span class="lbl" id="wmTypeLbl">Тип</span><div class="type-chips" id="wmTypeChips" role="group" aria-labelledby="wmTypeLbl"></div></div>
+    <div class="m-field"><label class="lbl" for="wmDesc">Описание</label><textarea id="wmDesc" placeholder="портовый город на северном побережье…"></textarea></div>
+    <div class="wm-sec">
+      <div class="lbl" style="margin-bottom:8px">Упоминания в тексте</div>
+      <div id="wmPrev"></div>
+    </div>
+    <div class="wv-foot" style="padding:16px 0 6px">
+      <button class="m-btn danger" id="wmDelete">УДАЛИТЬ</button>
+      <span style="flex:1"></span>
+      <button class="m-btn" id="wmCancel">ОТМЕНА</button>
+      <button class="m-btn primary" id="wmSave">СОХРАНИТЬ</button>
+    </div>
+  </div>
+</div>
+
+<div id="wikiViewModal" role="dialog" aria-modal="true" aria-labelledby="wvName">
+  <div class="wv-inner">
+    <div class="wv-head">
+      <span class="wv-dia"></span>
+      <b id="wvName"></b>
+      <span class="wv-type" id="wvType"></span>
+      <button class="sibtn" id="wvClose" style="color:var(--ink2)" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="wvAlias" class="wv-alias"></div>
+    <div id="wvDesc"></div>
+    <div id="wvTimeline" class="wv-tl"></div>
+    <div id="wvRel"></div>
+    <div id="wvQuotes"></div>
+    <div id="wvHint"></div>
+    <div class="wv-foot">
+      <button class="m-btn" id="wvEdit">РЕДАКТИРОВАТЬ</button>
+      <button class="m-btn primary" id="wvCloseBtn">ЗАКРЫТЬ</button>
+    </div>
+  </div>
+</div>
+
+<div id="dayModal" role="dialog" aria-modal="true" aria-labelledby="dmTitle">
+  <div class="dm-card">
+    <div class="dm-head">
+      <span class="wv-dia"></span>
+      <b id="dmTitle"></b>
+      <button class="sibtn" id="dmClose" title="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="dm-meta" id="dmMeta"></div>
+    <div class="dm-body" id="dmBody"></div>
+    <div class="dm-note" id="dmNote"></div>
+    <div class="dm-foot">
+      <button class="m-btn danger" id="dmRestore">ОТКАТИТЬ К ЭТОМУ ДНЮ</button>
+      <button class="m-btn primary" id="dmCloseBtn">ЗАКРЫТЬ</button>
+    </div>
+  </div>
+</div>
+
+<div id="askModal" role="dialog" aria-modal="true" aria-labelledby="amTitle">
+  <div class="am-card">
+    <div class="am-head"><span class="wv-dia"></span><b id="amTitle"></b></div>
+    <div class="am-msg" id="amMsg" role="alert" hidden></div>
+    <input id="amInput" autocomplete="off" spellcheck="false" aria-label="Значение">
+    <div class="am-foot">
+      <button class="m-btn" id="amCancel">ОТМЕНА</button>
+      <button class="m-btn primary" id="amOk">ОК</button>
+    </div>
+  </div>
+</div>
+
+<div id="selbar">
+  <div class="sb-row">
+    <button data-cmd="bold" title="Жирный · Ctrl+B"><b>Ж</b></button>
+    <button data-cmd="italic" title="Курсив · Ctrl+I"><i>К</i></button>
+    <button data-cmd="wiki" title="Добавить выделенное в энциклопедию"><span class="wplus">Э+</span></button>
+  </div>
+</div>
+
+<div id="synbar">
+  <div class="sb-sec" id="synSec" hidden>
+    <div class="sb-label"><span class="lbl-t">Синонимы</span><span class="src" id="synSrc"></span><button class="retry" id="synRetry" hidden>ПОВТОРИТЬ</button></div>
+    <div class="sb-chips" id="synChips"></div>
+  </div>
+  <div class="sb-sec" id="antSec" hidden>
+    <div class="sb-label"><span class="lbl-t">Антонимы</span><span class="src" id="antSrc"></span></div>
+    <div class="sb-chips" id="antChips"></div>
+  </div>
+</div>
+
+<div id="markTip" class="mark-tip-floater" role="tooltip"></div>
+<div id="marksRail"></div>
+<div id="blockmenu" role="menu" aria-label="Вставить блок"></div>
+<div id="exportMenu" role="menu" aria-label="Экспорт рукописи"></div>
+<div id="accMenu" role="menu" aria-label="Аккаунт"></div>
+<div id="toast" role="status"></div>
+<div id="printBook" aria-hidden="true"></div>
+
+<script src="js/01-core.js"></script>
+<script src="js/02-thesaurus.js"></script>
+<script src="js/03-snapshots.js"></script>
+<script src="js/04-state-seed.js"></script>
+<script src="js/05-chart.js"></script>
+<script src="js/06-marks.js"></script>
+<script src="js/07-layout.js"></script>
+<script src="js/08-declensions.js"></script>
+<script src="js/09-cooccurrence.js"></script>
+<script src="js/10-wiki-panel.js"></script>
+<script src="js/11-notes.js"></script>
+<script src="js/12-graph.js"></script>
+<script src="js/13-wiki-modal.js"></script>
+<script src="js/14-search.js"></script>
+<script src="js/15-editor.js"></script>
+<script src="js/16-accounts.js"></script>
+<script src="js/17-start.js"></script>
+<script src="js/18-voice.js"></script>
+<script src="js/19-mobile-reader.js"></script>
+<script src="js/20-sync.js"></script>
+<script src="js/21-shared.js"></script>
+</body>
+</html>
