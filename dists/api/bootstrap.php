@@ -52,8 +52,14 @@ function same_origin_ok(): bool
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     if ($origin === '' || $origin === 'null') return true; // curl / серверные вызовы
 
+    /* HTTP_HOST может быть без порта (стандартные 443/80) — подставляем схему,
+       иначе origin_parts вернёт порт null и сравнение всегда провалится */
+    $fwd = strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    $https = $fwd === 'https' || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    $scheme = $https ? 'https' : 'http';
+
     $a = origin_parts($origin);
-    $b = origin_parts('//' . ($_SERVER['HTTP_HOST'] ?? ''));
+    $b = origin_parts($scheme . '://' . ($_SERVER['HTTP_HOST'] ?? ''));
     return $a !== null && $b !== null && $a[0] === $b[0] && $a[1] === $b[1];
 }
 
@@ -67,7 +73,7 @@ function origin_parts(string $url): ?array
         $port = $scheme === 'https' ? 443 : ($scheme === 'http' ? 80 : null);
     }
     if ($port === null) return null;
-    return [$host, (int)$port];
+    return [strtolower($host), (int)$port];
 }
 
 function guard(): void
