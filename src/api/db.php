@@ -31,7 +31,56 @@ function db()
     }
 
     db_migrate($pdo, $schema);
+    db_migrate_share_token($pdo, $cfg['driver'] ?? 'sqlite');
     return $pdo;
+}
+
+/**
+ * F9: уникальный индекс по share_token (схема — только для новых БД).
+ * Для существующей таблицы: сначала снимаем дубли (оставляем MIN(id),
+ * остальным NULL), потом пробуем создать индекс — ошибку «уже существует»
+ * глушим.
+ */
+function db_migrate_share_token(PDO $pdo, string $driver): void
+{
+    /* индекс уже есть — дублей не появится, выходим */
+    try {
+        if ($driver === 'mysql') {
+            $n = (int)$pdo->query(
+                "SELECT COUNT(*) FROM information_schema.statistics
+                  WHERE table_schema = DATABASE() AND table_name = 'books'
+                    AND index_name = 'uq_books_token'"
+            )->fetchColumn();
+        } else {
+            $n = 0;
+            foreach ($pdo->query("PRAGMA index_list('books')") as $r) {
+                if (($r['name'] ?? '') === 'uq_books_token') { $n = 1; break; }
+            }
+        }
+        if ($n > 0) return;
+    } catch (Throwable $e) { return; }   /* таблицы ещё нет */
+
+    try {
+        $pdo->exec(
+            "UPDATE books SET share_token = NULL
+              WHERE share_token IS NOT NULL AND share_token <> ''
+                AND id NOT IN (
+                  SELECT keep_id FROM (
+                    SELECT MIN(id) AS keep_id FROM books
+                     WHERE share_token IS NOT NULL AND share_token <> ''
+                     GROUP BY share_token
+                  ) t
+                )"
+        );
+    } catch (Throwable $e) { /* нет колонки — не критично */ }
+
+    try {
+        if ($driver === 'mysql') {
+            $pdo->exec('CREATE UNIQUE INDEX uq_books_token ON books(share_token)');
+        } else {
+            $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS uq_books_token ON books(share_token)');
+        }
+    } catch (Throwable $e) { /* уже существует (Duplicate key name) */ }
 }
 
 function db_migrate(PDO $pdo, string $schemaFile): void

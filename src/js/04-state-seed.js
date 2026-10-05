@@ -43,17 +43,20 @@ function notesChapterHtml(){
     '<p>Если нужна заметка привязанная к конкретному месту в тексте — поставьте курсор в главе и нажмите <strong>Ctrl&nbsp;+&nbsp;Alt&nbsp;+&nbsp;N</strong>. Такая врезка появится и в панели «Заметки», и её видно только вам.</p>';
 }
 function refreshPamatka(b){
+  if(!b||!Array.isArray(b.chapters))return;
   var ch=null;
   for(var i=0;i<b.chapters.length;i++){
-    var h=tmp(b.chapters[i].html).querySelector('h1');
-    if(h&&h.textContent.trim()==='Памятка'){ch=b.chapters[i];break}
+    var c=b.chapters[i];
+    if(!c||typeof c.html!=='string')continue;
+    if(isPamatka(c)){ch=c;break}
   }
   if(!ch)b.chapters.push({id:uid(),html:pamatkaHtml(),marks:[]});
   else if(ch.html.indexOf('pamatka-v32')<0)ch.html=pamatkaHtml();
 }
 function ensureNotesChapter(b){
+  if(!b)return null;
   b.chapters=Array.isArray(b.chapters)?b.chapters:[];
-  var ch=b.chapters.filter(function(c){return c.kind==='notes'})[0];
+  var ch=b.chapters.filter(function(c){return c&&c.kind==='notes'})[0];
   if(!ch){
     ch={id:uid(),kind:'notes',html:notesChapterHtml(),pos:0,marks:[]};
     b.chapters.push(ch);
@@ -62,8 +65,28 @@ function ensureNotesChapter(b){
   }
   return ch;
 }
+/* дедупликация глав: повтор id и лишние служебные «Заметки» — мусор синхронизации,
+   чистим при загрузке и при сверке с сервером; книга с правкой помечается изменённой
+   (bump=false — в reconcile после LWW-выбора, чтобы не перекрыть свежую серверную версию) */
+function dedupeChapters(b,bump){
+  if(!b||!Array.isArray(b.chapters))return 0;
+  var seen={},notesSeen=false,kept=[],removed=0;
+  b.chapters.forEach(function(c){
+    if(!c||typeof c!=='object'){removed++;return}
+    if(!c.id){c.id=uid()}                 /* главы без id — присвоить, а не выбрасывать */
+    if(seen[c.id]||(c.kind==='notes'&&notesSeen)){removed++;return}
+    seen[c.id]=1;
+    if(c.kind==='notes')notesSeen=true;
+    kept.push(c);
+  });
+  if(!removed)return 0;
+  b.chapters=kept;
+  if(b.chapters.length&&!b.chapters.some(function(c){return c.id===b.current}))b.current=b.chapters[0].id;
+  if(bump!==false)b.updated=Date.now();
+  return removed;
+}
 function isPamatka(ch){
-  if(!ch)return false;
+  if(!ch||typeof ch.html!=='string')return false;
   var h=tmp(ch.html).querySelector('h1');
   return !!(h&&/^\s*памятка\s*$/i.test(h.textContent));
 }
@@ -107,13 +130,18 @@ function initState(){
 
   migrateHeroes(state);
   ensureMarksOnChapters(state);
-  state.books.forEach(refreshPamatka);
+  /* сначала нормализуем структуру глав (H1): refreshPamatka ищу их по html,
+     раньше падал на битых данных (chapters:undefined/null-элементах) */
   state.books.forEach(function(b){
+    if(!b||typeof b!=='object')return;
+    b.chapters=Array.isArray(b.chapters)?b.chapters.filter(function(c){return c&&typeof c==='object'}):[];
     b.wiki=Array.isArray(b.wiki)?b.wiki:[];
     b.customTypes=Array.isArray(b.customTypes)?b.customTypes:[];
-    b.wiki.forEach(function(w){w.aliases=Array.isArray(w.aliases)?w.aliases.filter(Boolean):[]});
+    b.wiki.forEach(function(w){if(w)w.aliases=Array.isArray(w.aliases)?w.aliases.filter(Boolean):[]});
     ensureNotesChapter(b);
+    dedupeChapters(b,false);
   });
+  state.books.forEach(refreshPamatka);
   persist();
 }
 
@@ -132,7 +160,9 @@ function migrateHeroes(st){
 function ensureMarksOnChapters(st){
   if(!st||!Array.isArray(st.books))return st;
   st.books.forEach(function(b){
-    (b.chapters||[]).forEach(function(ch){
+    if(!b)return;
+    (Array.isArray(b.chapters)?b.chapters:[]).forEach(function(ch){
+      if(!ch||typeof ch!=='object')return;
       if(!Array.isArray(ch.marks))ch.marks=[];
       ch.marks=ch.marks.filter(function(m){return m&&typeof m==='object'&&m.label});
     });
@@ -151,6 +181,9 @@ function normalizeState(s){
       return {
         id:(typeof b.id==='string'&&b.id)?b.id:uid(),
         title:(typeof b.title==='string')?b.title:'Без названия',
+        author:(typeof b.author==='string')?b.author:'',
+        visibility:(b.visibility==='unlisted'||b.visibility==='public')?b.visibility:'private',
+        share_token:(typeof b.share_token==='string')?b.share_token:'',
         color:(COLORS.indexOf(b.color)>=0)?b.color:COLORS[0],
         updated:(typeof b.updated==='number')?b.updated:Date.now(),
         current:(typeof b.current==='string')?b.current:null,

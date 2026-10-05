@@ -61,6 +61,7 @@ function createMarkAtCursor(){
     ch.marks=ch.marks||[];
     ch.marks.push({id:uid(),label:label,pos:pos,snippet:snippet});
     ch.marks.sort(function(a,b){return a.pos-b.pos});
+    b.updated=Date.now();                 /* H5 */
     persist();renderList(false);
     toast('Метка «'+label+'» добавлена');
   });
@@ -73,6 +74,7 @@ function deleteMark(chapterId,markId){
   uiConfirm('Удалить метку?','«'+mark.label+'» больше не появится в навигации.',true).then(function(ok){
     if(!ok)return;
     ch.marks=ch.marks.filter(function(m){return m.id!==markId});
+    b.updated=Date.now();                 /* H5 */
     persist();renderList(false);
   });
 }

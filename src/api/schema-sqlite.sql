@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS books(
 );
 CREATE INDEX IF NOT EXISTS idx_books_user ON books(user_id);
 CREATE INDEX IF NOT EXISTS idx_books_vis ON books(visibility);
-CREATE INDEX IF NOT EXISTS idx_books_token ON books(share_token);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_books_token ON books(share_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_exp ON sessions(expires);
 CREATE INDEX IF NOT EXISTS idx_stats_user ON stats(user_id);

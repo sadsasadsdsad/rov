@@ -45,5 +45,5 @@ CREATE TABLE IF NOT EXISTS books(
   version INT NOT NULL DEFAULT 1,
   KEY idx_books_user(user_id),
   KEY idx_books_vis(visibility),
-  KEY idx_books_token(share_token)
+  UNIQUE KEY uq_books_token(share_token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

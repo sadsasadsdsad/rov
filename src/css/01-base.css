@@ -8,8 +8,10 @@
  * Порядок: подключается ПЕРВЫМ — все переменные отсюда.
  * ========================================================================== */
 :root{
+  color-scheme:light;
+  -webkit-tap-highlight-color:rgba(0,0,0,0);
   --bg:#f4f2ec; --panel:#edeadf; --card:#fbfaf5; --glow:rgba(255,255,255,.55);
-  --ink:#191712; --ink2:#57534a; --ink3:#8a8574;
+  --ink:#191712; --ink2:#57534a; --ink3:#6f6a5c;
   --line:rgba(25,23,18,.16); --line2:rgba(25,23,18,.08);
   --accent:#c93a2b; --sel:rgba(201,58,43,.16);
   --hover:rgba(25,23,18,.06);
@@ -26,6 +28,7 @@
   --f-disp:'Unbounded',var(--f-ui);
 }
 [data-theme="dark"]{
+  color-scheme:dark;
   --bg:#161411; --panel:#1b1815; --card:#221e19; --glow:rgba(255,255,255,.03);
   --ink:#ece7d8; --ink2:#b8b1a1; --ink3:#8d8778;
   --line:rgba(233,228,214,.2); --line2:rgba(233,228,214,.1);
@@ -39,8 +42,9 @@
   --veil-glass:rgba(10,9,7,.52);
 }
 [data-theme="sepia"]{
+  color-scheme:light;
   --bg:#f2e6cf; --panel:#ebdcc2; --card:#f8eedb; --glow:rgba(255,250,238,.55);
-  --ink:#3a3024; --ink2:#6b5c46; --ink3:#9b8a70;
+  --ink:#3a3024; --ink2:#6b5c46; --ink3:#766a52;
   --line:rgba(58,48,36,.2); --line2:rgba(58,48,36,.11);
   --accent:#b0642c; --sel:rgba(176,100,44,.18);
   --hover:rgba(58,48,36,.07);
@@ -59,10 +63,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-serif);overflow:h
 body::after{content:"";position:fixed;inset:0;z-index:200;pointer-events:none;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")}
 body::before{content:"";position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity .9s ease;background:radial-gradient(130% 85% at 50% 45%,transparent 22%,var(--bg) 82%)}
 body.zen::before{opacity:.9}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
 .cover:focus-visible,.bv-card:focus-visible,.wk-card:focus-visible,.ch:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-#editor:focus-visible{outline:none}
+/* редактор: обводка всей области выглядит громоздко — фокус показываем
+   тонкой акцентной линией снизу (caret сам по себе не виден скринридеру) */
+#editor:focus-visible{outline:none;box-shadow:inset 0 -2px 0 var(--accent)}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px;border:2px solid transparent;background-clip:content-box}
 *{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
@@ -90,3 +96,13 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .sibtn:hover{color:var(--accent)}
 .sibtn svg{width:14px;height:14px;display:block}
 .hit-flash{color:var(--accent);background:var(--sel);border-radius:3px;padding:0 2px;box-shadow:0 0 0 2px var(--sel);transition:color .35s,background .35s,box-shadow .35s}
+
+/* пропустить навигацию — только при фокусе с клавиатуры */
+.skip-link{position:fixed;top:10px;left:10px;z-index:900;padding:10px 16px;background:var(--card);border:1px solid var(--accent);border-radius:10px;box-shadow:var(--shadow);font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;color:var(--ink);text-decoration:none;transform:translateY(-260%);transition:transform .16s}
+.skip-link:focus{transform:none}
+
+/* прокрутка внутри модалок, панелей и карточек не должна уводить страницу */
+.wm-card,.wv-inner,.dm-card,.am-card,.auth-profiles,.wp-body,.sp-col-body,.bv-card .bv-ex,.wv-col .col-body,#wvQuotes{overscroll-behavior:contain}
+
+h1{text-wrap:balance}
+.bv-stats,.lib-stats,#totalWords,.ch .wc{font-variant-numeric:tabular-nums}

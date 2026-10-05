@@ -94,12 +94,39 @@ body.ro .bv-access{display:none!important}
   background:var(--card);border:1px solid var(--line2);
   border-radius:var(--r-sm);padding:8px 11px;outline:none;
 }
+#bvShareLink:focus-visible{border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
 .share-row .m-btn{
   font-family:var(--f-ui);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   padding:8px 13px;white-space:nowrap;
   background:transparent;color:var(--ink2);
 }
 .share-row .m-btn:hover{color:var(--accent)}
+
+/* ===== значок доступа на обложке книги ===== */
+.cv-vis{
+  margin-left:auto;
+  font-family:var(--f-ui);font-size:8px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);border:1px solid var(--line2);border-radius:99px;
+  padding:3px 8px;background:var(--card-glass);white-space:nowrap;
+}
+.cv-vis[hidden]{display:none}
+.cv-vis[data-v="public"]{color:var(--accent);border-color:rgba(201,58,43,.4)}
+.cv-vis[data-v="unlisted"]{color:var(--ink2);border-color:var(--line)}
+
+/* ===== поле «Автор» в обзоре книги ===== */
+.bv-author{
+  display:block;margin:13px auto 0;
+  width:min(420px,92%);
+  font-family:var(--f-ui);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink2);text-align:center;
+  background:transparent;border:1px solid transparent;border-radius:99px;
+  padding:6px 14px;outline:none;
+  transition:border-color .2s,background .2s,color .2s;
+}
+.bv-author:hover:not(:disabled){border-color:var(--line2)}
+.bv-author:focus{border-color:var(--accent);background:var(--card-glass)}
+.bv-author:disabled{color:var(--ink3);cursor:default;letter-spacing:.1em}
+.bv-author[hidden]{display:none}
 
 /* ===== узкие экраны ===== */
 @media (max-width:880px){

@@ -154,6 +154,7 @@ function editNote(n){
     if(!el){toast('Не удалось найти врезку');return}
     el.textContent=v;
     ch.html=d.innerHTML;
+    b.updated=Date.now();                 /* H5: структурная правка уезжает на сервер */
     persist();invalidateCo();
     if(b.current===ch.id&&!workspace.hidden)loadChapter(ch);
     renderNotes();
@@ -170,6 +171,7 @@ function deleteNote(n){
     var el=noteElIn(d,n);
     if(el)el.remove();
     ch.html=d.innerHTML;
+    b.updated=Date.now();                 /* H5 */
     persist();invalidateCo();
     if(b.current===ch.id&&!workspace.hidden)loadChapter(ch);
     renderNotes();

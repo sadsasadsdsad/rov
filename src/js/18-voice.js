@@ -295,6 +295,6 @@ document.addEventListener('keydown',function(e){
 document.addEventListener('visibilitychange',function(){if(document.hidden&&micOn)micFatal('')});
 addEventListener('pagehide',function(){if(micOn)micFatal('')});
 if(!SRClass){
-  btnVoice.title='Диктовка голосом — не поддерживается этим браузером';
+  setBtnTitle(btnVoice,'Диктовка голосом — не поддерживается этим браузером');
   btnVoice.classList.add('unsup');
 }

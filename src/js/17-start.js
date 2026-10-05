@@ -36,17 +36,46 @@ function startApp(user){
   bindChartHover();
   saveTxt.textContent='Сохранено';
   updatePanelTabs();
+  if(typeof a11yPass==='function')a11yPass(document);
   if(typeof Sync!=='undefined'&&Sync.afterStart)Sync.afterStart();
   /* hash-ссылка #/read/<id>[/<token>] — открыть чужую книгу при загрузке */
   if(typeof routeReadHash==='function')routeReadHash();
+}
+
+/* «Перейти к содержимому»: цель зависит от открытого вида — если редактор
+   скрыт, ведём на ближайшую видимую область, иначе фокус никуда не уедет */
+function bindSkipLink(){
+  var sl=$('#skipLink');
+  if(!sl||sl._bound)return;
+  sl._bound=1;
+  sl.addEventListener('click',function(e){
+    var as=$('#authScreen');
+    if(as&&!as.classList.contains('off')){
+      /* авторизация перекрывает всё — ведём в неё */
+      e.preventDefault();
+      var f=as.querySelector('.auth-user')||as.querySelector('#authName')||as.querySelector('#authSubmit');
+      if(f)f.focus();
+      return;
+    }
+    if(editor&&editor.getClientRects().length)return;
+    e.preventDefault();
+    var alt=!library.hidden?library:(!bookView.hidden?bookView:null);
+    if(!alt)return;
+    alt.setAttribute('tabindex','-1');
+    alt.focus();
+    alt.removeAttribute('tabindex');
+  });
 }
 
 loadAccounts();
 function localBoot(){
   var sess=accounts.users.filter(function(u){return u.id===accounts.session})[0];
   if(sess){enterApp(sess);return}
-  /* гостевое чтение по ссылке #/read/… — без входа в аккаунт */
-  if((location.hash||'').indexOf('#/read/')===0){
+  /* гостевое чтение по ссылке #/read/… — только на чистом браузере:
+     при наличии локальных профилей уходим в авторизацию (иначе правки
+     оседают в u:guest и теряются, H9); hash сохранится — после входа
+     startApp вызовет routeReadHash и книга откроется */
+  if((location.hash||'').indexOf('#/read/')===0&&!accounts.session&&!accounts.users.length){
     enterApp({id:'guest',login:'guest',name:'Гость',salt:'',hash:'',created:Date.now(),lastLogin:Date.now()});
     return;
   }
@@ -63,6 +92,9 @@ function localBoot(){
   }
 }
 function boot(){
+  /* статическая разметка уже в DOM — раздаём aria-label иконным кнопкам */
+  if(typeof a11yPass==='function')a11yPass(document);
+  bindSkipLink();
   /* сначала — серверная сессия (api/auth.php): если она есть, входим без локального пароля */
   if(typeof Sync==='undefined'||!Sync||!Sync.boot){localBoot();return}
   Sync.boot().then(function(u){

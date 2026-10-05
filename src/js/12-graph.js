@@ -26,9 +26,27 @@ var graphState={
   selectedId:null,
   hoverId:null,
   pinned:{},               /* id -> true */
+  rings:null,              /* реальные радиусы колец от layoutRadial */
+  posCache:{},             /* id -> {x,y,w,h} закреплённых узлов */
+  lastClickId:null,
+  lastClickTime:0,
   lastPainted:0
 };
 var graphTimer=null;
+var graphRafId=null;
+var graphOpenTimer=null;
+
+/* перерисовка не чаще кадра — при быстром перетаскивании узлов */
+function scheduleGraphPaint(){
+  if(graphRafId)return;
+  graphRafId=requestAnimationFrame(function(){graphRafId=null;paintGraph()});
+}
+/* только transform — без перестройки SVG (пан и зум) */
+function applyGraphTransform(){
+  var g=document.getElementById('graphTransform');
+  if(!g){paintGraph();return}
+  g.setAttribute('transform','translate('+graphState.panX.toFixed(1)+','+graphState.panY.toFixed(1)+') scale('+graphState.zoom.toFixed(3)+')');
+}
 
 function scheduleGraph(){
   if(!$('#wikiPanel').classList.contains('on')||panelTab!=='graph')return;
@@ -151,6 +169,9 @@ function layoutRadial(nodes,links,W,H,mainId){
     levelRadius.push(r);
     prevR=r;
   }
+  /* реальные радиусы колец — paintGraph рисует направляющие по ним,
+     а не по приблизительной формуле от depth */
+  graphState.rings=levelRadius;
   main.x=cx;main.y=cy;
   for(var L=1;L<=maxLevel;L++){
     var ring=byLevel[L];
@@ -171,11 +192,19 @@ function layoutRadial(nodes,links,W,H,mainId){
       nd.y=cy+Math.sin(angle)*r2;
     });
   }
-  /* разведение наложений */
-  for(var iter=0;iter<50;iter++){
+  /* закреплённые узлы возвращаем на сохранённую позицию */
+  var pc=graphState.posCache;
+  nodes.forEach(function(nd){
+    if(graphState.pinned[nd.id]&&pc[nd.id]){nd.x=pc[nd.id].x;nd.y=pc[nd.id].y}
+  });
+  /* разведение наложений — число итераций ограничено размером графа,
+     чтобы раскладка сотен узлов не подвешивала интерфейс */
+  var sepIter=n>200?8:(n>100?20:50);
+  for(var iter=0;iter<sepIter;iter++){
     var moved=false;
     for(var i=0;i<nodes.length;i++){
       var a=nodes[i];if(a.id===mainId)continue;
+      if(graphState.pinned[a.id])continue;
       for(var j=i+1;j<nodes.length;j++){
         var b=nodes[j];if(b.id===mainId)continue;
         var dx=b.x-a.x,dy=b.y-a.y;
@@ -184,8 +213,8 @@ function layoutRadial(nodes,links,W,H,mainId){
         if(d<minD){
           var push=(minD-d)/2;
           var ux=dx/d,uy=dy/d;
+          if(!graphState.pinned[b.id]){b.x+=ux*push;b.y+=uy*push}
           a.x-=ux*push;a.y-=uy*push;
-          b.x+=ux*push;b.y+=uy*push;
           moved=true;
         }
       }
@@ -208,12 +237,27 @@ function layoutCircle(nodes,links,W,H,mainId){
     return b.score-a.score;
   });
   var cx=W/2,cy=H/2;
-  var r=Math.max(70,Math.min(W,H)/2-70);
+  /* радиус кольца — от вместимости: узлы с крупными радиусами не налезают */
+  var need=0;
+  sorted.forEach(function(nd){need+=nodeRadius(nd,nd.id===mainId)*2+26});
+  var rMax=Math.min(W,H)/2-70;
+  var rMin=need/(Math.PI*2);
+  var r=Math.max(70,Math.min(rMax,Math.max(rMin,Math.min(W,H)/4)));
   var step=(Math.PI*2)/n;
   sorted.forEach(function(nd,i){
     var ang=-Math.PI/2+step*i;
     nd.x=cx+Math.cos(ang)*r;
     nd.y=cy+Math.sin(ang)*r;
+  });
+  /* закреплённые узлы остаются на своих местах */
+  var pc=graphState.posCache;
+  nodes.forEach(function(nd){
+    if(graphState.pinned[nd.id]&&pc[nd.id]){nd.x=pc[nd.id].x;nd.y=pc[nd.id].y}
+  });
+  var pad=44;
+  nodes.forEach(function(nd){
+    nd.x=Math.max(pad,Math.min(W-pad,nd.x));
+    nd.y=Math.max(pad,Math.min(H-pad,nd.y));
   });
 }
 
@@ -237,7 +281,8 @@ function layoutForce(nodes,links,W,H,mainId){
     nd._dx=0; nd._dy=0;
   });
 
-  var ITER=400;
+  /* O(n²) на итерацию — масштабируем итерации по размеру графа */
+  var ITER=n>250?60:(n>120?120:400);
   for(var it=0;it<ITER;it++){
     for(var i=0;i<n;i++){nodes[i]._dx=0;nodes[i]._dy=0;}
 
@@ -286,7 +331,8 @@ function layoutForce(nodes,links,W,H,mainId){
     if(temp<0.5)break;
   }
   /* финальная уборка границ и наложений */
-  for(var iter=0;iter<30;iter++){
+  var forceSep=n>200?6:(n>100?14:30);
+  for(var iter=0;iter<forceSep;iter++){
     var moved=false;
     for(var i=0;i<n;i++){
       var a=nodes[i]; if(graphState.pinned[a.id])continue;
@@ -332,8 +378,13 @@ function paintGraph(){
   if(!svg||!d)return;
   var W=graphState.W,H=graphState.H;
   if(!W||!H)return;
-  svg.setAttribute('viewBox','0 0 '+W+' '+H);
-  svg.setAttribute('width',W);svg.setAttribute('height',H);
+    svg.setAttribute('viewBox','0 0 '+W+' '+H);
+    svg.setAttribute('width',W);svg.setAttribute('height',H);
+    /* схема — изображение: текстовый эквивалент списка рангов (.gp-row) ниже */
+    svg.setAttribute('role','img');
+    svg.setAttribute('aria-label','Схема книги: '+d.nodes.length+' '+plural(d.nodes.length,'узел','узла','узлов')+
+      ', '+d.links.length+' '+plural(d.links.length,'связь','связи','связей')+
+      (focusId?' · фокус на выбранном элементе':''));
 
   var V=svgVars();
   var cx=W/2,cy=H/2;
@@ -373,13 +424,13 @@ function paintGraph(){
 
   var s='<g id="graphTransform" transform="translate('+graphState.panX.toFixed(1)+','+graphState.panY.toFixed(1)+') scale('+graphState.zoom.toFixed(3)+')">';
 
-  /* Концентрические направляющие для радиального режима.
+  /* Концентрические направляющие для радиального режима — по реальным
+     радиусам из layoutRadial (graphState.rings), а не по формуле от depth.
      Прячем их при фокусе на узле — чтобы не путали выделенное окружение. */
-  if(graphState.mode==='radial' && !focusId){
-    var maxR=Math.max(80,Math.min(W,H)/2-60);
-    var levels=Math.min(graphState.depth|0,4);
-    for(var L=1;L<=levels;L++){
-      var rLevel=maxR*(L/levels);
+  if(graphState.mode==='radial' && !focusId && graphState.rings){
+    var rings=graphState.rings;
+    for(var L=1;L<rings.length;L++){
+      var rLevel=rings[L];
       s+='<circle class="gp-ring" cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+rLevel.toFixed(1)+'"/>';
       s+='<text class="gp-ring-label" x="'+(cx+rLevel+4).toFixed(1)+'" y="'+(cy-4).toFixed(1)+'">'+L+'</text>';
     }
@@ -406,6 +457,7 @@ function paintGraph(){
   });
 
   /* Узлы */
+  var labelQueue=[];
   d.nodes.forEach(function(n){
     var isMain=n.id===mainId;
     var isActive=n.id===activeId;
@@ -438,9 +490,41 @@ function paintGraph(){
       }
       var labelCls='glabel'+(isMain?' gmain':'')+(isRel?' grel':'');
       var label=n.name.length>22?n.name.slice(0,21)+'…':n.name;
-      s+='<text class="'+labelCls+'" x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" text-anchor="'+anchor+'">'+esc(label)+'</text>';
+      labelQueue.push({x:lx,y:ly,anchor:anchor,cls:labelCls,text:label,
+        pri:(isMain?2:(isRel?1:0))});
     }
   });
+
+  /* Размещение подписей без пересечений: сначала приоритетные (главный,
+     окружение фокуса), затем остальные. Конфликтующие сдвигаются вверх/вниз,
+     без места — скрываются, кроме приоритетных. */
+  if(labelQueue.length){
+    labelQueue.sort(function(a,b){return b.pri-a.pri});
+    var placed=[];
+    labelQueue.forEach(function(L){
+      var w=L.text.length*5.6+6,h=11;
+      var x0=L.anchor==='start'?L.x:(L.anchor==='end'?L.x-w:L.x-w/2);
+      var box={x0:x0,y0:L.y-h,x1:x0+w,y1:L.y+3};
+      var cand=[[0,0],[0,-12],[0,12],[-w*0.6,0],[w*0.6,0]];
+      var ok=null;
+      for(var ci=0;ci<cand.length;ci++){
+        var b2={x0:box.x0+cand[ci][0],y0:box.y0+cand[ci][1],x1:box.x1+cand[ci][0],y1:box.y1+cand[ci][1]};
+        var hit=false;
+        for(var pi=0;pi<placed.length;pi++){
+          var p=placed[pi];
+          if(b2.x0<p.x1&&b2.x1>p.x0&&b2.y0<p.y1&&b2.y1>p.y0){hit=true;break}
+        }
+        if(!hit){ok=b2;break}
+      }
+      if(!ok&&L.pri<2)return;
+      var px=(ok||box);
+      placed.push(px);
+      var dx=px.x0-box.x0,dy=px.y0-box.y0;
+      if(dx||dy)s+='<g transform="translate('+dx.toFixed(1)+','+dy.toFixed(1)+')">';
+      s+='<text class="'+L.cls+'" x="'+L.x.toFixed(1)+'" y="'+L.y.toFixed(1)+'" text-anchor="'+L.anchor+'">'+esc(L.text)+'</text>';
+      if(dx||dy)s+='</g>';
+    });
+  }
 
   s+='</g>';
   svg.innerHTML=s;
@@ -489,11 +573,11 @@ function renderGraphRank(){
   nodes.slice(0,12).forEach(function(n,i){
     var pct=Math.max(3,Math.round((n.score/(maxScore||1))*100));
     var isFocus=(focusId===n.id);
-    html+='<div class="gp-row'+(i===0?' is-main':'')+(isFocus?' is-focus':'')+'" data-id="'+escAttr(n.id)+'">'+
+    html+='<button type="button" class="gp-row'+(i===0?' is-main':'')+(isFocus?' is-focus':'')+'" data-id="'+escAttr(n.id)+'" aria-pressed="'+(isFocus?'true':'false')+'">'+
       '<span class="gp-i">'+(i+1)+'</span>'+
       '<span class="gp-name" title="'+escAttr(n.name)+'">'+esc(n.name)+'</span>'+
       '<span class="gp-bar"><i style="width:'+pct+'%;background:'+wikiTypeColor(n.type)+'"></i></span>'+
-      '<span class="gp-v">'+fmt(n.mentions)+'</span></div>';
+      '<span class="gp-v">'+fmt(n.mentions)+'</span></button>';
   });
   html+='</div>';
   var focusNode=focusId?nodes.find(function(x){return x.id===focusId}):null;
@@ -506,10 +590,10 @@ function renderGraphRank(){
     html+='<div class="gp-h" style="margin-top:18px"><span class="lbl">Ближайшее окружение «'+esc(anchorNode.name)+'»</span></div><div class="gp-list">';
     rels.forEach(function(r){
       var pct=Math.max(4,Math.round((r.w/maxW)*100));
-      html+='<div class="gp-row" data-id="'+escAttr(r.n.id)+'"><span class="gp-i">→</span>'+
+      html+='<button type="button" class="gp-row" data-id="'+escAttr(r.n.id)+'" aria-pressed="'+(focusId===r.n.id?'true':'false')+'"><span class="gp-i">→</span>'+
         '<span class="gp-name" title="'+escAttr(r.n.name)+'">'+esc(r.n.name)+'</span>'+
         '<span class="gp-bar"><i style="width:'+pct+'%;background:var(--accent)"></i></span>'+
-        '<span class="gp-v">'+fmt(r.w)+'</span></div>';
+        '<span class="gp-v">'+fmt(r.w)+'</span></button>';
     });
     html+='</div>';
   }else{
@@ -547,6 +631,7 @@ function renderGraphTypeBar(){
     btn.style.setProperty('--tc',wikiTypeColor(k));
     btn.textContent=wikiTypeLabel(k)+' · '+cnt;
     btn.title=graphState.hiddenTypes[k]?'Включить':'Скрыть';
+    btn.setAttribute('aria-pressed',graphState.hiddenTypes[k]?'false':'true');
     btn.addEventListener('click',function(){
       graphState.hiddenTypes[k]=!graphState.hiddenTypes[k];
       renderGraphTypeBar();
@@ -556,20 +641,24 @@ function renderGraphTypeBar(){
   });
 }
 
-function buildAndRenderGraph(rebuild){
+function buildAndRenderGraph(rebuild,keepView){
   var pane=$('#paneGraph');
   if(!pane||pane.hidden)return;
   var box=$('#graphCanvas');
   var W=box.clientWidth|0,H=box.clientHeight|0;
-  if(W<40||H<40){setTimeout(function(){buildAndRenderGraph(rebuild)},120);return}
+  if(W<40||H<40){setTimeout(function(){buildAndRenderGraph(rebuild,keepView)},120);return}
   var d=buildGraphData();
   graphState.data=d;
   graphState.W=W;graphState.H=H;
-  graphState.zoom=1;graphState.panX=0;graphState.panY=0;
+  /* вид (зум/пан) сохраняем по умолчанию — не сбрасываем при рефлоу и
+     мелких перестройках; явный сброс — через keepView=true (fit/смена режима) */
+  if(keepView){graphState.zoom=1;graphState.panX=0;graphState.panY=0}
+  if(graphState.mode!=='radial')graphState.rings=null;
   var svg=$('#graphSvg');
   if(!d.nodes.length){
     svg.innerHTML='';
     graphState.mainId=null;
+    graphState.posCache={};
     renderGraphTypeBar();
     renderGraphLegend();
     renderGraphRank();
@@ -585,6 +674,10 @@ function buildAndRenderGraph(rebuild){
     if(graphState.mode==='radial')layoutRadial(nodes,links,W,H,graphState.mainId);
     else if(graphState.mode==='circle')layoutCircle(nodes,links,W,H,graphState.mainId);
     else layoutForce(nodes,links,W,H,graphState.mainId);
+    /* запоминаем позиции закреплённых узлов для следующих перестроек */
+    var pc={};
+    nodes.forEach(function(nd){if(graphState.pinned[nd.id])pc[nd.id]={x:nd.x,y:nd.y}});
+    graphState.posCache=pc;
   }
   paintGraph();
   renderGraphTypeBar();
@@ -600,33 +693,45 @@ function zoomBy(k){
   graphState.panX=cx-kk*(cx-graphState.panX);
   graphState.panY=cy-kk*(cy-graphState.panY);
   graphState.zoom=newZoom;
-  paintGraph();
+  applyGraphTransform();
 }
 document.querySelectorAll('.gp-mode').forEach(function(b){
   b.addEventListener('click',function(){
     graphState.mode=b.dataset.mode;
-    document.querySelectorAll('.gp-mode').forEach(function(x){x.classList.toggle('on',x===b)});
+    document.querySelectorAll('.gp-mode').forEach(function(x){
+      x.classList.toggle('on',x===b);
+      x.setAttribute('aria-pressed',x===b?'true':'false');
+    });
     /* при смене режима сбрасываем закрепления, чтобы раскладка не спорила */
     graphState.pinned={};
-    buildAndRenderGraph(true);
+    graphState.posCache={};
+    buildAndRenderGraph(true,true);
   });
+});
+document.querySelectorAll('.gp-mode').forEach(function(x){
+  x.setAttribute('aria-pressed',x.classList.contains('on')?'true':'false');
 });
 $('#gpPeople').addEventListener('click',function(){
   graphState.people=!graphState.people;
   this.classList.toggle('on',graphState.people);
+  this.setAttribute('aria-pressed',graphState.people?'true':'false');
   buildAndRenderGraph(true);
 });
 $('#gpLabels').addEventListener('click',function(){
   graphState.labels=!graphState.labels;
   this.classList.toggle('on',graphState.labels);
+  this.setAttribute('aria-pressed',graphState.labels?'true':'false');
   paintGraph();
 });
 $('#gpLabels').classList.add('on');
+$('#gpLabels').setAttribute('aria-pressed','true');
+$('#gpPeople').setAttribute('aria-pressed','false');
 $('#gpRebuild').addEventListener('click',function(){
   invalidateCo();
   graphState.pinned={};
+  graphState.posCache={};
   graphState.focusId=null;
-  buildAndRenderGraph(true);
+  buildAndRenderGraph(true,true);
   toast('Схема пересобрана');
 });
 $('#gpExport').addEventListener('click',function(){
@@ -634,8 +739,19 @@ $('#gpExport').addEventListener('click',function(){
   if(!svg||!svg.innerHTML){toast('Схема пуста');return}
   var clone=svg.cloneNode(true);
   clone.setAttribute('xmlns','http://www.w3.org/2000/svg');
-  var cs=getComputedStyle(document.documentElement);
-  clone.style.background=cs.getPropertyValue('--bg').trim()||'#fff';
+  var V=svgVars();
+  /* внешний файл не видит 06-graph.css — впрыскиваем стили явно */
+  var st='<style>'+
+    'text{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;fill:'+V.ink3+';letter-spacing:.01em;paint-order:stroke;stroke:'+V.card+';stroke-width:3px;stroke-linejoin:round}'+
+    'text.gmain{fill:'+V.accent+';font-weight:600;font-size:12.5px}'+
+    'text.grel{fill:'+V.ink2+';font-weight:500}'+
+    '.gp-ring{fill:none;stroke:'+V.line+';stroke-dasharray:2 5;opacity:.5}'+
+    '.gp-ring-label{font-size:8px;fill:'+V.ink3+';stroke:none;opacity:.6}'+
+    '</style>';
+  clone.insertAdjacentHTML('afterbegin',st);
+  /* фон-прямоугольник — style="background" часть вьюеры SVG игнорируют */
+  var w=svg.getAttribute('width')||graphState.W,h=svg.getAttribute('height')||graphState.H;
+  clone.insertAdjacentHTML('afterbegin','<rect width="'+w+'" height="'+h+'" fill="'+V.bg+'"/>');
   var blob=new Blob([clone.outerHTML],{type:'image/svg+xml;charset=utf-8'});
   var a=mk('a');
   a.href=URL.createObjectURL(blob);
@@ -666,6 +782,7 @@ $('#gpWeight').addEventListener('change',function(){
   var drag=null,moved=false,startX=0,startY=0;
   var panning=false,px=0,py=0,startPanX=0,startPanY=0;
   var nodeTip=$('#gpNodeTip');
+  var pointers={},pinch=null;   /* пинч-зум двумя пальцами */
 
   function findNode(id){
     var d=graphState.data;if(!d)return null;
@@ -690,6 +807,26 @@ $('#gpWeight').addEventListener('change',function(){
   function hideNodeTip(){if(nodeTip)nodeTip.classList.remove('on')}
 
   svg.addEventListener('pointerdown',function(e){
+    /* новый жест — гасим непросроченное отложенное открытие статьи */
+    if(graphOpenTimer){clearTimeout(graphOpenTimer);graphOpenTimer=null}
+    pointers[e.pointerId]={x:e.clientX,y:e.clientY};
+    var ids=Object.keys(pointers);
+    if(ids.length===2){
+      /* второй палец — переходим в режим пинч-зума */
+      drag=null;panning=false;canvas.classList.remove('panning','dragging');
+      var a=pointers[ids[0]],b=pointers[ids[1]];
+      pinch={
+        d0:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),
+        z0:graphState.zoom,
+        mx:(a.x+b.x)/2,my:(a.y+b.y)/2,
+        panX0:graphState.panX,panY0:graphState.panY
+      };
+      hideNodeTip();
+      try{svg.setPointerCapture(e.pointerId)}catch(err){}
+      e.preventDefault();
+      return;
+    }
+    if(pinch)return;
     var c=e.target.closest?e.target.closest('circle.gnode'):null;
     if(!c){
       panning=true;px=e.clientX;py=e.clientY;
@@ -708,10 +845,26 @@ $('#gpWeight').addEventListener('change',function(){
     e.preventDefault();
   });
   svg.addEventListener('pointermove',function(e){
+    if(pointers[e.pointerId]){pointers[e.pointerId].x=e.clientX;pointers[e.pointerId].y=e.clientY}
+    if(pinch){
+      var ids=Object.keys(pointers);
+      if(ids.length<2)return;
+      var a=pointers[ids[0]],b=pointers[ids[1]];
+      var d=Math.max(1,Math.hypot(a.x-b.x,a.y-b.y));
+      var rect=svg.getBoundingClientRect();
+      var mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+      var newZoom=Math.max(0.35,Math.min(3.2,pinch.z0*(d/pinch.d0)));
+      var kk=newZoom/pinch.z0;
+      graphState.zoom=newZoom;
+      graphState.panX=(mx-rect.left)-kk*((pinch.mx-rect.left)-pinch.panX0);
+      graphState.panY=(my-rect.top)-kk*((pinch.my-rect.top)-pinch.panY0);
+      applyGraphTransform();
+      return;
+    }
     if(panning){
       graphState.panX=startPanX+(e.clientX-px);
       graphState.panY=startPanY+(e.clientY-py);
-      paintGraph();
+      applyGraphTransform();
       return;
     }
     if(!drag){
@@ -728,43 +881,81 @@ $('#gpWeight').addEventListener('change',function(){
     drag.x=(e.clientX-r.left-graphState.panX)/z;
     drag.y=(e.clientY-r.top-graphState.panY)/z;
     graphState.pinned[drag.id]=true;
-    paintGraph();
+    scheduleGraphPaint();
   });
+  function endPointer(e){
+    delete pointers[e.pointerId];
+    if(pinch&&Object.keys(pointers).length<2)pinch=null;
+    try{svg.releasePointerCapture(e.pointerId)}catch(err){}
+  }
   svg.addEventListener('pointerup',function(e){
+    var wasPinch=!!pinch;
+    var remain=[];
+    Object.keys(pointers).forEach(function(k){
+      if(String(k)!==String(e.pointerId))remain.push(k);
+    });
+    endPointer(e);
+    if(wasPinch){
+      pinch=null;
+      if(remain.length===1&&pointers[remain[0]]){
+        /* один палец остался — переходим в обычное панорамирование */
+        var p=pointers[remain[0]];
+        panning=true;px=p.x;py=p.y;
+        startPanX=graphState.panX;startPanY=graphState.panY;
+        canvas.classList.add('panning');
+      }
+      return;
+    }
     if(panning){
       panning=false;
       canvas.classList.remove('panning');
-      try{svg.releasePointerCapture(e.pointerId)}catch(err){}
       return;
     }
     if(!drag)return;
     var wasMoved=moved;
     var id=drag.id;
+    var dpos=wasMoved?{x:drag.x,y:drag.y}:null;
     drag=null;
     canvas.classList.remove('dragging');
-    try{svg.releasePointerCapture(e.pointerId)}catch(err){}
     if(!wasMoved){
-      openWikiView(id);
+      /* одиночный клик открывает статью, но с задержкой: второй клик в
+         пределах DBL_MS отменяет открытие и переключает фокус.
+         Раньше модалка успевала перекрыть второй клик — фокус был недостижим. */
+      var now=Date.now();
+      var isDbl=(graphState.lastClickId===id)&&(now-graphState.lastClickTime<450);
+      clearTimeout(graphOpenTimer);graphOpenTimer=null;
+      if(isDbl){
+        graphState.lastClickId=null;graphState.lastClickTime=0;
+        graphState.focusId=(graphState.focusId===id)?null:id;
+        paintGraph();renderGraphRank();
+      }else{
+        graphState.lastClickId=id;graphState.lastClickTime=now;
+        graphOpenTimer=setTimeout(function(){
+          graphOpenTimer=null;
+          if(graphState.lastClickId===id){
+            graphState.lastClickId=null;graphState.lastClickTime=0;
+            openWikiView(id);
+          }
+        },450);
+      }
     } else {
+      if(dpos)graphState.posCache[id]=dpos;
       renderGraphRank();
     }
   });
   svg.addEventListener('pointerleave',function(){hideNodeTip()});
-  svg.addEventListener('pointercancel',function(){
-    drag=null;panning=false;canvas.classList.remove('panning','dragging');
+  svg.addEventListener('pointercancel',function(e){
+    delete pointers[e.pointerId];
+    drag=null;panning=false;pinch=null;canvas.classList.remove('panning','dragging');
     hideNodeTip();
   });
 
   svg.addEventListener('dblclick',function(e){
-    var c=e.target.closest?e.target.closest('circle.gnode'):null;
-    if(!c){
-      if(graphState.focusId){graphState.focusId=null;paintGraph();renderGraphRank();}
-      return;
-    }
-    var id=c.getAttribute('data-id');
-    graphState.focusId=(graphState.focusId===id)?null:id;
-    paintGraph();
-    renderGraphRank();
+    /* фокус по второму клику обрабатывается в pointerup по таймингу —
+       здесь только фон: двойной клик по пустому месту сбрасывает фокус */
+    if(e.target.closest&&e.target.closest('circle.gnode'))return;
+    clearTimeout(graphOpenTimer);graphOpenTimer=null;
+    if(graphState.focusId){graphState.focusId=null;paintGraph();renderGraphRank();}
   });
 
   canvas.addEventListener('wheel',function(e){
@@ -780,7 +971,7 @@ $('#gpWeight').addEventListener('change',function(){
     graphState.panX=mx-kk*(mx-graphState.panX);
     graphState.panY=my-kk*(my-graphState.panY);
     graphState.zoom=newZoom;
-    paintGraph();
+    applyGraphTransform();
   },{passive:false});
 
   $('#gpZoomIn').addEventListener('click',function(){zoomBy(1.25)});
@@ -789,7 +980,8 @@ $('#gpWeight').addEventListener('change',function(){
     graphState.zoom=1;graphState.panX=0;graphState.panY=0;
     graphState.focusId=null;
     graphState.pinned={};
-    buildAndRenderGraph(true);
+    graphState.posCache={};
+    buildAndRenderGraph(true,true);
   });
 })();
 if('ResizeObserver' in window){

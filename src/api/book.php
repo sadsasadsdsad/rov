@@ -29,8 +29,12 @@ if ($method === 'PUT' || $method === 'POST') {
     $b['title'] = mb_substr((string)($b['title'] ?? 'Без названия'), 0, 255);
     $b['author'] = mb_substr((string)($b['author'] ?? ''), 0, 255);
     $b['updated'] = isset($b['updated']) ? (int)$b['updated'] : ts();
+    /* F10: часы клиента впереди больше чем на 10 минут — не даём им
+       вечным «будущим» выигрывать LWW у всех устройств */
+    if ($b['updated'] > ts() + 600000) $b['updated'] = ts();
+    if ($b['updated'] < 0) $b['updated'] = ts();
 
-    $row = db_one('SELECT user_id, updated, visibility, share_token FROM books WHERE id = ?', [$id]);
+    $row = db_one('SELECT user_id, updated, visibility, share_token, content FROM books WHERE id = ?', [$id]);
     if ($row) {
         if ((string)$row['user_id'] !== (string)$u['id']) json_err(403, 'not your book');
         if ((int)$row['updated'] > $b['updated']) {
@@ -47,13 +51,28 @@ if ($method === 'PUT' || $method === 'POST') {
     /* токен ссылки: живёт в колонке share_token, в content не попадает */
     $token = $row ? (string)$row['share_token'] : '';
     $reqToken = preg_replace('/[^a-f0-9]/', '', strtolower((string)($b['share_token'] ?? '')));
+    if (strlen($reqToken) !== 32) $reqToken = '';   /* F9: только 32-hex, иначе игнорируем */
     unset($b['share_token']);
     if ($b['visibility'] !== 'private') {
         if ($reqToken !== '') $token = $reqToken;
         elseif ($token === '') $token = bin2hex(random_bytes(16));
+        /* F9: токен должен быть уникален (дубли делают ссылку неоднозначной) —
+           коллизия чужого токена (например, бэкап-восстановление) → новый */
+        for ($i = 0; $i < 8; $i++) {
+            $c = db_one('SELECT id FROM books WHERE share_token = ?', [$token]);
+            if ($c === null || (string)$c['id'] === $id) break;
+            $token = bin2hex(random_bytes(16));
+        }
     }
 
-    if (!isset($b['chapters']) || !is_array($b['chapters'])) $b['chapters'] = [];
+    /* F11: частичный PUT (без ключа chapters) не должен затирать текст —
+       главы берутся из текущей записи. Пустой массив остаётся пустым:
+       это настоящое «удалили все главы». */
+    if (!isset($b['chapters']) || !is_array($b['chapters'])) {
+        $cur = $row ? json_decode((string)$row['content'], true) : null;
+        $b['chapters'] = (is_array($cur) && isset($cur['chapters']) && is_array($cur['chapters']))
+            ? $cur['chapters'] : [];
+    }
 
     $content = json_encode($b, JSON_UNESCAPED_UNICODE);
     if ($content === false) json_err(422, 'bad book json');
@@ -66,10 +85,21 @@ if ($method === 'PUT' || $method === 'POST') {
             [$b['title'], $b['author'], $b['updated'], $b['visibility'], $tokBind, $content, $id]
         );
     } else {
-        db_run(
-            'INSERT INTO books(id,user_id,title,author,updated,visibility,share_token,content,version) VALUES(?,?,?,?,?,?,?,?,1)',
-            [$id, $u['id'], $b['title'], $b['author'], $b['updated'], $b['visibility'], $tokBind, $content]
-        );
+        try {
+            db_run(
+                'INSERT INTO books(id,user_id,title,author,updated,visibility,share_token,content,version) VALUES(?,?,?,?,?,?,?,?,1)',
+                [$id, $u['id'], $b['title'], $b['author'], $b['updated'], $b['visibility'], $tokBind, $content]
+            );
+        } catch (PDOException $e) {
+            /* гонка: книга с этим id уже вставлена параллельным запросом —
+               повторяем как UPDATE (LWW уже проверен выше) */
+            $own = db_one('SELECT user_id FROM books WHERE id = ?', [$id]);
+            if (!$own || (string)$own['user_id'] !== (string)$u['id']) json_err(409, 'id conflict');
+            db_run(
+                'UPDATE books SET title = ?, author = ?, updated = ?, visibility = ?, share_token = ?, content = ?, version = version + 1 WHERE id = ?',
+                [$b['title'], $b['author'], $b['updated'], $b['visibility'], $tokBind, $content, $id]
+            );
+        }
     }
     json_out([
         'ok' => true,

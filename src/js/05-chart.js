@@ -26,7 +26,12 @@ function renderStats(){
   if(!svg||!plot)return;
   tip.classList.remove('on');
   var W=plot.clientWidth|0,H=plot.clientHeight|0;
-  if(W<10||H<10){setTimeout(renderStats,60);return}
+  if(W<10||H<10){
+    /* M7: при скрытой библиотеке график нулевого размера — не крутим
+       самовозобновляющийся таймер (16 вызовов/сек, парсинг всех глав) */
+    if(!library||library.hidden)return;
+    setTimeout(renderStats,60);return;
+  }
   svg.setAttribute('viewBox','0 0 '+W+' '+H);
   svg.setAttribute('width',W);svg.setAttribute('height',H);
   svg.removeAttribute('preserveAspectRatio');

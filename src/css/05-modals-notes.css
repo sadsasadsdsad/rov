@@ -95,12 +95,13 @@
 .wk-card{background:transparent;border:1px dashed var(--line);border-radius:9px;padding:8px 11px;cursor:pointer;transition:border-color .15s,background .15s;position:relative;content-visibility:auto;contain-intrinsic-size:auto 72px}
 .wk-card:hover{border-color:var(--accent);background:var(--hover)}
 .wk-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wk-open{display:flex;align-items:center;gap:7px;flex:1;min-width:0;overflow:hidden;text-align:left}
 .wk-dia{width:7px;height:7px;transform:rotate(45deg);flex:0 0 auto;background:var(--ink3)}
 .wk-name{font-weight:600;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
 .wk-card[data-type="person"] .wk-name{color:var(--accent)}
 .wk-type{font-family:var(--f-ui);font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);border-radius:99px;padding:2px 7px;flex:0 0 auto}
 .wk-del{width:18px;height:18px;display:grid;place-items:center;color:var(--ink3);font-size:13px;line-height:1;opacity:0;transition:opacity .15s,color .15s;flex:0 0 auto;background:transparent;border:0}
-.wk-card:hover .wk-del{opacity:1}
+.wk-card:hover .wk-del,.wk-card:focus-within .wk-del{opacity:1}
 .wk-del:hover{color:var(--accent)}
 .wk-alias{font-family:var(--f-ui);font-size:8.5px;color:var(--ink3);margin-top:3px;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wk-desc{font-size:11px;color:var(--ink2);margin-top:4px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -118,9 +119,9 @@
 .note-head b{color:var(--accent);font-weight:500;white-space:nowrap}
 .note-head span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .note-txt{font-size:12.5px;line-height:1.6;color:var(--ink2);white-space:pre-wrap;word-break:break-word;max-height:120px;overflow:hidden;position:relative}
-.note-card.open .note-txt{max-height:none}
+.note-card.open .note-txt,.note-card:focus-within .note-txt{max-height:none}
 .note-acts{display:flex;gap:6px;margin-top:8px;opacity:0;transition:opacity .15s;flex-wrap:wrap}
-.note-card:hover .note-acts,.note-card.open .note-acts{opacity:1}
-.note-btn{font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);border-radius:6px;padding:3px 8px;background:transparent;transition:.15s}
+.note-card:hover .note-acts,.note-card.open .note-acts,.note-card:focus-within .note-acts{opacity:1}
+.note-btn{font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);border-radius:6px;padding:3px 8px;background:transparent;transition:color .15s,border-color .15s}
 .note-btn:hover{color:var(--accent);border-color:var(--accent)}
 

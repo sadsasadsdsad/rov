@@ -27,6 +27,7 @@ $('#wmSave').addEventListener('click',function(){
   }else{
     b.wiki.push({id:uid(),type:selectedType,name:name,desc:$('#wmDesc').value.trim(),aliases:aliases});
   }
+  b.updated=Date.now();                    /* H5 */
   persist();invalidateCo();
   closeWikiModal();renderWiki();
   if(!$('#paneGraph').hidden)scheduleGraph();
@@ -39,6 +40,7 @@ $('#wmDelete').addEventListener('click',function(){
   uiConfirm('Удалить статью?','«'+(en?en.name:'')+'» исчезнет из энциклопедии.',true).then(function(ok){
     if(!ok)return;
     b.wiki=b.wiki.filter(function(x){return x.id!==editingWikiId});
+    b.updated=Date.now();                    /* H5 */
     persist();invalidateCo();
     closeWikiModal();renderWiki();
     if(!$('#paneGraph').hidden)scheduleGraph();

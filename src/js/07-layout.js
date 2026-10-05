@@ -10,6 +10,7 @@
 "use strict";
 /* ===== layout ===== */
 function setLayoutVars(){
+  if(!state||!state.ui)return;             /* M8: до initState state не создан */
   var u=state.ui,r=document.documentElement.style;
   r.setProperty('--side-w',(u.sideW||272)+'px');
   r.setProperty('--wiki-w',(u.wikiW||390)+'px');
@@ -35,6 +36,7 @@ function dragX(handle,onMove){
 dragX(edRz,function(dx){state.ui.edW=clamp((state.ui.edW||660)+dx*2,520,1040);document.documentElement.style.setProperty('--ed-w',state.ui.edW+'px');positionEdRz()});
 addEventListener('resize',function(){
   positionEdRz();
+  if(typeof state==='undefined'||!state)return;   /* M8: ресайз до старта приложения */
   updateStats();
   if(searchOpen)positionSearchResults();
   if(!$('#paneGraph').hidden)scheduleGraph();
@@ -67,7 +69,7 @@ function uiAsk(cfg){
     var msg=$('#amMsg');
     if(cfg.message){msg.textContent=cfg.message;msg.hidden=false}else{msg.hidden=true;msg.textContent=''}
     var inp=$('#amInput');
-    if(cfg.input){inp.hidden=false;inp.value=(cfg.value==null?'':cfg.value);inp.placeholder=cfg.placeholder||''}
+    if(cfg.input){inp.hidden=false;inp.value=(cfg.value==null?'':cfg.value);inp.placeholder=cfg.placeholder||'';inp.setAttribute('aria-label',cfg.title||'Значение')}
     else{inp.hidden=true;inp.value=''}
     var ok=$('#amOk');
     ok.textContent=cfg.ok||'ОК';

@@ -157,14 +157,19 @@ function restoreFromSnapshot(key){
     state.books=snap.books.map(function(b){
       return {
         id:b.id,title:b.title||'Без названия',
+        author:(typeof b.author==='string')?b.author:'',
+        visibility:(b.visibility==='unlisted'||b.visibility==='public')?b.visibility:'private',
+        share_token:(typeof b.share_token==='string')?b.share_token:'',
         color:(COLORS.indexOf(b.color)>=0)?b.color:COLORS[0],
-        updated:b.updated||Date.now(),current:b.current||null,
+        /* откат должен победить свежую серверную версию (H8) — бампаем updated */
+        updated:Date.now(),current:b.current||null,
         customTypes:Array.isArray(b.customTypes)?b.customTypes:[],
         wiki:Array.isArray(b.wiki)?b.wiki:[],
         chapters:(b.chapters||[]).map(function(c){return {id:c.id,html:c.html||'',pos:c.pos||0,marks:Array.isArray(c.marks)?c.marks:[],kind:c.kind||''}})
       };
     });
     state.activeBookId=null;
+    if(typeof Sync!=='undefined'&&Sync){Sync.sentBooks={};Sync.markDirty()}
     Object.keys(snapshots).forEach(function(k){if(k>key)delete snapshots[k]});
     persistSnapshots();persist();
     invalidateCo();

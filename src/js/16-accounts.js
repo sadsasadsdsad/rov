@@ -3,8 +3,8 @@
  * Проект: «Черновик» — веб-редактор рукописей. tests/ — разобранная копия
  *   src/index.html: 18 JS-скриптов, подключаются строго по номеру.
  * Раздел оригинала: src/index.html, строки 5417–5778 (раздел 16 из 18).
- * Что делает: профили в localStorage, хеши паролей (PBKDF2 с запасным weak-хешем), обходной мастер-пароль (MASTER_PASS), экран #authScreen (вход/регистрация/профили), меню аккаунта (смена и удаление пароля).
- * Ключевое: hashPassword, verifyPassword, loadAccounts/saveAccounts, doSignup, enterApp, openAccMenu, changePassword, deleteAccount.
+ * Что делает: профили в localStorage, хеши паролей (PBKDF2 с запасным weak-хешем), обходной мастер-пароль (MASTER_PASS), экран #authScreen (профили/вход по логину и паролю/регистрация), меню аккаунта (смена и удаление пароля).
+ * Ключевое: hashPassword, verifyPassword, loadAccounts/saveAccounts, doSignup, doSignin, enterApp, openAccMenu, changePassword, deleteAccount.
  * Зависимости: 01-core (MASTER_PASS, ACC_LS), 07-layout (uiPrompt/uiConfirm), 17-start (startApp).
  * ========================================================================== */
 "use strict";
@@ -111,16 +111,20 @@ function authError(msg){
 }
 var authMode='login';
 function setAuthMode(m){
-  authMode=m;
-  document.querySelectorAll('.auth-tab').forEach(function(t){t.classList.toggle('on',t.dataset.mode===m)});
-  var isSignup=m==='signup';
-  $('#authProfiles').hidden=isSignup;
-  $('#authForm').hidden=!isSignup;
-  $('#authSub').textContent=isSignup?'новый профиль':'выберите профиль';
-  if(isSignup){
-    $('#authSubmit').textContent='СОЗДАТЬ ПРОФИЛЬ';
+  authMode=(m==='signin'||m==='signup')?m:'login';
+  document.querySelectorAll('.auth-tab').forEach(function(t){t.classList.toggle('on',t.dataset.mode===authMode)});
+  var isSignup=authMode==='signup',isSignin=authMode==='signin';
+  $('#authProfiles').hidden=(authMode!=='login');
+  $('#authForm').hidden=(authMode==='login');
+  $('#authNameField').hidden=isSignin;
+  $('#authPassOpt').hidden=isSignin;
+  $('#authPass2Field').hidden=true;
+  $('#authPass').autocomplete=isSignin?'current-password':'new-password';
+  $('#authSub').textContent=isSignin?'вход в аккаунт':(isSignup?'новый профиль':'выберите профиль');
+  if(isSignup||isSignin){
+    $('#authSubmit').textContent=isSignin?'ВОЙТИ':'СОЗДАТЬ ПРОФИЛЬ';
     authError('');
-    setTimeout(function(){$('#authName').focus()},80);
+    setTimeout(function(){(isSignin?$('#authLogin'):$('#authName')).focus()},80);
   } else {
     renderAuthProfiles();
   }
@@ -211,6 +215,9 @@ function validateSignup(){
 }
 function doSignup(){
   if(!validateSignup())return;
+  var btn=$('#authSubmit');
+  if(btn.disabled)return;                    /* защита от двойного сабмита (H3) */
+  btn.disabled=true;
   var name=$('#authName').value.trim();
   var login=$('#authLogin').value.trim().toLowerCase();
   var pass=$('#authPass').value;
@@ -233,9 +240,44 @@ function doSignup(){
     if(isFirst)migrateLegacyData(u.id);
     enterApp(u);
     if(pass)syncLogin(u,pass);
-  });
+  },function(){btn.disabled=false;authError('Не удалось обработать пароль — попробуйте ещё раз')});
 }
 /* серверный вход/регистрация (20-sync.js); при недоступности сервера — тихий переход в локальный режим */
+/* строгий вход в существующий серверный аккаунт (вкладка «Вход») */
+function doSignin(){
+  var login=$('#authLogin').value.trim().toLowerCase();
+  var pass=$('#authPass').value;
+  if(!login){authError('Введите логин');return}
+  if(!/^[a-z0-9_.-]{3,32}$/.test(login)){authError('Логин: 3-32 символа — латиница, цифры, _ - .');return}
+  if(!pass){authError('Введите пароль');return}
+  if(typeof Sync==='undefined'||!Sync||!Sync.login){authError('Синхронизация недоступна — обновите страницу');return}
+  authError('');
+  var btn=$('#authSubmit');btn.disabled=true;
+  Sync.login(login,pass).then(function(r){
+    btn.disabled=false;
+    if(!r.ok){
+      if(r.reason==='offline')authError('Нет связи с сервером — проверьте интернет');
+      else if(r.reason==='no-account')authError('На сервере нет аккаунта @'+login+' — создайте его во вкладке «Новый профиль».');
+      else if(r.reason==='wrong-password')authError('Неверный пароль для @'+login);
+      else authError('Сервер не ответил — попробуйте позже');
+      return;
+    }
+    var loc=findUser(login);
+    var isFirst=accounts.users.length===0;
+    if(!loc){
+      loc={id:uid()+uid(),login:login,name:((r.user&&r.user.name)||login),salt:'',hash:'',created:(r.user&&r.user.created)||Date.now(),lastLogin:Date.now()};
+      accounts.users.push(loc);
+      if(isFirst)migrateLegacyData(loc.id);
+    }else{
+      loc.lastLogin=Date.now();
+      if(r.user&&r.user.name)loc.name=r.user.name;
+    }
+    accounts.session=loc.id;
+    saveAccounts();
+    authError('');
+    enterApp(loc);           /* startApp сам вызовет afterStart → pull */
+  });
+}
 function syncLogin(u,pass){
   if(typeof Sync==='undefined'||!Sync||!Sync.join)return;
   Sync.join(u.login,u.name||u.login,pass).then(function(r){
@@ -246,9 +288,16 @@ function syncLogin(u,pass){
 }
 function enterApp(u){
   if(appStarted)return;
-  appStarted=true;
   authError('');
-  startApp(u);
+  try{
+    startApp(u);
+    appStarted=true;
+  }catch(e){
+    /* H1: если initState/startApp упал на битых данных — не оставляем
+       appStarted=true (иначе повторные клики молча ничего не делают) */
+    appStarted=false;
+    throw e;
+  }
 }
 function renderAccButtons(){
   document.querySelectorAll('.acc-btn').forEach(function(b){
@@ -265,15 +314,16 @@ function openAccMenu(anchor){
   var m=$('#accMenu');if(!m||!currentUser)return;
   var nb=state.books.length,tw=0;
   state.books.forEach(function(b){tw+=bookWords(b)});
-  m.innerHTML=
+  m.innerHTML='<div role="group">'+
     '<div class="acc-head"><div class="an"></div><div class="al"></div></div>'+
     '<div class="acc-stat"><span>книг</span><b>'+fmt(nb)+'</b></div>'+
     '<div class="acc-stat"><span>слов всего</span><b>'+fmt(tw)+'</b></div>'+
     '<div class="acc-stat"><span>синхронизация</span><b>'+((typeof Sync!=='undefined'&&Sync.mode==='server')?'вкл':'локально')+'</b></div>'+
-    '<button class="bm-item" data-a="pass"><span class="bm-badge">✱</span><span class="t">Сменить пароль</span></button>'+
-    '<button class="bm-item" data-a="switch"><span class="bm-badge">⇄</span><span class="t">Сменить профиль</span></button>'+
-    '<button class="bm-item" data-a="logout"><span class="bm-badge">⎋</span><span class="t">Выйти</span></button>'+
-    '<button class="bm-item" data-a="del"><span class="bm-badge">×</span><span class="t">Удалить аккаунт</span></button>';
+    '<button type="button" class="bm-item" role="menuitem" data-a="pass"><span class="bm-badge">✱</span><span class="t">Сменить пароль</span></button>'+
+    '<button type="button" class="bm-item" role="menuitem" data-a="switch"><span class="bm-badge">⇄</span><span class="t">Сменить профиль</span></button>'+
+    '<button type="button" class="bm-item" role="menuitem" data-a="logout"><span class="bm-badge">⎋</span><span class="t">Выйти</span></button>'+
+    '<button type="button" class="bm-item" role="menuitem" data-a="del"><span class="bm-badge">×</span><span class="t">Удалить аккаунт</span></button>'+
+    '</div>';
   m.querySelector('.an').textContent=currentUser.name||currentUser.login;
   m.querySelector('.al').textContent='@'+currentUser.login+' · с '+new Date(currentUser.created||Date.now()).toLocaleDateString('ru-RU');
   var w=262,r=anchor.getBoundingClientRect();
@@ -289,9 +339,15 @@ function accAction(a){
   if(a==='logout'||a==='switch'){
     try{commitNow()}catch(e){}
     try{persist()}catch(e){}
-    try{if(typeof Sync!=='undefined'&&Sync.logout)Sync.logout()}catch(e){}
-    accounts.session=null;saveAccounts();
-    setTimeout(function(){location.reload()},60);
+    /* M10: если сервер недоступен, cookie-сессия HttpOnly не закроется —
+       перезагрузка вернула бы залогиненного пользователя. Не перезагружаем,
+       просим повторить, когда будет сеть. */
+    var p=(typeof Sync!=='undefined'&&Sync&&Sync.logout)?Sync.logout():Promise.resolve(true);
+    Promise.resolve(p).then(function(ok){
+      if(!ok){toast('Нет связи с сервером — выход отложен, повторите позже');return}
+      accounts.session=null;saveAccounts();
+      setTimeout(function(){location.reload()},60);
+    });
     return;
   }
   if(a==='pass'){changePassword();return}
@@ -349,7 +405,8 @@ function deleteAccount(){
 $('#authForm').addEventListener('submit',function(e){
   e.preventDefault();
   authError('');
-  doSignup();
+  if(authMode==='signin')doSignin();
+  else doSignup();
 });
 document.querySelectorAll('.auth-tab').forEach(function(t){
   t.addEventListener('click',function(){setAuthMode(t.dataset.mode)});
@@ -369,15 +426,18 @@ $('#authLogin').addEventListener('input',function(){
   var v=this.value.trim().toLowerCase();
   var hint=$('#authLoginHint');
   if(!v){hint.textContent='';hint.className='auth-hint';return}
-  if(!/^[a-z0-9_.-]{3,32}$/.test(v)){hint.textContent='3–32 символа: латиница, цифры, _ - .';hint.className='auth-hint err'}
-  else if(findUser(v)){hint.textContent='этот логин уже занят';hint.className='auth-hint err'}
-  else{hint.textContent='логин свободен';hint.className='auth-hint ok'}
+  if(!/^[a-z0-9_.-]{3,32}$/.test(v)){hint.textContent='3-32 символа: латиница, цифры, _ - .';hint.className='auth-hint err'}
+  else if(authMode!=='signin'&&findUser(v)){hint.textContent='логин уже занят';hint.className='auth-hint err'}
+  else{hint.textContent='логин подходит';hint.className='auth-hint ok'}
 });
 $('#authPass').addEventListener('input',updateStrength);
 $('#authPassToggle').addEventListener('click',function(){
   var inp=$('#authPass');
-  if(inp.type==='password'){inp.type='text';this.textContent='🙈'}
-  else{inp.type='password';this.textContent='👁'}
+  var show=inp.type==='password';
+  inp.type=show?'text':'password';
+  this.textContent=show?'🙈':'👁';
+  this.setAttribute('aria-pressed',show?'true':'false');
+  setBtnTitle(this,show?'Скрыть пароль':'Показать пароль');
 });
 $('#authPass2').addEventListener('input',function(){
   if($('#authPass').value)validateSignup();

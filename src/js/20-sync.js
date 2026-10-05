@@ -3,7 +3,8 @@
  * Проект: «Черновик» — веб-редактор рукописей.
  * Что делает:
  *   - Sync.boot() — определяет серверную сессию при запуске (вход уже сделан);
- *   - Sync.join/login/logout — аккаунт на сервере (api/auth.php);
+ *   - Sync.join/login/logout — аккаунт на сервере (api/auth.php): join — вход
+ *     или регистрация, login — строгий вход без создания аккаунта;
  *   - Sync.pull() — забирает состояние сервера и сводит его с локальным:
  *     книги — LWW по updated, профиль (тема/настройки) — LWW,
  *     статистика — max-merge по дням (конфликтов не бывает);
@@ -11,7 +12,7 @@
  *     профиль и статистику (POST api/state.php), удаления (DELETE);
  *   - Sync.markDirty() — вызывается из persist(), дебаунс 1.5 с;
  *   - офлайн: сеть недоступна → работаем из localStorage, повтор по таймеру.
- * Ключевое: Sync.boot, Sync.join, Sync.pull, Sync.flush, Sync.markDirty.
+ * Ключевое: Sync.boot, Sync.join, Sync.login, Sync.pull, Sync.flush, Sync.markDirty.
  * Зависимости: 01–19 (state, persist, saveTxt, renderStats, setTheme).
  * ========================================================================== */
 "use strict";
@@ -25,6 +26,11 @@ var Sync = {
   sentProfile: null,        /* JSON профиля, подтверждённый сервером */
   sentStats: null,          /* JSON статистики, подтверждённый сервером */
   needDelete: {},           /* id -> true: удалить на сервере */
+  tombs: null,              /* id -> время удаления: tombstone до подтверждения DELETE (H4) */
+  pullTries: 0,             /* M1: счётчик отложенных сверек активной книги */
+  pullFails: 0,             /* M2: бэкофф ретраев pull после сетевых ошибок */
+  pullTimer: null,
+  staleHit: false,          /* L5: сервер ответил stale — нужна сверка после flush */
   freshSeed: false,         /* локальный state только что засеян (новый профиль) */
   pendingPull: false,       /* подмена открытой книги отложена */
   dirty: false,
@@ -102,6 +108,24 @@ function statsMergeMax(a, b) {
   return out;
 }
 
+/* ---------- tombstones: удалённые книги до подтверждения DELETE (H4) ----------
+   Без них restart теряет факт удаления (sentBooks={} → reconcile воскрешает
+   книгу с сервера). Ключ привязан к LS текущего профиля. */
+function tombsKey() { return (typeof LS === 'string' && LS ? LS : 'chernovik.v2') + '.del'; }
+Sync.loadTombs = function () {
+  if (Sync.tombs) return;
+  try { Sync.tombs = JSON.parse(localStorage.getItem(tombsKey())) || {} } catch (e) { Sync.tombs = {} }
+};
+Sync.saveTombs = function () {
+  try { localStorage.setItem(tombsKey(), JSON.stringify(Sync.tombs || {})) } catch (e) {}
+};
+Sync.tombBook = function (id) {
+  Sync.loadTombs();
+  Sync.tombs[id] = Date.now();
+  Sync.saveTombs();
+  Sync.needDelete[id] = 1;
+};
+
 /* ---------- строка статуса внизу редактора ---------- */
 function syncStatus(kind) {
   if (typeof isReadOnly === 'function' && isReadOnly()) return;
@@ -140,13 +164,32 @@ Sync.join = function (login, name, pass) {
     });
 };
 
+/* строгий вход: аккаунт обязан существовать на сервере (не создаёт новый) */
+Sync.login = function (login, pass) {
+  return syncFetch('api/auth.php?action=login', { method: 'POST', body: { login: login, pass: pass } })
+    .then(function (j) {
+      Sync.user = j.user; Sync.mode = 'server';
+      Sync.sentBooks = {}; Sync.sentProfile = null; Sync.sentStats = null;
+      Sync.pulled = false;
+      return { ok: true, user: j.user };
+    })
+    .catch(function (e) {
+      if (!e.status) return { ok: false, reason: 'offline' };
+      if (e.status === 404) return { ok: false, reason: 'no-account' };
+      if (e.status === 401) return { ok: false, reason: 'wrong-password' };
+      return { ok: false, reason: 'http' };
+    });
+};
+
 Sync.logout = function () {
-  if (Sync.mode !== 'server') return Promise.resolve();
-  var p = syncFetch('api/auth.php?action=logout', { method: 'POST', keepalive: true })
-    .catch(function () {});
-  Sync.mode = 'local'; Sync.user = null; Sync.pulled = false;
-  Sync.sentBooks = {}; Sync.sentProfile = null; Sync.sentStats = null;
-  return p;
+  if (Sync.mode !== 'server') return Promise.resolve(true);
+  return syncFetch('api/auth.php?action=logout', { method: 'POST', keepalive: true })
+    .then(function () {
+      Sync.mode = 'local'; Sync.user = null; Sync.pulled = false;
+      Sync.sentBooks = {}; Sync.sentProfile = null; Sync.sentStats = null;
+      return true;
+    })
+    .catch(function () { return false });   /* офлайн: вызывающий решает, что делать (M10) */
 };
 
 /* ---------- сверка состояния ---------- */
@@ -160,6 +203,7 @@ function applyProfile(pd) {
     if (typeof setTheme === 'function') setTheme(state.theme);
     if (typeof applyReaderPrefs === 'function') applyReaderPrefs();
     if (typeof invalidateCo === 'function') invalidateCo();
+    if (typeof setLayoutVars === 'function') setLayoutVars();   /* M11: ширины колонок с сервера */
   } catch (e) {}
 }
 
@@ -182,6 +226,7 @@ function reconcile(srv) {
   state.books.forEach(function (b) { ids[b.id] = 1 });
 
   var out = [];
+  var appliedActive = null;   /* M1: id активной книги, подменённой серверной версией */
   Object.keys(ids).forEach(function (id) {
     var L = Lb[id] || null, Sv = S[id] || null;
     var has = Object.prototype.hasOwnProperty.call(Sync.sentBooks, id);
@@ -200,7 +245,11 @@ function reconcile(srv) {
       return;
     }
     if (!L && Sv) {
-      if (!has || Sv.updated > sent) { out.push(Sv); Sync.sentBooks[id] = Sv.updated; }
+      /* удалена локально — не воскрешаем (tombstone новее серверной версии) */
+      Sync.loadTombs();
+      var tb = Sync.tombs[id];
+      if (tb && tb >= Sv.updated) { Sync.needDelete[id] = 1; return; }
+      if (!has || Sv.updated > sent) { out.push(Sv); Sync.sentBooks[id] = Sv.updated; if (tb) { delete Sync.tombs[id]; Sync.saveTombs(); } }
       else Sync.needDelete[id] = 1;           /* удалена локально — подтвердим удаление */
       return;
     }
@@ -209,20 +258,41 @@ function reconcile(srv) {
       if (lNew && !sNew) { out.push(L); return; }          /* отправим */
       if (!lNew && sNew) {                                 /* изменилась только на сервере */
         if (Sv.updated > L.updated) {
-          if (isActive) { Sync.pendingPull = true; out.push(L); return; }
+          /* M1: откладываем максимум 2 раза, иначе петля pull каждые 4с;
+             перед финальной подменой DOM главы дописывается в state */
+          if (isActive && Sync.pullTries < 2) { Sync.pullTries++; Sync.pendingPull = true; out.push(L); return; }
+          if (isActive) { appliedActive = id; Sync.pullTries = 0; }
           out.push(Sv); Sync.sentBooks[id] = Sv.updated;
         } else out.push(L);
         return;
       }
       /* оба изменены — побеждает более позднее обновление */
       if (Sv.updated > L.updated) {
-        if (isActive) { Sync.pendingPull = true; out.push(L); return; }
+        if (isActive && Sync.pullTries < 2) { Sync.pullTries++; Sync.pendingPull = true; out.push(L); return; }
+        if (isActive) { appliedActive = id; Sync.pullTries = 0; }
         out.push(Sv); Sync.sentBooks[id] = Sv.updated;
       } else out.push(L);
       return;
     }
   });
   state.books = out;
+
+  /* после подмены активной книги (M1) — перечитать главу в редакторе,
+     иначе DOM останется со старым текстом, а state уже новый */
+  if (appliedActive && state.activeBookId === appliedActive) {
+    try {
+      if (typeof workspace !== 'undefined' && workspace && !workspace.hidden && typeof loadChapter === 'function') {
+        loadChapter(currentCh());
+      } else if (typeof renderBookView === 'function') renderBookView();
+    } catch (e) {}
+  }
+
+  /* дедупликация глав (дубли id/служебных глав) — если что-то вычистили, книга уедет на сервер */
+  if (typeof dedupeChapters === 'function') {
+    var deduped = 0;
+    state.books.forEach(function (b) { deduped += dedupeChapters(b) });
+    if (deduped) Sync.markDirty();
+  }
 
   /* профиль (тема/настройки/мир): при первом заходе (sentProfile=null) сервер авторитетен */
   var pd = (srv.prefs && srv.prefs.data) ? srv.prefs.data : null;
@@ -254,33 +324,42 @@ Sync.pull = function () {
   return syncFetch('api/state.php').then(function (srv) {
     reconcile(srv || { books: [], stats: {}, prefs: null });
     Sync.pulled = true;
+    Sync.pullFails = 0;
     if (Sync.pendingPull) {
       Sync.pendingPull = false;
       setTimeout(function () { Sync.pull().then(function () { Sync.flush() }) }, 4000);
     }
   }).catch(function (e) {
     if (e.status === 401) { Sync.mode = 'local'; Sync.user = null; Sync.pulled = true; syncStatus('local'); return; }
-    /* сеть недоступна — работаем локально, отправим при появлении связи */
-    Sync.pulled = true;
+    /* M2: сетевой сбой — НЕ помечаем сверку успешной (иначе flush уйдёт
+       из несведённого состояния); пробуем снова с бэкоффом */
+    Sync.pulled = false;
     syncStatus('offline');
+    clearTimeout(Sync.pullTimer);
+    Sync.pullFails = (Sync.pullFails || 0) + 1;
+    Sync.pullTimer = setTimeout(function () { if (Sync.mode === 'server' && !Sync.pulled) Sync.pull() },
+      Math.min(30000, 3000 * Sync.pullFails));
   });
 };
 
 /* ---------- отправка ---------- */
-function syncPutBook(b) {
-  return syncFetch('api/book.php?id=' + encodeURIComponent(b.id), { method: 'PUT', body: b })
+function syncPutBook(b, keepalive) {
+  return syncFetch('api/book.php?id=' + encodeURIComponent(b.id), { method: 'PUT', body: b, keepalive: keepalive })
     .then(function (j) {
       if (j && j.ok === false && j.stale) return 'stale';
       Sync.sentBooks[b.id] = b.updated;
       return 'ok';
     });
 }
-function syncDelBook(id) {
-  return syncFetch('api/book.php?id=' + encodeURIComponent(id), { method: 'DELETE' })
-    .then(function () { delete Sync.sentBooks[id]; delete Sync.needDelete[id]; });
+function syncDelBook(id, keepalive) {
+  return syncFetch('api/book.php?id=' + encodeURIComponent(id), { method: 'DELETE', keepalive: keepalive })
+    .then(function () {
+      delete Sync.sentBooks[id]; delete Sync.needDelete[id];
+      if (Sync.tombs) { delete Sync.tombs[id]; Sync.saveTombs(); }  /* подтверждено — снять tombstone */
+    });
 }
-function syncPutState(prefs, stats) {
-  return syncFetch('api/state.php', { method: 'POST', body: { prefs: prefs, stats: stats } })
+function syncPutState(prefs, stats, keepalive) {
+  return syncFetch('api/state.php', { method: 'POST', body: { prefs: prefs, stats: stats }, keepalive: keepalive })
     .then(function () { return 'ok' });
 }
 
@@ -320,7 +399,8 @@ Sync.flush = function (opt) {
         var wasProf = pstr !== Sync.sentProfile, wasStats = sstr !== Sync.sentStats;
         syncPutState(
           wasProf ? { data: profileOf(state), updated: Date.now() } : null,
-          wasStats ? normalizeStats(state.stats) : null
+          wasStats ? normalizeStats(state.stats) : null,
+          !!opt.keepalive
         ).then(function () {
           if (wasProf) Sync.sentProfile = pstr;
           if (wasStats) Sync.sentStats = sstr;
@@ -330,8 +410,9 @@ Sync.flush = function (opt) {
       return;
     }
     var op = plan[i++];
-    var req = op.t === 'book' ? syncPutBook(op.b)
-      : op.t === 'del' ? syncDelBook(op.id)
+    var ka = !!opt.keepalive;                 /* L6: keepalive при закрытии вкладки */
+    var req = op.t === 'book' ? syncPutBook(op.b, ka)
+      : op.t === 'del' ? syncDelBook(op.id, ka)
       : Promise.resolve();
     req.then(function (r) {
       if (r === 'stale') { Sync.staleHit = true; return step(); }
@@ -370,9 +451,13 @@ Sync.afterStart = function () {
   });
 };
 
-addEventListener('online', function () { Sync.fails = 0; Sync.flush() });
+addEventListener('online', function () {
+  Sync.fails = 0;
+  if (Sync.mode === 'server' && !Sync.pulled) { clearTimeout(Sync.pullTimer); Sync.pull().then(function () { Sync.flush() }) }
+  else Sync.flush();
+});
 addEventListener('beforeunload', function () {
   if (Sync.mode === 'server' && (Sync.dirty || Sync.timer)) {
-    try { Sync.flush({ silent: true }) } catch (e) {}
+    try { Sync.flush({ silent: true, keepalive: true }) } catch (e) {}   /* L6 */
   }
 });

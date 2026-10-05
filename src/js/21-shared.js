@@ -23,6 +23,67 @@
 
 function isForeign(){return !!foreignDoc}
 
+/* --- санитайзер HTML глав чужой книги ------------------------------------
+ * Чужой HTML попадает в innerHTML редактора/печати/tmp(): враждебная книга
+ * может содержать <img onerror>, <svg onload>, javascript:-ссылки. Чистим
+ * DOM-прогоном по белому списку: опасные теги удаляются с содержимым,
+ * неизвестные раскрываются (текст остаётся), атрибуты — только разрешённые,
+ * id/style вырезаются (DOM clobbering / инъекция стилей).
+ * -------------------------------------------------------------------------- */
+var SAN_DROP={SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,LINK:1,META:1,BASE:1,
+  FORM:1,INPUT:1,TEXTAREA:1,SELECT:1,BUTTON:1,SVG:1,MATH:1,CANVAS:1,TEMPLATE:1,
+  VIDEO:1,AUDIO:1,SOURCE:1,TRACK:1,APPLET:1,FRAME:1,FRAMESET:1,NOFRAMES:1,
+  NOSCRIPT:1,PLAINTEXT:1,XMP:1,BLINK:1,FONT:1,BIG:1,TT:1};
+var SAN_TAGS={P:1,H1:1,H2:1,H3:1,H4:1,H5:1,H6:1,BLOCKQUOTE:1,BR:1,HR:1,
+  EM:1,STRONG:1,B:1,I:1,U:1,S:1,STRIKE:1,MARK:1,SPAN:1,DIV:1,A:1,
+  UL:1,OL:1,LI:1,SUB:1,SUP:1,CODE:1,PRE:1,TABLE:1,THEAD:1,TBODY:1,TFOOT:1,
+  TR:1,TD:1,TH:1,CAPTION:1,IMG:1,FIGURE:1,FIGCAPTION:1};
+var SAN_ATTRS={class:1,href:1,src:1,alt:1,title:1,lang:1,dir:1,contenteditable:1,
+  'data-nid':1,'data-wiki':1,'data-type':1,colspan:1,rowspan:1,start:1};
+function sanUrl(v,tag){
+  if(typeof v!=='string')return null;
+  var s=v.replace(/^[\s\u0000-\u0020]+/,'').toLowerCase();
+  if(s.indexOf('javascript:')===0||s.indexOf('vbscript:')===0)return null;
+  if(s.indexOf('data:')===0)return (tag==='IMG'&&s.indexOf('data:image/')===0)?v:null;
+  if(/^(https?:|mailto:|#|\/|\.\/|\.\.\/)/.test(s))return v;
+  if(s&&s.indexOf(':')<0)return v;                          /* относительные ссылки */
+  return null;
+}
+function sanitizeChapterHtml(html){
+  if(typeof html!=='string'||!html)return '';
+  var d=mk('div');d.innerHTML=html;
+  (function walk(node){
+    var kids=Array.prototype.slice.call(node.childNodes);
+    for(var i=0;i<kids.length;i++){
+      var el=kids[i];
+      if(el.nodeType===3)continue;                          /* текст — ок */
+      if(el.nodeType!==1){el.parentNode.removeChild(el);continue} /* комментарии и прочее */
+      var tag=el.tagName;
+      if(SAN_DROP[tag]){el.parentNode.removeChild(el);continue}
+      if(!SAN_TAGS[tag]){                                  /* неизвестный тег — раскрыть */
+        var par=el.parentNode;
+        var inner=Array.prototype.slice.call(el.childNodes);
+        for(var j=0;j<inner.length;j++)par.insertBefore(inner[j],el);
+        par.removeChild(el);
+        for(var k=0;k<inner.length;k++)if(inner[k].nodeType===1)walk(inner[k]);
+        continue;
+      }
+      var attrs=Array.prototype.slice.call(el.attributes);
+      for(var a=0;a<attrs.length;a++){
+        var aname=attrs[a].name.toLowerCase();
+        if(!SAN_ATTRS[aname]){el.removeAttribute(attrs[a].name);continue}
+        if(aname==='href'||aname==='src'){
+          var u=sanUrl(attrs[a].value,tag);
+          if(u===null)el.removeAttribute(attrs[a].name);
+          else if(u!==attrs[a].value)el.setAttribute(aname,u);
+        }
+      }
+      walk(el);
+    }
+  })(d);
+  return d.innerHTML;
+}
+
 function roNormalize(b){
   if(!b||typeof b!=='object')return b;
   b.wiki=Array.isArray(b.wiki)?b.wiki:[];
@@ -32,6 +93,7 @@ function roNormalize(b){
   b.chapters.forEach(function(ch){
     if(!Array.isArray(ch.marks))ch.marks=[];
     if(typeof ch.html!=='string')ch.html='';
+    ch.html=sanitizeChapterHtml(ch.html);
     if(typeof ch.pos!=='number')ch.pos=0;
   });
   if(!b.chapters.some(function(c){return c.id===b.current})&&b.chapters.length)b.current=b.chapters[0].id;
@@ -222,7 +284,8 @@ function openSharedBook(id,token){
     })
     .then(function(j){
       if(!j||!j.book)return false;
-      var meta={line:(j.meta&&j.meta.author)?('Автор: '+j.meta.author):'чужая книга'};
+      var a=(j.meta&&j.meta.author)?j.meta.author:'';
+      var meta={line:a?('Автор: '+a):'чужая книга',author:a};
       openForeignBook(roNormalize(j.book),meta);
       return true;
     })

@@ -26,6 +26,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Черновик — минималистичное приложение для написания книг">
+<meta name="theme-color" content="#f4f2ec">
 <title>Черновик — библиотека v0.02</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23191712'/%3E%3Crect x='11' y='11' width='10' height='10' fill='%23c93a2b' transform='rotate(45 16 16)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,40 +46,43 @@
 </head>
 <body>
 
+<a class="skip-link" id="skipLink" href="#editor">Перейти к содержимому</a>
+
 <div id="authScreen" class="off">
   <div class="auth-card">
     <div class="auth-brand"><span class="dia"></span><b>ЧЕРНОВИК</b></div>
     <div class="auth-sub" id="authSub">выберите профиль</div>
     <div class="auth-tabs">
       <button class="auth-tab on" type="button" data-mode="login">Профили</button>
+      <button class="auth-tab" type="button" data-mode="signin">Вход</button>
       <button class="auth-tab" type="button" data-mode="signup">Новый профиль</button>
     </div>
 
-    <div class="auth-err" id="authErr" hidden></div>
+    <div class="auth-err" id="authErr" role="alert" hidden></div>
 
     <div id="authProfiles" class="auth-profiles"></div>
 
     <form id="authForm" autocomplete="off" hidden>
-      <label class="auth-field">
+      <label class="auth-field" id="authNameField">
         <span class="lbl">Имя автора</span>
-        <input id="authName" maxlength="40" autocomplete="nickname" spellcheck="false" placeholder="Как вас показывать">
+        <input id="authName" name="name" maxlength="40" autocomplete="nickname" spellcheck="false" placeholder="Как вас показывать">
       </label>
       <label class="auth-field">
         <span class="lbl">Логин</span>
-        <input id="authLogin" maxlength="32" autocomplete="username" spellcheck="false" placeholder="латиница, цифры, _ - .">
+        <input id="authLogin" name="login" maxlength="32" autocomplete="username" spellcheck="false" placeholder="латиница, цифры, _ - .">
         <span class="auth-hint" id="authLoginHint"></span>
       </label>
       <label class="auth-field">
-        <span class="lbl">Пароль <span class="auth-optional">— необязательно</span></span>
+        <span class="lbl">Пароль <span class="auth-optional" id="authPassOpt">— необязательно</span></span>
         <div class="auth-pass-wrap">
-          <input id="authPass" type="password" autocomplete="new-password" placeholder="оставьте пустым, если не нужен">
-          <button type="button" class="auth-pass-toggle" id="authPassToggle" title="Показать пароль">👁</button>
+          <input id="authPass" name="password" type="password" autocomplete="new-password" placeholder="оставьте пустым, если не нужен">
+          <button type="button" class="auth-pass-toggle" id="authPassToggle" title="Показать пароль" aria-label="Показать пароль" aria-pressed="false">👁</button>
         </div>
         <div class="auth-strength" id="authStrength"><i></i><i></i><i></i><i></i></div>
       </label>
       <label class="auth-field" id="authPass2Field" hidden>
         <span class="lbl">Повторите пароль</span>
-        <input id="authPass2" type="password" autocomplete="new-password">
+        <input id="authPass2" name="password_confirm" type="password" autocomplete="new-password">
       </label>
       <button class="m-btn primary auth-submit" id="authSubmit" type="submit">СОЗДАТЬ ПРОФИЛЬ</button>
     </form>
@@ -158,7 +162,7 @@
       <button type="button" data-t="shared">Общие книги</button>
     </div>
     <div class="shared-box" id="sharedBox" hidden>
-      <input id="sharedSearch" type="search" placeholder="Поиск по названию или автору" autocomplete="off">
+      <input id="sharedSearch" type="search" placeholder="Поиск по названию или автору" aria-label="Поиск по общим книгам" autocomplete="off">
       <div class="shared-list" id="sharedList"></div>
     </div>
     <div class="shelf" id="shelf"></div>
@@ -192,6 +196,7 @@
   <div class="bv-body">
     <div class="bv-head enter">
       <div class="bv-title-row"><span class="wv-dia"></span><h1 id="bvTitle"></h1><span class="bv-type">книга</span></div>
+      <input id="bvAuthor" class="bv-author" maxlength="80" placeholder="Автор" aria-label="Автор книги" spellcheck="false" hidden>
       <div class="bv-desc" id="bvDesc"></div>
       <div class="bv-stats" id="bvStats"></div>
       <div class="bv-access" id="bvAccess" hidden>
@@ -202,7 +207,7 @@
           <button type="button" data-v="public">публичная</button>
         </div>
         <div class="share-row" id="bvShareRow" hidden>
-          <input id="bvShareLink" readonly spellcheck="false">
+          <input id="bvShareLink" readonly spellcheck="false" aria-label="Ссылка для доступа к книге">
           <button type="button" class="m-btn" id="bvShareCopy">Копировать</button>
         </div>
       </div>
@@ -216,7 +221,7 @@
   <aside id="side">
     <div class="brand"><span class="dia"></span><b>ЧЕРНОВИК</b><small>для книг</small></div>
     <div class="bookbox">
-      <div class="lbl">Книга</div>
+      <label class="lbl" for="bookTitle">Книга</label>
       <input id="bookTitle" autocomplete="off" spellcheck="false">
     </div>
     <div class="chapters-label"><span class="lbl">Главы</span><span class="lbl" id="chCount"></span></div>
@@ -239,7 +244,7 @@
       <div class="tb-center">
         <label class="tb-search" id="tbSearch">
           <svg class="tb-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.2"/><path d="m15.5 15.5 4.5 4.5"/></svg>
-          <input id="spInput" autocomplete="off" placeholder="Поиск: текст, мир, заметки…">
+          <input id="spInput" autocomplete="off" placeholder="Поиск: текст, мир, заметки…" aria-label="Поиск по книге">
           <span class="tb-cnt" id="spCount"></span>
           <button class="tb-clr" id="spClose" type="button" title="Очистить">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -310,14 +315,14 @@
   </div>
 
   <div class="wp-pane" id="paneWorld">
-    <input id="wpSearch" autocomplete="off" placeholder="Поиск по миру книги…">
+    <input id="wpSearch" autocomplete="off" placeholder="Поиск по миру книги…" aria-label="Поиск по миру книги">
     <div class="wp-filters" id="wpFilters"></div>
     <div class="wp-body" id="wpBody"></div>
   </div>
 
   <div class="wp-pane" id="paneNotes" hidden>
     <div class="np-bar">
-      <input id="npSearch" autocomplete="off" placeholder="Поиск по заметкам…">
+      <input id="npSearch" autocomplete="off" placeholder="Поиск по заметкам…" aria-label="Поиск по заметкам">
       <button class="lbl lbl-btn" id="npAdd">+ заметка</button>
     </div>
     <div class="wp-filters" id="npFilters"></div>
@@ -450,20 +455,20 @@
 
 <button id="zenpill">РЕЖИМ ФОКУСА — ESC, ЧТОБЫ ВЫЙТИ</button>
 <button id="micPill" type="button" title="Остановить диктовку"><span class="mp-dot"></span><span class="mp-txt">Слушаю…</span><span class="mp-hint">нажмите, чтобы остановить</span></button>
-<input type="file" id="restoreInput" accept=".json,application/json">
+<input type="file" id="restoreInput" accept=".json,application/json" aria-label="Файл резервной копии">
 
-<div id="wikiModal">
+<div id="wikiModal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
   <div class="wm-card">
     <div class="wm-head">
       <span class="wv-dia"></span>
       <b id="wmTitle">Новая статья</b>
       <span class="wv-type" id="wmTypeBadge"></span>
-      <button class="sibtn" id="wmClose" style="color:var(--ink2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button class="sibtn" id="wmClose" style="color:var(--ink2)" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
-    <div class="m-field"><span class="lbl">Название</span><input id="wmName" autocomplete="off" placeholder="Туманная Гавань"></div>
-    <div class="m-field"><span class="lbl">Другие имена <span class="auth-optional">— через запятую</span></span><input id="wmAliases" autocomplete="off" placeholder="Аня, Аннушка, госпожа Верн"></div>
-    <div class="m-field"><span class="lbl">Тип</span><div class="type-chips" id="wmTypeChips"></div></div>
-    <div class="m-field"><span class="lbl">Описание</span><textarea id="wmDesc" placeholder="портовый город на северном побережье…"></textarea></div>
+    <div class="m-field"><label class="lbl" for="wmName">Название</label><input id="wmName" autocomplete="off" placeholder="Туманная Гавань"></div>
+    <div class="m-field"><label class="lbl" for="wmAliases">Другие имена <span class="auth-optional">— через запятую</span></label><input id="wmAliases" autocomplete="off" placeholder="Аня, Аннушка, госпожа Верн"></div>
+    <div class="m-field"><span class="lbl" id="wmTypeLbl">Тип</span><div class="type-chips" id="wmTypeChips" role="group" aria-labelledby="wmTypeLbl"></div></div>
+    <div class="m-field"><label class="lbl" for="wmDesc">Описание</label><textarea id="wmDesc" placeholder="портовый город на северном побережье…"></textarea></div>
     <div class="wm-sec">
       <div class="lbl" style="margin-bottom:8px">Упоминания в тексте</div>
       <div id="wmPrev"></div>
@@ -477,13 +482,13 @@
   </div>
 </div>
 
-<div id="wikiViewModal">
+<div id="wikiViewModal" role="dialog" aria-modal="true" aria-labelledby="wvName">
   <div class="wv-inner">
     <div class="wv-head">
       <span class="wv-dia"></span>
       <b id="wvName"></b>
       <span class="wv-type" id="wvType"></span>
-      <button class="sibtn" id="wvClose" style="color:var(--ink2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button class="sibtn" id="wvClose" style="color:var(--ink2)" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="wvAlias" class="wv-alias"></div>
     <div id="wvDesc"></div>
@@ -498,7 +503,7 @@
   </div>
 </div>
 
-<div id="dayModal">
+<div id="dayModal" role="dialog" aria-modal="true" aria-labelledby="dmTitle">
   <div class="dm-card">
     <div class="dm-head">
       <span class="wv-dia"></span>
@@ -515,11 +520,11 @@
   </div>
 </div>
 
-<div id="askModal">
+<div id="askModal" role="dialog" aria-modal="true" aria-labelledby="amTitle">
   <div class="am-card">
     <div class="am-head"><span class="wv-dia"></span><b id="amTitle"></b></div>
-    <div class="am-msg" id="amMsg" hidden></div>
-    <input id="amInput" autocomplete="off" spellcheck="false">
+    <div class="am-msg" id="amMsg" role="alert" hidden></div>
+    <input id="amInput" autocomplete="off" spellcheck="false" aria-label="Значение">
     <div class="am-foot">
       <button class="m-btn" id="amCancel">ОТМЕНА</button>
       <button class="m-btn primary" id="amOk">ОК</button>
@@ -548,7 +553,7 @@
 
 <div id="markTip" class="mark-tip-floater" role="tooltip"></div>
 <div id="marksRail"></div>
-<div id="blockmenu"></div>
+<div id="blockmenu" role="menu" aria-label="Вставить блок"></div>
 <div id="exportMenu" role="menu" aria-label="Экспорт рукописи"></div>
 <div id="accMenu" role="menu" aria-label="Аккаунт"></div>
 <div id="toast" role="status"></div>

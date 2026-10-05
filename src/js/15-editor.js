@@ -66,9 +66,9 @@ var ITEMS=[
   {tag:'nb',badge:'✎',title:'Заметка (не печатается)',hint:'CTRL ALT 4',al:'note заметка nb врезка комментарий'},
   {tag:'sep',badge:'✦',title:'Разделитель',hint:'— — —',al:'sep разделитель сцена'}
 ];
-menu.innerHTML='<div class="bm-head">Вставить блок</div>'+ITEMS.map(function(it,i){
-  return '<div class="bm-item" data-i="'+i+'"><span class="bm-badge">'+it.badge+'</span><span class="t">'+it.title+'</span><span class="h">'+it.hint+'</span></div>';
-}).join('');
+menu.innerHTML='<div role="group"><div class="bm-head">Вставить блок</div>'+ITEMS.map(function(it,i){
+  return '<div class="bm-item" role="menuitem" tabindex="-1" data-i="'+i+'"><span class="bm-badge">'+it.badge+'</span><span class="t">'+it.title+'</span><span class="h">'+it.hint+'</span></div>';
+}).join('')+'</div>';
 var itemEls=Array.prototype.slice.call(menu.querySelectorAll('.bm-item'));
 itemEls.forEach(function(el){
   el.addEventListener('mousedown',function(e){e.preventDefault()});
@@ -457,6 +457,10 @@ function restoreBackup(file){
     try{st=normalizeState(JSON.parse(reader.result))}catch(e){st=null}
     if(st)st=migrateHeroes(st);
     if(st)st=ensureMarksOnChapters(st);
+    /* санитайзер из 21-shared: защита от импорта вредоносного бэкапа */
+    if(st&&typeof sanitizeChapterHtml==='function'){
+      st.books.forEach(function(bk){(bk.chapters||[]).forEach(function(c){c.html=sanitizeChapterHtml(c.html)})});
+    }
     if(!st){alert('Это не похоже на резервную копию «Черновика» — файл не читается.');return}
     uiConfirm('Загрузить резервную копию?','Текущие книги будут полностью заменены.',false).then(function(ok){
       if(!ok)return;
@@ -469,9 +473,14 @@ function restoreBackup(file){
       state.books.forEach(refreshPamatka);
       state.books.forEach(function(b){
         b.customTypes=Array.isArray(b.customTypes)?b.customTypes:[];
+        b.wiki=Array.isArray(b.wiki)?b.wiki:[];
         b.wiki.forEach(function(w){w.aliases=Array.isArray(w.aliases)?w.aliases:[]});
         ensureNotesChapter(b);
+        /* откат из бэкапа должен победить свежую серверную копию (H8):
+           иначе LWW сразу вернёт серверную версию по старому updated */
+        b.updated=Date.now();
       });
+      if(typeof Sync!=='undefined'&&Sync){Sync.sentBooks={};Sync.markDirty()}
       persist();invalidateCo();
       document.body.classList.remove('zen','side-open');
       $('#btnZen').classList.remove('on');
@@ -498,6 +507,7 @@ function moveChapter(id,dir){
   var i=arr.findIndex(function(x){return x.id===id});
   var j=i+dir;if(i<0||j<0||j>=arr.length)return;
   var t=arr[i];arr[i]=arr[j];arr[j]=t;
+  b.updated=Date.now();                    /* H5 */
   persist();renderList(false);updateStats();
 }
 function dropAtEnd(){
@@ -506,6 +516,7 @@ function dropAtEnd(){
   var from=arr.findIndex(function(x){return x.id===dragChId});
   if(from>=0&&from<arr.length-1){
     var it=arr.splice(from,1)[0];arr.push(it);
+    b.updated=Date.now();                  /* H5 */
     persist();renderList(false);updateStats();
   }
 }
@@ -545,6 +556,24 @@ list.addEventListener('drop',function(e){if(dragChId&&list.classList.contains('d
   ob.observe(document.body,{attributes:true,class:'class'});
 })();
 
+/* перестановка глав с клавиатуры (Alt+↑/↓) — альтернатива drag&drop */
+function moveChapter(id,dir){
+  var b=book();if(!b||isReadOnly())return;
+  var arr=b.chapters,i=-1;
+  for(var k=0;k<arr.length;k++){if(arr[k].id===id){i=k;break}}
+  var j=i+dir;
+  if(i<0||j<0||j>=arr.length)return;
+  arr.splice(j,0,arr.splice(i,1)[0]);
+  b.updated=Date.now();                          /* H5: дата пишется при любой правке */
+  persist();renderList(false);
+  var rows=list.querySelectorAll('.ch');
+  if(rows[j]){
+    var ob=rows[j].querySelector('.ch-open');
+    if(ob)ob.focus();
+  }
+  toast('Глава перемещена на '+(j+1)+'-е место');
+}
+
 function renderList(animate){
   var b=book();if(!b)return;
   list.innerHTML='';
@@ -556,11 +585,18 @@ function renderList(animate){
     el.className='ch'+(ch.id===b.current?' active':'')+(animate?' boot':'')+(isNotes?' notes-ch':'');
     if(animate)el.style.animationDelay=(i*35)+'ms';
     el.draggable=!isReadOnly();
-    el.innerHTML='<span class="num">'+(isNotes?'✎':String(i+1).padStart(2,'0'))+'</span><span class="ttl"></span><span class="wc"></span>'+
-      (isNotes||isReadOnly()?'':'<button class="del" title="Удалить главу">×</button>');
+    el.innerHTML='<button type="button" class="ch-open"><span class="num">'+(isNotes?'✎':String(i+1).padStart(2,'0'))+'</span><span class="ttl"></span><span class="wc"></span></button>'+
+      (isNotes||isReadOnly()?'':'<button type="button" class="del" title="Удалить главу" aria-label="Удалить главу">×</button>');
     el.querySelector('.ttl').textContent=chapterTitle(ch);
     el.querySelector('.wc').textContent=isNotes?'—':fmt(w);
     el.addEventListener('click',function(){openChapter(ch.id)});
+    var openBtn=el.querySelector('.ch-open');
+    /* клавиатурная альтернатива перетаскиванию: Alt+↑ / Alt+↓ */
+    openBtn.addEventListener('keydown',function(e){
+      if(!e.altKey||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;
+      e.preventDefault();e.stopPropagation();
+      moveChapter(ch.id,e.key==='ArrowUp'?-1:1);
+    });
     var delBtn=el.querySelector('.del');
     if(delBtn){
       delBtn.addEventListener('click',function(e){
@@ -569,6 +605,7 @@ function renderList(animate){
         uiConfirm('Удалить главу?','«'+chapterTitle(ch)+'» будет удалена безвозвратно.',true).then(function(ok){
           if(!ok)return;
           b.chapters=b.chapters.filter(function(x){return x.id!==ch.id});
+          b.updated=Date.now();               /* H5: без бампа правка не уезжает на сервер */
           if(b.current===ch.id)openChapter(b.chapters[0].id,true);
           persist();invalidateCo();renderList(true);
         });
@@ -600,6 +637,7 @@ function renderList(animate){
       var to=arr.findIndex(function(x){return x.id===ch.id});
       arr.splice(before?to:to+1,0,item);
       dragChId=null;clearDropMarks();
+      b.updated=Date.now();                  /* H5 */
       persist();invalidateCo();renderList(false);updateStats();
     });
     list.appendChild(el);
@@ -610,7 +648,7 @@ function renderList(animate){
       ch.marks.forEach(function(m){
         var mi=mk('div');
         mi.className='mark-item';
-        mi.innerHTML='<span class="mark-lbl"></span><button class="mark-del" title="Удалить метку">×</button>';
+        mi.innerHTML='<button type="button" class="mark-open"><span class="mark-lbl"></span></button><button type="button" class="mark-del" title="Удалить метку" aria-label="Удалить метку">×</button>';
         mi.querySelector('.mark-lbl').textContent=m.label;
         mi.addEventListener('click',function(e){e.stopPropagation();jumpToMark(ch.id,m.id)});
         mi.querySelector('.mark-del').addEventListener('click',function(e){
@@ -625,6 +663,7 @@ function renderList(animate){
   $('#totalWords').textContent=fmt(total)+' '+plural(total,'слово','слова','слов');
   $('#totalRead').textContent=total?('≈ '+Math.ceil(total/180)+' мин'):'';
   renderMarksRail();
+  if(typeof a11yPass==='function')a11yPass(list);
 }
 
 function renderMarksRail(){
@@ -661,6 +700,7 @@ function renderMarksRail(){
     rail.appendChild(dot);
   });
   rail.classList.add('on');
+  if(typeof a11yPass==='function')a11yPass(rail);
 }
 
 function updateCrumb(){
@@ -672,6 +712,7 @@ function updateCrumb(){
 }
 function loadChapter(c){
   zenAnchor=null;
+  if(!c||typeof c!=='object')c={id:null,html:'<p></p>',pos:0,marks:[]};   /* L7 */
   editor.innerHTML=c.html||'<p></p>';
   if(!editor.firstElementChild)editor.innerHTML='<p></p>';
   ensureNoteIds();
@@ -682,7 +723,18 @@ function loadChapter(c){
 }
 function openChapter(id,skipSave){
   var b=book();if(!b)return;
-  if(!skipSave){var prev=currentCh();if(prev){if(!isReadOnly())prev.html=cleanHtml();prev.pos=scroller.scrollTop}}
+  if(!skipSave){
+    clearTimeout(saveTimer);              /* отложенный save не должен сравнить уже новую главу (H6) */
+    var prev=currentCh();
+    if(prev){
+      if(!isReadOnly()){
+        var oldHtml=prev.html;
+        prev.html=cleanHtml();
+        if(prev.html!==oldHtml)b.updated=Date.now();
+      }
+      prev.pos=scroller.scrollTop;
+    }
+  }
   closeMenu();selbar.classList.remove('on');hideSynbar();
   b.current=id;
   loadChapter(currentCh());
@@ -695,13 +747,27 @@ $('#addCh').addEventListener('click',function(){
   var b=book();if(!b)return;
   var ch=currentCh();if(ch){ch.html=cleanHtml();ch.pos=scroller.scrollTop}
   var n={id:uid(),html:'<h1></h1><p></p>',pos:0,marks:[]};
-  b.chapters.push(n);persist();openChapter(n.id,true);
+  b.chapters.push(n);
+  b.updated=Date.now();                   /* структурная правка должна уезжать на сервер (H5) */
+  persist();openChapter(n.id,true);
   editor.focus();caretStart(editor.querySelector('h1'));
 });
 $('#bookTitle').addEventListener('input',function(){
   if(isReadOnly())return;
   var b=book();if(!b)return;
-  b.title=$('#bookTitle').value;updateCrumb();scheduleSave();
+  var v=$('#bookTitle').value;
+  if(b.title!==v){b.title=v;b.updated=Date.now()}   /* смена названия должна уезжать на сервер */
+  updateCrumb();scheduleSave();
+});
+$('#bvAuthor').addEventListener('change',function(){
+  if(isReadOnly())return;
+  var b=book();if(!b)return;
+  var v=this.value.trim();
+  if((b.author||'')===v)return;
+  b.author=v;
+  b.updated=Date.now();   /* как переименование: LWW-бамп, книга уйдёт на сервер */
+  persist();
+  if(typeof renderLibrary==='function')renderLibrary();
 });
 
 function openBookOverview(id){
@@ -719,6 +785,13 @@ function openBookOverview(id){
 function renderBookView(){
   var b=book();if(!b)return;
   $('#bvTitle').textContent=b.title||'Без названия';
+  var ba=$('#bvAuthor');
+  if(ba){
+    ba.hidden=false;
+    ba.disabled=isReadOnly();
+    ba.placeholder=isReadOnly()?'автор не указан':'Автор — как подписывать книгу';
+    ba.value=isForeign()?((foreignMeta&&foreignMeta.author)||''):((typeof b.author==='string')?b.author:'');
+  }
   var w=bookWords(b),min=Math.ceil(w/180);
   var vis=visibleChapters(b);
   var nch=vis.length;
@@ -732,7 +805,7 @@ function renderBookView(){
     ? '<span class="ro-badge">чтение</span>'+esc((foreignMeta&&foreignMeta.line)||'автор не указан')
     :(b.updated?esc('изменено '+timeAgo(b.updated)):'');
   var bvOpenBtn=$('#bvOpen');
-  if(bvOpenBtn)bvOpenBtn.title=isReadOnly()?'Читать':'Открыть в редакторе';
+  if(bvOpenBtn)setBtnTitle(bvOpenBtn,isReadOnly()?'Читать':'Открыть в редакторе');
   bvGrid.innerHTML='';
   var displayIdx=0;
   b.chapters.forEach(function(ch,i){
@@ -771,7 +844,9 @@ function renderBookView(){
     nc.addEventListener('click',function(){
       var b2=book();if(!b2||isReadOnly())return;
       var n={id:uid(),html:'<h1></h1><p></p>',pos:0,marks:[]};
-      b2.chapters.push(n);persist();
+      b2.chapters.push(n);
+      b2.updated=Date.now();                 /* H5 */
+      persist();
       enterEditor(n.id);
       editor.focus();caretStart(editor.querySelector('h1'));
     });
@@ -796,6 +871,18 @@ function chapterExcerpt(ch,maxBlocks){
 }
 function enterEditor(chId){
   var b=book();if(!b)return;
+  /* дописать текущую главу ДО переключения (H7): иначе набранный текст
+     остаётся только в DOM и теряется при loadChapter чужой главы */
+  if(!isReadOnly()&&!workspace.hidden){
+    clearTimeout(saveTimer);
+    var cur=currentCh();
+    if(cur){
+      var oldHtml=cur.html;
+      cur.html=cleanHtml();
+      if(cur.html!==oldHtml)b.updated=Date.now();
+      cur.pos=scroller.scrollTop;
+    }
+  }
   b.wiki=Array.isArray(b.wiki)?b.wiki:[];
   b.customTypes=Array.isArray(b.customTypes)?b.customTypes:[];
   if(!b.chapters.length&&!isReadOnly()){
@@ -832,20 +919,35 @@ function renderLibrary(){
     el.style.setProperty('--c',b.color||COLORS[0]);
     el.style.animationDelay=(Math.min(i,7)*50)+'ms';
     el.innerHTML=
-      '<span class="cv-top"><span class="cv-dia"></span><span class="cv-tools">'+
+      '<span class="cv-top"><span class="cv-dia"></span><span class="cv-vis" hidden></span><span class="cv-tools">'+
       '<button class="cv-ren" title="Переименовать"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3"/></svg></button>'+
       '<button class="cv-del" title="Удалить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span></span>'+
       '<span class="cv-title"></span>'+
+      '<span class="cv-author"></span>'+
       '<span class="cv-rule"></span>'+
       '<span class="cv-meta"></span>'+
       '<span class="cv-time"></span>';
     el.querySelector('.cv-title').textContent=b.title||'Без названия';
-    var visN=visibleChapters(b).length;
+    var author=(typeof b.author==='string'&&b.author.trim())?b.author.trim():((currentUser&&(currentUser.name||currentUser.login))||'');
+    var av=el.querySelector('.cv-author');
+    av.textContent=author;
+    av.hidden=!author;
+    var vis=el.querySelector('.cv-vis');
+    var visLabel=(b.visibility==='public')?'публичная':(b.visibility==='unlisted'?'по ссылке':'');
+    if(visLabel){vis.hidden=false;vis.textContent=visLabel;vis.setAttribute('data-v',b.visibility)}
+    var visList=visibleChapters(b);
+    var visN=visList.length;
+    var curIdx=0;
+    for(var vi=0;vi<visList.length;vi++){if(visList[vi].id===b.current){curIdx=vi+1;break}}
     el.querySelector('.cv-meta').innerHTML=
       '<span>'+visN+' '+plural(visN,'глава','главы','глав')+'</span>'+
       '<span class="cv-dot"></span>'+
       '<span>'+fmt(w)+' '+plural(w,'слово','слова','слов')+'</span>';
-    el.querySelector('.cv-time').textContent=b.updated?('изменено '+timeAgo(b.updated)):'';
+    var timeTxt=b.updated?('изменено '+timeAgo(b.updated)):'';
+    var prog=(curIdx>1&&visN>1)?('гл. '+curIdx+' из '+visN):'';
+    el.querySelector('.cv-time').innerHTML=prog?
+      '<span>'+prog+'</span><span class="cv-dot"></span><span>'+esc(timeTxt)+'</span>':
+      '<span>'+esc(timeTxt)+'</span>';
     el.addEventListener('click',function(){openBookOverview(b.id)});
     el.addEventListener('keydown',function(e){if(e.key==='Enter')openBookOverview(b.id)});
     el.querySelector('.cv-ren').addEventListener('click',function(e){
@@ -861,6 +963,9 @@ function renderLibrary(){
         if(!ok)return;
         state.books=state.books.filter(function(x){return x.id!==b.id});
         if(state.activeBookId===b.id)state.activeBookId=null;
+        /* H4: сразу помечаем удаление — иначе после перезапуска
+           reconcile воскресит книгу с сервера (sentBooks пуст) */
+        if(typeof Sync!=='undefined'&&Sync&&Sync.tombBook)Sync.tombBook(b.id);
         snapshotStats();persist();invalidateCo();renderLibrary();renderStats();
       });
     });
@@ -878,6 +983,7 @@ function renderLibrary(){
     : 'полка пуста —<br>начните первую книгу';
 
   renderStats();
+  if(typeof a11yPass==='function')a11yPass(shelf);
 }
 function createBook(){
   var first={id:uid(),html:'<h1></h1><p></p>',pos:0,marks:[]};
@@ -924,7 +1030,7 @@ $('#btnSide').addEventListener('click',function(){
   if(mqMobile.matches)document.body.classList.toggle('side-open');
   else{
     var hidden=document.body.classList.toggle('side-hidden');
-    this.title=hidden?'Показать панель глав':'Скрыть панель глав';
+    setBtnTitle(this,hidden?'Показать панель глав':'Скрыть панель глав');
   }
   hideMarkTip();
   renderMarksRail();
@@ -950,8 +1056,10 @@ function setTheme(t){
   document.querySelectorAll('.ic-sun').forEach(function(i){i.style.display=(t==='light')?'':'none'});
   document.querySelectorAll('.ic-sepia').forEach(function(i){i.style.display=(t==='sepia')?'':'none'});
   document.querySelectorAll('.ic-moon').forEach(function(i){i.style.display=(t==='dark')?'':'none'});
+  var tc=document.querySelector('meta[name="theme-color"]');
+  if(tc){var bgc={light:'#f4f2ec',dark:'#161411',sepia:'#f2e6cf'}[t];if(bgc)tc.setAttribute('content',bgc)}
   var tt={light:'Тема: день',dark:'Тема: ночь',sepia:'Тема: сепия'}[t];
-  if(tt)document.querySelectorAll('.btn-theme').forEach(function(b){b.title=tt});
+  if(tt)document.querySelectorAll('.btn-theme').forEach(function(b){setBtnTitle(b,tt)});
   persist();renderStats();
   if(!$('#paneGraph').hidden)scheduleGraph();
 }
@@ -1091,12 +1199,13 @@ function closeExportMenu(){$('#exportMenu').classList.remove('on')}
 function openExportMenu(){
   var m=$('#exportMenu'),b=book();if(!b)return;
   var w=bookWords(b),n=visibleChapters(b).length,notes=collectNotes().length;
-  m.innerHTML='<div class="bm-head">Скачать рукопись · '+n+' '+plural(n,'глава','главы','глав')+' · '+fmt(w)+' слов</div>'+
-    '<button class="bm-item" data-k="txt"><span class="bm-badge">Tx</span><span class="t">Простой текст</span><span class="h">.TXT</span></button>'+
-    '<button class="bm-item" data-k="md"><span class="bm-badge">Md</span><span class="t">Markdown</span><span class="h">.MD</span></button>'+
-    '<button class="bm-item" data-k="html"><span class="bm-badge">&lt;&gt;</span><span class="t">Веб-страница</span><span class="h">.HTML</span></button>'+
-    '<button class="bm-item" data-k="print"><span class="bm-badge">⎙</span><span class="t">Печать / PDF</span><span class="h">CTRL+P</span></button>'+
-    (notes?('<div class="bm-head" style="padding-top:10px">'+fmt(notes)+' '+plural(notes,'заметка','заметки','заметок')+' не войдут в файл</div>'):'');
+  m.innerHTML='<div role="group"><div class="bm-head">Скачать рукопись · '+n+' '+plural(n,'глава','главы','глав')+' · '+fmt(w)+' слов</div>'+
+    '<button type="button" class="bm-item" role="menuitem" data-k="txt"><span class="bm-badge">Tx</span><span class="t">Простой текст</span><span class="h">.TXT</span></button>'+
+    '<button type="button" class="bm-item" role="menuitem" data-k="md"><span class="bm-badge">Md</span><span class="t">Markdown</span><span class="h">.MD</span></button>'+
+    '<button type="button" class="bm-item" role="menuitem" data-k="html"><span class="bm-badge">&lt;&gt;</span><span class="t">Веб-страница</span><span class="h">.HTML</span></button>'+
+    '<button type="button" class="bm-item" role="menuitem" data-k="print"><span class="bm-badge">⎙</span><span class="t">Печать / PDF</span><span class="h">CTRL+P</span></button>'+
+    (notes?('<div class="bm-head" style="padding-top:10px">'+fmt(notes)+' '+plural(notes,'заметка','заметки','заметок')+' не войдут в файл</div>'):'')+
+    '</div>';
   var r=$('#btnExport').getBoundingClientRect();
   m.style.top=(r.bottom+8)+'px';
   m.style.left=Math.max(10,Math.min(r.left-180,innerWidth-260))+'px';

@@ -103,7 +103,9 @@
   body.reader.rd-ui #rdHud{transform:none;opacity:1;pointer-events:auto}
 
   #rdSeek{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin:0;display:block;padding:0}
-  #rdSeek:focus-visible{outline:none}
+  #rdSeek:focus-visible{outline:none;box-shadow:0 0 0 3px var(--sel)}
+  #rdSeek:focus-visible::-webkit-slider-thumb{box-shadow:var(--shadow-sm),0 0 0 4px var(--sel)}
+  #rdSeek:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px var(--sel)}
   #rdSeek::-webkit-slider-runnable-track{height:3px;border-radius:99px;background:linear-gradient(90deg,var(--accent) 0 var(--p,0%),var(--line2) var(--p,0%) 100%)}
   #rdSeek::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-5.5px;border-radius:50%;background:var(--accent);border:2px solid var(--bg);box-shadow:var(--shadow-sm)}
   #rdSeek::-moz-range-track{height:3px;border-radius:99px;background:var(--line2)}

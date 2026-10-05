@@ -76,7 +76,9 @@ else
   echo "    ВНИМАНИЕ: сертификата нет — конфиг будет на порту 80 (нужен certbot)"
 fi
 
-MAIN_CONF="server {
+MAIN_CONF="limit_req_zone \$binary_remote_addr zone=ch_auth:10m rate=10r/m;
+
+server {
   server_name $DOMAIN;
   root $SITE_ROOT;
   index index.html;
@@ -94,6 +96,18 @@ else
 fi
 MAIN_CONF+="  client_max_body_size 20m;
 
+  # брутфорс пароля — rate-limit на auth-эндпоинт (вход/регистрация/выход)
+  location = /api/auth.php {
+    limit_req zone=ch_auth burst=20 nodelay;
+    limit_req_status 429;
+    include snippets/fastcgi-php.conf;
+    fastcgi_pass unix:$FPM_SOCK;
+    fastcgi_param CHEROVIK_DB mysql;
+    fastcgi_param CHEROVIK_MYSQL_DSN \"mysql:host=localhost;dbname=$DB_NAME;charset=utf8mb4\";
+    fastcgi_param CHEROVIK_MYSQL_USER $DB_USER;
+    fastcgi_param CHEROVIK_MYSQL_PASS $DB_PASS;
+  }
+
   location ~ \.php\$ {
     include snippets/fastcgi-php.conf;
     fastcgi_pass unix:$FPM_SOCK;
@@ -101,6 +115,21 @@ MAIN_CONF+="  client_max_body_size 20m;
     fastcgi_param CHEROVIK_MYSQL_DSN \"mysql:host=localhost;dbname=$DB_NAME;charset=utf8mb4\";
     fastcgi_param CHEROVIK_MYSQL_USER $DB_USER;
     fastcgi_param CHEROVIK_MYSQL_PASS $DB_PASS;
+  }
+
+  # закрываем статику в api/ (схемы sql, дампы sqlite, md, логи) — там только php
+  location ~ ^/api/ {
+    deny all;
+  }
+
+  # не раздаём файлы-документацию/бэкапы/схемы из любого места сайта
+  location ~ \\.(md|sql|sqlite|log|bak|ini|conf)$ {
+    deny all;
+  }
+
+  # закрываем dotfiles (.git, .gitignore, .dbpass и т.п.), кроме certbot-challenge
+  location ~ /\\.(?!well-known/) {
+    deny all;
   }
 }
 "
@@ -122,6 +151,8 @@ else
   ln -sf "$TARGET" "$ENABLED_DIR/$DOMAIN.conf"
 fi
 printf '%s\n' "$MAIN_CONF" > "$TARGET"
+chmod 600 "$TARGET"   # в конфиге пароль БД — не давать читать всем
+rm -f "$ENABLED_DIR/default"   # стоковый сайт nginx не нужен
 for f in "$ENABLED_DIR"/*; do
   [[ -f "$f" || -L "$f" ]] || continue
   [[ "$(basename "$f")" == "$(basename "$TARGET")" ]] && continue

@@ -74,4 +74,34 @@ function timeAgo(ts){
   if(days<7)return days+' дн назад';
   return new Date(ts).toLocaleDateString('ru-RU');
 }
+/* =========================================================================
+   ДОСТУПНОСТЬ: иконочные кнопки получают aria-label из title (title сам по
+   себе не везде объявляется скринридерами и не показывается на тач-экранах),
+   декоративные svg прячутся от AT. Вызывать после отрисовки динамических
+   списков: a11yPass(container).
+   ========================================================================= */
+function a11yPass(root){
+  root=root||document;
+  if(!root.querySelectorAll)return;
+  var btns=root.querySelectorAll('button,a[href],[role="button"]');
+  Array.prototype.forEach.call(btns,function(b){
+    /* декоративные svg внутри действия не должны объявляться AT */
+    Array.prototype.forEach.call(b.querySelectorAll('svg'),function(s){
+      if(s.getAttribute('aria-hidden')==='true')return;
+      s.setAttribute('aria-hidden','true');
+      s.setAttribute('focusable','false');
+    });
+    if(b.getAttribute('aria-label'))return;
+    var txt=(b.textContent||'').replace(/\s+/g,' ').trim();
+    if(txt)return;                       /* есть текст — он и есть имя */
+    var t=b.getAttribute('title');
+    if(t)b.setAttribute('aria-label',t);
+  });
+}
+/* смена title у динамических кнопок — держим aria-label синхронным */
+function setBtnTitle(b,t){
+  if(!b)return;
+  b.title=t;
+  b.setAttribute('aria-label',t);
+}
 

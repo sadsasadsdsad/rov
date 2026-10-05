@@ -9,19 +9,19 @@
  * ========================================================================== */
 /* ====== ГРАФ — улучшенная версия ====== */
 .gp-bar{display:flex;gap:4px;align-items:center;padding:8px 12px;flex:0 0 auto;flex-wrap:wrap;border-bottom:1px dashed var(--line2);background:var(--card-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;z-index:2}
-.gp-mode{font-family:var(--f-ui);font-size:8px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);border-radius:99px;padding:4px 9px;color:var(--ink3);transition:.16s;background:transparent;white-space:nowrap}
+.gp-mode{font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);border-radius:99px;padding:4px 9px;color:var(--ink3);transition:color .16s,border-color .16s,background .16s;background:transparent;white-space:nowrap}
 .gp-mode:hover{color:var(--ink);border-color:var(--line)}
 .gp-mode.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .gp-sp{flex:1;min-width:2px}
-.gp-toggle{font-family:var(--f-ui);font-size:8px;letter-spacing:.08em;text-transform:uppercase;border:1px dashed var(--line2);border-radius:99px;padding:4px 9px;color:var(--ink3);transition:.16s;background:transparent;white-space:nowrap}
+.gp-toggle{font-family:var(--f-ui);font-size:9px;letter-spacing:.08em;text-transform:uppercase;border:1px dashed var(--line2);border-radius:99px;padding:4px 9px;color:var(--ink3);transition:color .16s,border-color .16s,background .16s;background:transparent;white-space:nowrap}
 .gp-toggle:hover{border-color:var(--accent);color:var(--accent)}
 .gp-toggle.on{border-style:solid;border-color:var(--accent);color:var(--accent);background:var(--sel)}
 .gp-sliders{display:flex;gap:14px;align-items:center;padding:6px 14px 8px;flex:0 0 auto;border-bottom:1px dashed var(--line2);flex-wrap:wrap}
-.gp-slider{display:flex;align-items:center;gap:8px;font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);flex:1;min-width:150px}
+.gp-slider{display:flex;align-items:center;gap:8px;font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);flex:1;min-width:150px}
 .gp-slider input[type=range]{flex:1;accent-color:var(--accent);height:3px;min-width:60px;cursor:pointer}
 .gp-slider .gp-val{color:var(--accent);min-width:26px;text-align:right;font-weight:500;letter-spacing:.02em}
 .gp-typebar{display:flex;gap:5px;padding:0 14px 8px;flex-wrap:wrap;border-bottom:1px dashed var(--line2);flex:0 0 auto}
-.gp-tchip{position:relative;border:1px solid var(--line2);border-radius:99px;padding:3px 9px 3px 18px;font-family:var(--f-ui);font-size:8px;letter-spacing:.1em;color:var(--ink3);transition:.15s;text-transform:uppercase;background:transparent}
+.gp-tchip{position:relative;border:1px solid var(--line2);border-radius:99px;padding:3px 9px 3px 18px;font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;color:var(--ink3);transition:color .15s,border-color .15s,opacity .15s;text-transform:uppercase;background:transparent}
 .gp-tchip::before{content:"";position:absolute;left:8px;top:50%;margin-top:-2.5px;width:5px;height:5px;transform:rotate(45deg);background:var(--tc,var(--ink3));opacity:.85}
 .gp-tchip:hover{color:var(--ink)}
 .gp-tchip.off{opacity:.42;text-decoration:line-through}
@@ -58,18 +58,20 @@
 }
 #graphSvg text.gmain{fill:var(--accent);font-weight:600;font-size:12.5px}
 #graphSvg text.grel{fill:var(--ink2);font-weight:500}
-#graphSvg line.glink{
+/* JS создаёт <path class="glink"> — селекторы должны быть по path,
+   по line.hover/transition никогда не срабатывали */
+#graphSvg path.glink{
   transition:opacity .22s,stroke-width .22s,stroke .22s;
   vector-effect:non-scaling-stroke;
   cursor:pointer;
 }
-#graphSvg line.glink:hover{stroke:var(--accent)!important;opacity:1!important}
+#graphSvg path.glink:hover{stroke:var(--accent)!important;opacity:1!important}
 #graphSvg .gp-ring{fill:none;stroke:var(--line2);stroke-dasharray:2 5;opacity:.5;transition:opacity .22s}
-#graphSvg .gp-ring-label{font-family:var(--f-ui);font-size:8px;fill:var(--ink3);letter-spacing:.14em;text-transform:uppercase;opacity:.6;stroke:none;paint-order:initial;transition:opacity .22s}
+#graphSvg .gp-ring-label{font-family:var(--f-ui);font-size:9px;fill:var(--ink3);letter-spacing:.14em;text-transform:uppercase;opacity:.6;stroke:none;paint-order:initial;transition:opacity .22s}
 #graphSvg.focused .gp-ring,
 #graphSvg.focused .gp-ring-label{opacity:0!important}
-#graphSvg.focused line.glink{opacity:.03!important}
-#graphSvg.focused line.glink.grel{opacity:1!important}
+#graphSvg.focused path.glink{opacity:.03!important}
+#graphSvg.focused path.glink.grel{opacity:1!important}
 #graphSvg.focused circle.gnode{opacity:.14}
 #graphSvg.focused circle.gnode.grel{opacity:1}
 #graphSvg.focused text{opacity:.14}
@@ -78,7 +80,7 @@
 .gp-hint{
   position:absolute;
   bottom:8px;left:12px;right:76px;
-  font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;
   text-transform:uppercase;color:var(--ink3);opacity:.65;
   pointer-events:none;line-height:1.55;
 }
@@ -92,13 +94,13 @@
 .gp-node-tip .nt-meta{color:var(--ink3);font-size:9.5px;letter-spacing:.04em;display:flex;flex-wrap:wrap;gap:4px 10px}
 .gp-node-tip .nt-meta b{color:var(--ink2);font-weight:500}
 .gp-zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:4px;z-index:3}
-.gp-zoom button{width:28px;height:28px;display:grid;place-items:center;background:var(--card-glass);border:1px solid var(--line2);border-radius:7px;color:var(--ink2);transition:.15s;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.gp-zoom button{width:28px;height:28px;display:grid;place-items:center;background:var(--card-glass);border:1px solid var(--line2);border-radius:7px;color:var(--ink2);transition:color .15s,border-color .15s;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .gp-zoom button:hover{color:var(--accent);border-color:var(--accent)}
 .gp-zoom button svg{width:14px;height:14px}
 
 .gp-legend{
   display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:0;
-  font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);
   flex:0 0 auto;align-items:center;
 }
 .gp-legend i{width:8px;height:8px;display:inline-block;transform:rotate(45deg);margin-right:6px;vertical-align:middle}
@@ -113,7 +115,8 @@
 .gp-main b{font-size:16px;font-weight:600;letter-spacing:-.01em}
 .gp-main-l{font-family:var(--f-ui);font-size:9px;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase}
 .gp-list{display:flex;flex-direction:column;gap:4px}
-.gp-row{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:3px 2px;cursor:pointer;border-radius:6px;transition:background .15s}
+/* строки-кнопки: полная ширина и выравнивание влево (button по умолчанию центрирует) */
+.gp-row{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:3px 2px;cursor:pointer;border-radius:6px;transition:background .15s;width:100%;text-align:left;font-family:var(--f-serif);line-height:1.35}
 .gp-row:hover{background:var(--hover)}
 .gp-row.is-main{font-weight:600}
 .gp-row.is-focus{background:var(--sel);border:1px solid var(--accent);padding:2px 1px}
@@ -122,4 +125,11 @@
 .gp-row .gp-bar{flex:1;height:6px;border-radius:3px;background:var(--line2);overflow:hidden;min-width:30px}
 .gp-row .gp-bar i{display:block;height:100%;border-radius:3px;background:var(--accent);transition:width .5s cubic-bezier(.2,.7,.2,1)}
 .gp-v{font-family:var(--f-ui);font-size:9.5px;color:var(--ink3);width:38px;text-align:right;flex:0 0 auto;font-variant-numeric:tabular-nums}
+
+/* тач-устройства: чипы/кнопки тулбара до 24px+, тонкие подписи читаемее */
+@media (pointer:coarse){
+  .gp-mode,.gp-toggle,.gp-tchip{padding-top:7px;padding-bottom:7px}
+  .gp-zoom button{width:36px;height:36px}
+  .gp-row{padding-top:6px;padding-bottom:6px}
+}
 

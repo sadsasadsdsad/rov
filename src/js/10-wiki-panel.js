@@ -26,6 +26,11 @@ function updatePanelTabs(){
         ind.style.width=active.offsetWidth+'px';
         ind.style.transform='translateX('+active.offsetLeft+'px)';
         ind.classList.add('on');
+      }else if(!panel.offsetParent){
+        /* M13: панель невидима (body.reader / display:none) — таймер
+           самоплодился и парсил все главы каждые 60мс; полагаемся
+           на ResizeObserver ниже */
+        ind.classList.remove('on');
       }else{
         setTimeout(updatePanelTabs,60);
       }

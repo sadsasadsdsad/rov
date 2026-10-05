@@ -204,13 +204,20 @@ function renderTypeChips(){
     var chip=mk('div');
     chip.className='type-chip'+(selectedType===tp.k?' on':'');
     chip.style.setProperty('--tc',tp.color);
-    chip.tabIndex=0;
-    chip.innerHTML='<span>'+esc(tp.s)+'</span>'+(isCustom?'<button class="tc-del" type="button" title="Удалить тип">×</button>':'');
+    /* чип — обычный div: и выбор, и удаление живут в настоящих <button> */
+    chip.innerHTML='<button type="button" class="tc-pick" aria-pressed="'+(selectedType===tp.k?'true':'false')+'"><span>'+esc(tp.s)+'</span></button>'+(isCustom?'<button class="tc-del" type="button" title="Удалить тип" aria-label="Удалить тип «'+escAttr(tp.s)+'»">×</button>':'');
+    function selectType(){
+      selectedType=tp.k;
+      box.querySelectorAll('.type-chip').forEach(function(c){
+        c.classList.toggle('on',c===chip);
+        var p=c.querySelector('.tc-pick');
+        if(p)p.setAttribute('aria-pressed',c===chip?'true':'false');
+      });
+      paintTypeBadge();
+    }
     chip.addEventListener('click',function(e){
       if(e.target.closest('.tc-del'))return;
-      selectedType=tp.k;
-      box.querySelectorAll('.type-chip').forEach(function(c){c.classList.toggle('on',c===chip)});
-      paintTypeBadge();
+      selectType();
     });
     if(isCustom)chip.querySelector('.tc-del').addEventListener('click',function(e){e.stopPropagation();removeType(tp.k)});
     box.appendChild(chip);
@@ -224,6 +231,7 @@ function renderTypeChips(){
       var k='custom_'+uid();
       var color=COLORS[(b.customTypes.length+3)%COLORS.length];
       b.customTypes.push({k:k,t:name,s:name,color:color});
+      b.updated=Date.now();                  /* H5 */
       persist();selectedType=k;renderTypeChips();
     });
   });
@@ -238,6 +246,7 @@ function removeType(k){
     b.customTypes=(b.customTypes||[]).filter(function(t){return t.k!==k});
     used.forEach(function(w){w.type='other'});
     if(selectedType===k)selectedType='other';
+    b.updated=Date.now();                    /* H5 */
     persist();invalidateCo();renderTypeChips();
     if($('#wikiPanel').classList.contains('on')){renderWikiFilters();renderWiki()}
   });
@@ -285,7 +294,7 @@ function renderWiki(){
     group.forEach(function(en){
       var st=nameStats(en);
       var card=mk('div');card.className='wk-card';card.dataset.type=en.type;
-      card.innerHTML='<div class="wk-top"><span class="wk-dia" style="background:'+wikiTypeColor(en.type)+'"></span><span class="wk-name"></span><span class="wk-type">'+esc(wikiTypeLabel(en.type))+'</span><button class="wk-del" title="Удалить статью">×</button></div>'+
+      card.innerHTML='<div class="wk-top"><button type="button" class="wk-open"><span class="wk-dia" style="background:'+wikiTypeColor(en.type)+'"></span><span class="wk-name"></span><span class="wk-type">'+esc(wikiTypeLabel(en.type))+'</span></button><button type="button" class="wk-del" title="Удалить статью" aria-label="Удалить статью">×</button></div>'+
         ((en.aliases&&en.aliases.length)?'<div class="wk-alias"></div>':'')+
         (en.desc?'<div class="wk-desc"></div>':'')+
         (st.appear.length?'<div class="wk-tl">'+timelineHtml(st.appear,st.total,true)+'</div>':'')+
@@ -297,9 +306,11 @@ function renderWiki(){
       card.addEventListener('click',function(){openWikiView(en.id)});
       card.querySelector('.wk-del').addEventListener('click',function(e){
         e.stopPropagation();
+        if(isReadOnly())return;              /* M5: guard ro-режима */
         uiConfirm('Удалить статью?','«'+en.name+'» исчезнет из энциклопедии.',true).then(function(ok){
           if(!ok)return;
           b.wiki=b.wiki.filter(function(x){return x.id!==en.id});
+          b.updated=Date.now();              /* H5 */
           persist();invalidateCo();renderWiki();
         });
       });
