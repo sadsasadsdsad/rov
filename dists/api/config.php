@@ -3,20 +3,28 @@
  * config.php — настройки сервера «Черновика»
  * Локально по умолчанию работает SQLite (файл api/data.sqlite) — ничего
  *   настраивать не нужно. На хостинге задайте переменные окружения
- *   или отредактируйте значения ниже.
+ *   (в nginx через fastcgi_param — см. README) или отредактируйте
+ *   значения ниже.
+ * Ключи читаются из окружения (getenv), затем из $_SERVER (fastcgi_param).
  * ========================================================================== */
+$env = function (string $key, ?string $def = null): ?string {
+    $v = getenv($key);
+    if ($v === false || $v === '') $v = $_SERVER[$key] ?? $_ENV[$key] ?? null;
+    return ($v === null || $v === '') ? $def : $v;
+};
+
 return [
     /* sqlite | mysql — на боевом хостинге обычно mysql */
-    'driver' => getenv('CHEROVIK_DB') ?: 'sqlite',
+    'driver' => $env('CHEROVIK_DB', 'sqlite'),
 
     'sqlite' => [
-        'path' => getenv('CHEROVIK_SQLITE') ?: __DIR__ . '/data.sqlite',
+        'path' => $env('CHEROVIK_SQLITE') ?: __DIR__ . '/data.sqlite',
     ],
 
     'mysql' => [
-        'dsn'  => getenv('CHEROVIK_MYSQL_DSN') ?: 'mysql:host=localhost;dbname=chernovik;charset=utf8mb4',
-        'user' => getenv('CHEROVIK_MYSQL_USER') ?: 'chernovik',
-        'pass' => getenv('CHEROVIK_MYSQL_PASS') ?: '',
+        'dsn'  => $env('CHEROVIK_MYSQL_DSN', 'mysql:host=localhost;dbname=chernovik;charset=utf8mb4'),
+        'user' => $env('CHEROVIK_MYSQL_USER', 'chernovik'),
+        'pass' => $env('CHEROVIK_MYSQL_PASS', ''),
     ],
 
     /* имя cookie сессии и срок её жизни */
