@@ -34,7 +34,7 @@ if ($method === 'PUT' || $method === 'POST') {
     if ($b['updated'] > ts() + 600000) $b['updated'] = ts();
     if ($b['updated'] < 0) $b['updated'] = ts();
 
-    $row = db_one('SELECT user_id, updated, visibility, share_token FROM books WHERE id = ?', [$id]);
+    $row = db_one('SELECT user_id, updated, visibility, share_token, content FROM books WHERE id = ?', [$id]);
     if ($row) {
         if ((string)$row['user_id'] !== (string)$u['id']) json_err(403, 'not your book');
         if ((int)$row['updated'] > $b['updated']) {
@@ -65,7 +65,14 @@ if ($method === 'PUT' || $method === 'POST') {
         }
     }
 
-    if (!isset($b['chapters']) || !is_array($b['chapters'])) $b['chapters'] = [];
+    /* F11: частичный PUT (без ключа chapters) не должен затирать текст —
+       главы берутся из текущей записи. Пустой массив остаётся пустым:
+       это настоящое «удалили все главы». */
+    if (!isset($b['chapters']) || !is_array($b['chapters'])) {
+        $cur = $row ? json_decode((string)$row['content'], true) : null;
+        $b['chapters'] = (is_array($cur) && isset($cur['chapters']) && is_array($cur['chapters']))
+            ? $cur['chapters'] : [];
+    }
 
     $content = json_encode($b, JSON_UNESCAPED_UNICODE);
     if ($content === false) json_err(422, 'bad book json');

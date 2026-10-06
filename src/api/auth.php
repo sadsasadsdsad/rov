@@ -14,7 +14,7 @@ switch ($action) {
     case 'me':
         need_method('GET', 'HEAD');
         $u = current_user();
-        json_out(['user' => $u ? public_user($u) : null]);
+        json_out(['user' => $u ? public_user($u) : null, 'db' => db_engine()]);
 
     case 'join':
         guard();

@@ -67,6 +67,7 @@ if ($method === 'GET' || $method === 'HEAD') {
             : ['data' => null, 'updated' => 0],
         'stats' => stats_get((string)$u['id']),
         'books' => $list,
+        'meta'  => ['db' => db_engine()],
     ]);
 }
 

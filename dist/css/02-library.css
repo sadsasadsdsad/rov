@@ -165,9 +165,10 @@ body.zen #marksRail{opacity:0!important;visibility:hidden!important}
 .cv-author{display:block;font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-top:7px;position:relative;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cv-author[hidden]{display:none}
 .cv-rule{width:26px;height:2px;background:var(--c,var(--accent));margin-top:12px;margin-bottom:13px;position:relative}
-.cv-meta{display:flex;align-items:center;gap:8px;font-family:var(--f-ui);font-size:9.5px;color:var(--ink2);letter-spacing:.02em;position:relative;margin-top:auto;padding-top:14px}
+.cv-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-family:var(--f-ui);font-size:9.5px;color:var(--ink2);letter-spacing:.02em;position:relative;margin-top:auto;padding-top:14px}
+.cv-meta>span,.cv-time>span{white-space:nowrap}
 .cv-dot{width:3px;height:3px;background:var(--ink3);transform:rotate(45deg);flex:0 0 auto}
-.cv-time{display:block;font-family:var(--f-ui);font-size:9px;color:var(--ink3);margin-top:7px;position:relative}
+.cv-time{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-family:var(--f-ui);font-size:9px;color:var(--ink3);margin-top:7px;position:relative}
 .cover.new{border:1.5px dashed var(--line);background:transparent;box-shadow:none;align-items:center;justify-content:center;gap:8px;color:var(--ink3)}
 .cover.new::before,.cover.new::after{display:none}
 .cover.new:hover{border-color:var(--accent);color:var(--accent);background:var(--sel)}

@@ -310,6 +310,14 @@ function renderAccButtons(){
   });
 }
 function closeAccMenu(){var m=$('#accMenu');if(m)m.classList.remove('on')}
+/* F13: на чём работает — SQLite/MySQL на сервере, localStorage без синхронизации */
+function dbLabel(){
+  if(typeof Sync==='undefined'||!Sync||Sync.mode!=='server')return 'localStorage';
+  var d=String(Sync.db||'').toLowerCase();
+  if(d.indexOf('mysql')===0)return 'MySQL';
+  if(d.indexOf('sqlite')===0)return 'SQLite';
+  return '…';
+}
 function openAccMenu(anchor){
   var m=$('#accMenu');if(!m||!currentUser)return;
   var nb=state.books.length,tw=0;
@@ -319,6 +327,7 @@ function openAccMenu(anchor){
     '<div class="acc-stat"><span>книг</span><b>'+fmt(nb)+'</b></div>'+
     '<div class="acc-stat"><span>слов всего</span><b>'+fmt(tw)+'</b></div>'+
     '<div class="acc-stat"><span>синхронизация</span><b>'+((typeof Sync!=='undefined'&&Sync.mode==='server')?'вкл':'локально')+'</b></div>'+
+    '<div class="acc-stat"><span>хранилище</span><b>'+dbLabel()+'</b></div>'+
     '<button type="button" class="bm-item" role="menuitem" data-a="pass"><span class="bm-badge">✱</span><span class="t">Сменить пароль</span></button>'+
     '<button type="button" class="bm-item" role="menuitem" data-a="switch"><span class="bm-badge">⇄</span><span class="t">Сменить профиль</span></button>'+
     '<button type="button" class="bm-item" role="menuitem" data-a="logout"><span class="bm-badge">⎋</span><span class="t">Выйти</span></button>'+

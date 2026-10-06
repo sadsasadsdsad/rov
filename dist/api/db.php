@@ -36,6 +36,22 @@ function db()
 }
 
 /**
+ * F13: какое хранилище реально используется — подсказка в меню аккаунта
+ * («SQLite» локально, «MySQL» на хостинге). Падение подключения не ломает ответ.
+ */
+function db_engine(): string
+{
+    try {
+        $name = db()->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if (is_string($name) && $name !== '') return strtolower($name);
+    } catch (Throwable $e) {
+        /* проглотили: ниже fallback из конфига */
+    }
+    $cfg = require __DIR__ . '/config.php';
+    return (string)($cfg['driver'] ?? 'sqlite');
+}
+
+/**
  * F9: уникальный индекс по share_token (схема — только для новых БД).
  * Для существующей таблицы: сначала снимаем дубли (оставляем MIN(id),
  * остальным NULL), потом пробуем создать индекс — ошибку «уже существует»

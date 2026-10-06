@@ -66,9 +66,9 @@ body.zen::before{opacity:.9}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
 .cover:focus-visible,.bv-card:focus-visible,.wk-card:focus-visible,.ch:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-/* редактор: обводка всей области выглядит громоздко — фокус показываем
-   тонкой акцентной линией снизу (caret сам по себе не виден скринридеру) */
-#editor:focus-visible{outline:none;box-shadow:inset 0 -2px 0 var(--accent)}
+/* редактор: обводка всей области выглядит громоздко, а подчёркивание
+   снизу читается как случайная полоска — фокус виден по курсору */
+#editor:focus-visible{outline:none}
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px;border:2px solid transparent;background-clip:content-box}
 *{scrollbar-width:thin;scrollbar-color:var(--line) transparent}

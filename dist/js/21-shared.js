@@ -145,6 +145,13 @@ function closeForeignBook(){
   document.body.classList.remove('ro');
   applyReaderMode();
   updateRoChrome();
+  /* F12: DOM редактора мог остаться с главой ЧУЖОЙ книги. ro снят — и любой
+     commitNow()/scheduleSave() (полка, Ctrl+S, beforeunload) записал бы её
+     в СВОЮ книгу. Перечитываем свою главу, чтобы в DOM не осталось чужого. */
+  try{
+    if(typeof loadChapter==='function'&&typeof currentCh==='function')loadChapter(currentCh());
+    if(typeof renderList==='function')renderList(false);
+  }catch(e){}
   if((location.hash||'').indexOf('#/read/')===0){
     try{history.replaceState(null,'',location.pathname+location.search)}catch(e){location.hash=''}
   }

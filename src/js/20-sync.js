@@ -20,6 +20,7 @@
 var Sync = {
   base: '',                 /* '' = тот же origin, что и страница */
   mode: 'local',            /* server | local */
+  db: null,                 /* F13: движок хранилища сервера: 'sqlite' | 'mysql' */
   user: null,               /* {id,login,name} на сервере */
   pulled: false,            /* состояние сервера уже сводилось */
   sentBooks: {},            /* id -> updated, подтверждено сервером */
@@ -144,6 +145,7 @@ Sync.boot = function () {
   return syncFetch('api/auth.php?action=me').then(function (j) {
     Sync.user = (j && j.user) || null;
     Sync.mode = Sync.user ? 'server' : 'local';
+    if (j && j.db) Sync.db = j.db;          /* F13: sqlite/mysql для меню аккаунта */
     return Sync.user;
   }).catch(function () {
     Sync.mode = 'local'; Sync.user = null;
@@ -322,6 +324,7 @@ function reconcile(srv) {
 Sync.pull = function () {
   if (Sync.mode !== 'server') { Sync.pulled = true; return Promise.resolve(); }
   return syncFetch('api/state.php').then(function (srv) {
+    if (srv && srv.meta && srv.meta.db) Sync.db = srv.meta.db;   /* F13 */
     reconcile(srv || { books: [], stats: {}, prefs: null });
     Sync.pulled = true;
     Sync.pullFails = 0;

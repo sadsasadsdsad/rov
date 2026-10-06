@@ -420,7 +420,9 @@ function scheduleSave(){
     rememberPos();
     var ch=currentCh();
     var oldHtml=ch?ch.html:null;
-    if(ch)ch.html=cleanHtml();
+    /* F12: пишем DOM в главу только когда редактор открыт — иначе можно
+       затереть главу пустым/чужим содержимым (закрытая чужая книга, старт) */
+    if(ch&&workspace.hidden===false)ch.html=cleanHtml();
     if(ch&&ch.html!==oldHtml)b.updated=Date.now();
     snapshotStats();
     persist();invalidateCo();renderList(false);
@@ -942,9 +944,12 @@ function renderLibrary(){
     el.querySelector('.cv-meta').innerHTML=
       '<span>'+visN+' '+plural(visN,'глава','главы','глав')+'</span>'+
       '<span class="cv-dot"></span>'+
-      '<span>'+fmt(w)+' '+plural(w,'слово','слова','слов')+'</span>'+
-      (curIdx>1&&visN>1?'<span class="cv-dot"></span><span>гл. '+curIdx+' из '+visN+'</span>':'');
-    el.querySelector('.cv-time').textContent=b.updated?('изменено '+timeAgo(b.updated)):'';
+      '<span>'+fmt(w)+' '+plural(w,'слово','слова','слов')+'</span>';
+    var timeTxt=b.updated?('изменено '+timeAgo(b.updated)):'';
+    var prog=(curIdx>1&&visN>1)?('гл. '+curIdx+' из '+visN):'';
+    el.querySelector('.cv-time').innerHTML=prog?
+      '<span>'+prog+'</span><span class="cv-dot"></span><span>'+esc(timeTxt)+'</span>':
+      '<span>'+esc(timeTxt)+'</span>';
     el.addEventListener('click',function(){openBookOverview(b.id)});
     el.addEventListener('keydown',function(e){if(e.key==='Enter')openBookOverview(b.id)});
     el.querySelector('.cv-ren').addEventListener('click',function(e){

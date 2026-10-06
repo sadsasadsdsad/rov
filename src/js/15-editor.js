@@ -420,7 +420,9 @@ function scheduleSave(){
     rememberPos();
     var ch=currentCh();
     var oldHtml=ch?ch.html:null;
-    if(ch)ch.html=cleanHtml();
+    /* F12: пишем DOM в главу только когда редактор открыт — иначе можно
+       затереть главу пустым/чужим содержимым (закрытая чужая книга, старт) */
+    if(ch&&workspace.hidden===false)ch.html=cleanHtml();
     if(ch&&ch.html!==oldHtml)b.updated=Date.now();
     snapshotStats();
     persist();invalidateCo();renderList(false);
