@@ -403,7 +403,7 @@ function rememberPos(){var b=book();if(!b)return;var ch=currentCh();if(ch)ch.pos
 function commitNow(){
   if(isReadOnly())return;
   var b=book();
-  if(b&&workspace.hidden===false){
+  if(b&&workspace.hidden===false&&editorOwned){
     var ch=currentCh();
     var oldHtml=ch?ch.html:null;
     rememberPos();
@@ -421,8 +421,9 @@ function scheduleSave(){
     var ch=currentCh();
     var oldHtml=ch?ch.html:null;
     /* F12: пишем DOM в главу только когда редактор открыт — иначе можно
-       затереть главу пустым/чужим содержимым (закрытая чужая книга, старт) */
-    if(ch&&workspace.hidden===false)ch.html=cleanHtml();
+       затереть главу пустым/чужим содержимым (закрытая чужая книга, старт);
+       F14: и только если в DOM действительно своя глава */
+    if(ch&&workspace.hidden===false&&editorOwned)ch.html=cleanHtml();
     if(ch&&ch.html!==oldHtml)b.updated=Date.now();
     snapshotStats();
     persist();invalidateCo();renderList(false);
@@ -717,6 +718,7 @@ function loadChapter(c){
   if(!c||typeof c!=='object')c={id:null,html:'<p></p>',pos:0,marks:[]};   /* L7 */
   editor.innerHTML=c.html||'<p></p>';
   if(!editor.firstElementChild)editor.innerHTML='<p></p>';
+  editorOwned=!foreignDoc&&!isReadOnly();   /* F14: DOM = своя глава? */
   ensureNoteIds();
   applyMarks(false);
   scroller.scrollTop=(typeof c.pos==='number')?c.pos:0;
@@ -729,7 +731,7 @@ function openChapter(id,skipSave){
     clearTimeout(saveTimer);              /* отложенный save не должен сравнить уже новую главу (H6) */
     var prev=currentCh();
     if(prev){
-      if(!isReadOnly()){
+      if(!isReadOnly()&&editorOwned){
         var oldHtml=prev.html;
         prev.html=cleanHtml();
         if(prev.html!==oldHtml)b.updated=Date.now();
@@ -747,7 +749,7 @@ function openChapter(id,skipSave){
 $('#addCh').addEventListener('click',function(){
   if(isReadOnly())return;
   var b=book();if(!b)return;
-  var ch=currentCh();if(ch){ch.html=cleanHtml();ch.pos=scroller.scrollTop}
+  var ch=currentCh();if(ch&&editorOwned){ch.html=cleanHtml();ch.pos=scroller.scrollTop}
   var n={id:uid(),html:'<h1></h1><p></p>',pos:0,marks:[]};
   b.chapters.push(n);
   b.updated=Date.now();                   /* структурная правка должна уезжать на сервер (H5) */
@@ -773,6 +775,9 @@ $('#bvAuthor').addEventListener('change',function(){
 });
 
 function openBookOverview(id){
+  /* F14: обзор СВОЕЙ книги — если ещё висит чужая (мимо closeForeignBook),
+     закрываем: иначе book() вернёт foreignDoc и обзор/коммиты пойдут в чужое */
+  if(typeof foreignDoc!=='undefined'&&foreignDoc&&typeof closeForeignBook==='function')closeForeignBook();
   state.activeBookId=id;
   var b=book();if(!b)return;
   b.wiki=Array.isArray(b.wiki)?b.wiki:[];
@@ -874,8 +879,8 @@ function chapterExcerpt(ch,maxBlocks){
 function enterEditor(chId){
   var b=book();if(!b)return;
   /* дописать текущую главу ДО переключения (H7): иначе набранный текст
-     остаётся только в DOM и теряется при loadChapter чужой главы */
-  if(!isReadOnly()&&!workspace.hidden){
+     остаётся только в DOM и теряется при loadChapter чужой главы (F14: своё) */
+  if(!isReadOnly()&&!workspace.hidden&&editorOwned){
     clearTimeout(saveTimer);
     var cur=currentCh();
     if(cur){
@@ -1186,7 +1191,7 @@ function toast(msg){
   clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('on')},2200);
 }
 function syncCurrentChapter(){
-  var ch=currentCh();if(ch&&workspace.hidden===false){ch.html=cleanHtml();ch.pos=scroller.scrollTop}
+  var ch=currentCh();if(ch&&workspace.hidden===false&&editorOwned){ch.html=cleanHtml();ch.pos=scroller.scrollTop}
 }
 function doExport(kind){
   var b=book();if(!b)return;

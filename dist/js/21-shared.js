@@ -142,6 +142,7 @@ function openForeignOverview(){
 function closeForeignBook(){
   if(!foreignDoc)return;
   foreignDoc=null;foreignMeta={};
+  editorOwned=false;                 /* F14: пока своя глава не перечитана — не пишем */
   document.body.classList.remove('ro');
   applyReaderMode();
   updateRoChrome();
@@ -151,7 +152,9 @@ function closeForeignBook(){
   try{
     if(typeof loadChapter==='function'&&typeof currentCh==='function')loadChapter(currentCh());
     if(typeof renderList==='function')renderList(false);
-  }catch(e){}
+  }catch(e){
+    try{ if(typeof editor!=='undefined'&&editor)editor.innerHTML='<p></p>' }catch(e2){}
+  }
   if((location.hash||'').indexOf('#/read/')===0){
     try{history.replaceState(null,'',location.pathname+location.search)}catch(e){location.hash=''}
   }

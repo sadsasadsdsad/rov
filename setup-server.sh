@@ -108,6 +108,13 @@ MAIN_CONF+="  client_max_body_size 20m;
     fastcgi_param CHEROVIK_MYSQL_PASS $DB_PASS;
   }
 
+  # статика — без кеша: после выкладки клиент сразу получает новые js/css,
+  # иначе браузер часами держит старые скрипты и «фикс не применяется»
+  location ~* \\.(js|css|html)\$ {
+    add_header Cache-Control "no-cache, must-revalidate";
+    try_files \$uri =404;
+  }
+
   location ~ \.php\$ {
     include snippets/fastcgi-php.conf;
     fastcgi_pass unix:$FPM_SOCK;

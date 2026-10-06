@@ -204,6 +204,10 @@ function normalizeState(s){
 
 /* foreignDoc — чужая книга ВНЕ state.books: не попадает в persist/экспорт/бэкап */
 var foreignDoc=null,foreignMeta={};
+/* F14: DOM редактора показывает главу СВОЕЙ книги. Любая запись
+   «DOM → глава» разрешена только при editorOwned=true — иначе чужая глава
+   могла утечь в свою книгу, если режим чтения сняли мимо closeForeignBook(). */
+var editorOwned=false;
 function book(){if(foreignDoc)return foreignDoc;return state.books.find(function(b){return b.id===state.activeBookId})}
 function currentCh(){var b=book();if(!b||!b.chapters.length)return null;return b.chapters.find(function(c){return c.id===b.current})||b.chapters[0]}
 function chapterTitle(ch){var h=tmp(ch.html).querySelector('h1');var t=h?h.textContent.trim():'';return t||(isNotesCh(ch)?'Заметки':'Без названия')}
