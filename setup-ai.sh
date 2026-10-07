@@ -56,6 +56,9 @@ else
 fi
 AIKEY="$(cat "$AIKEY_FILE")"
 [[ -n "$AIKEY" ]] || { echo "пустой ключ в $AIKEY_FILE"; exit 1; }
+# PHP-FPM (www-data) должен читать ключ — иначе api/ai.php ответит 401
+chgrp www-data "$AIKEY_FILE" 2>/dev/null || true
+chmod 640 "$AIKEY_FILE"
 
 echo "==> 3/5 Раскладка кода в $DEST"
 rm -rf "$DEST"

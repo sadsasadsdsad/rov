@@ -68,7 +68,13 @@ function ai_key(): string
     }
     $f = dirname(__DIR__, 2) . '/.aikey'; // корень репозитория (вне web-root)
     if (is_file($f)) {
-        return trim((string)file_get_contents($f));
+        $c = @file_get_contents($f);
+        if ($c === false) {
+            // ключ есть, но PHP его не читает — лучше увидеть это сразу,
+            // а не «401 от прокси»: chown root:www-data && chmod 640 .aikey
+            ai_fail(500, 'config', 'ключ .aikey недоступен для PHP — проверь владельца/права файла');
+        }
+        return trim($c);
     }
     return '';
 }

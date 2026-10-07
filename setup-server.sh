@@ -67,9 +67,12 @@ if [[ -f "$AIKEY_FILE" ]]; then
   echo "    ключ ИИ-релея уже есть: $AIKEY_FILE"
 else
   head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$AIKEY_FILE"
-  chmod 600 "$AIKEY_FILE"
   echo "    новый ключ ИИ-релея сохранён: $AIKEY_FILE"
 fi
+# PHP-FPM (www-data) обязан читать ключ — иначе релей уйдёт в прокси
+# без авторизации и получит 401
+chgrp www-data "$AIKEY_FILE" 2>/dev/null || true
+chmod 640 "$AIKEY_FILE"
 mysql --batch <<SQL
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
