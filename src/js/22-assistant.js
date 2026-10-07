@@ -231,7 +231,7 @@ function aiPing(){
   var st=aiEl('aiStatus');
   if(!st)return Promise.resolve(false);
   var txt=st.querySelector('.txt');
-  if(txt)txt.textContent='Проверяю связь с прокси…';
+  if(txt)txt.textContent='Проверяю связь с ИИ…';
   st.classList.remove('err');
   return aiFetch(aiUrl('models'),{headers:aiHeaders(),method:'GET'},6000)
     .then(function(r){return {ok:r.ok,status:r.status}})
