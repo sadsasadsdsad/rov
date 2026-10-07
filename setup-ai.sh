@@ -38,7 +38,9 @@ fi
 
 echo "==> 1/5 Python"
 export DEBIAN_FRONTEND=noninteractive
-if ! python3 -c 'import venv' >/dev/null 2>&1; then
+# именно ensurepip, а не venv: модуль venv в stdlib есть всегда, а без
+# пакета python3-venv сборка окружения падает на шаге с pip
+if ! python3 -c 'import ensurepip' >/dev/null 2>&1; then
   apt-get update -qq
   apt-get install -y -qq python3-venv >/dev/null
 fi
