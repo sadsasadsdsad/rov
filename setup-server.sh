@@ -59,6 +59,17 @@ else
   chmod 600 "$DB_PASS_FILE"
   echo "    новый пароль сохранён: $DB_PASS_FILE"
 fi
+
+# ключ ИИ-релея: api/ai.php читает его, прокси web2api (setup-ai.sh) кладёт
+# в свой API_KEYS — один источник правды, в git файл не попадает
+AIKEY_FILE="$SCRIPT_DIR/.aikey"
+if [[ -f "$AIKEY_FILE" ]]; then
+  echo "    ключ ИИ-релея уже есть: $AIKEY_FILE"
+else
+  head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$AIKEY_FILE"
+  chmod 600 "$AIKEY_FILE"
+  echo "    новый ключ ИИ-релея сохранён: $AIKEY_FILE"
+fi
 mysql --batch <<SQL
 CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
@@ -76,7 +87,8 @@ else
   echo "    ВНИМАНИЕ: сертификата нет — конфиг будет на порту 80 (нужен certbot)"
 fi
 
-MAIN_CONF="limit_req_zone \$binary_remote_addr zone=ch_auth:10m rate=10r/m;
+MAIN_CONF="limit_req_zone \$binary_remote_addr zone=ch_auth:10m rate=60r/m;
+limit_req_zone \$binary_remote_addr zone=ch_ai:10m rate=20r/m;
 
 server {
   server_name $DOMAIN;
@@ -94,39 +106,73 @@ else
   MAIN_CONF+="  listen 80;
 "
 fi
+if [[ $HAVE_SSL == yes ]]; then
+  TLS_LINE='    fastcgi_param CHEROVIK_TLS 1;'
+else
+  TLS_LINE=''
+fi
+
 MAIN_CONF+="  client_max_body_size 20m;
 
-  # брутфорс пароля — rate-limit на auth-эндпоинт (вход/регистрация/выход)
+  # заголовки безопасности. В location, где есть свои add_header, эти НЕ
+  # наследуются — поэтому продублированы и в блоке статики ниже.
+  add_header X-Frame-Options \"SAMEORIGIN\" always;
+  add_header X-Content-Type-Options \"nosniff\" always;
+  add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;
+
+  # брутфорс пароля: nginx режет только паводок (GET ?action=me ходит при
+  # каждой загрузке — потому burst такой большой), точный лимит — 15 неудач
+  # на логин за 15 мин — считает auth.php по таблице login_attempts
   location = /api/auth.php {
-    limit_req zone=ch_auth burst=20 nodelay;
+    limit_req zone=ch_auth burst=40 nodelay;
     limit_req_status 429;
     include snippets/fastcgi-php.conf;
     fastcgi_pass unix:$FPM_SOCK;
+$TLS_LINE
     fastcgi_param CHEROVIK_DB mysql;
     fastcgi_param CHEROVIK_MYSQL_DSN \"mysql:host=localhost;dbname=$DB_NAME;charset=utf8mb4\";
     fastcgi_param CHEROVIK_MYSQL_USER $DB_USER;
     fastcgi_param CHEROVIK_MYSQL_PASS $DB_PASS;
   }
 
-  # статика — без кеша: после выкладки клиент сразу получает новые js/css,
-  # иначе браузер часами держит старые скрипты и «фикс не применяется»
-  location ~* \\.(js|css|html)\$ {
-    add_header Cache-Control "no-cache, must-revalidate";
-    try_files \$uri =404;
+  # ИИ-релей (api/ai.php): стрим может идти до 5 минут, поэтому свой
+  # fastcgi_read_timeout и запрет буферизации; очередь своя — ch_ai
+  location = /api/ai.php {
+    limit_req zone=ch_ai burst=30 nodelay;
+    limit_req_status 429;
+    fastcgi_read_timeout 300s;
+    fastcgi_buffering off;
+    include snippets/fastcgi-php.conf;
+    fastcgi_pass unix:$FPM_SOCK;
+$TLS_LINE
   }
 
   location ~ \.php\$ {
     include snippets/fastcgi-php.conf;
     fastcgi_pass unix:$FPM_SOCK;
+$TLS_LINE
     fastcgi_param CHEROVIK_DB mysql;
     fastcgi_param CHEROVIK_MYSQL_DSN \"mysql:host=localhost;dbname=$DB_NAME;charset=utf8mb4\";
     fastcgi_param CHEROVIK_MYSQL_USER $DB_USER;
     fastcgi_param CHEROVIK_MYSQL_PASS $DB_PASS;
   }
 
-  # закрываем статику в api/ (схемы sql, дампы sqlite, md, логи) — там только php
+  # закрываем статику в api/ (схемы sql, дампы sqlite, md, логи) — там только php.
+  # Порядок важен: regex-блоки nginx проверяются сверху вниз, поэтому этот
+  # идёт ПОСЛЕ php (иначе закроется и api/*.php) и ДО раздачи js/css/html
+  # (иначе /api/foo.js|html отдал бы nginx).
   location ~ ^/api/ {
     deny all;
+  }
+
+  # статика — без кеша: после выкладки клиент сразу получает новые js/css,
+  # иначе браузер часами держит старые скрипты и «фикс не применяется»
+  location ~* \\.(js|css|html)\$ {
+    add_header Cache-Control \"no-cache, must-revalidate\";
+    add_header X-Frame-Options \"SAMEORIGIN\" always;
+    add_header X-Content-Type-Options \"nosniff\" always;
+    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;
+    try_files \$uri =404;
   }
 
   # не раздаём файлы-документацию/бэкапы/схемы из любого места сайта

@@ -13,7 +13,8 @@
               01-ядро … 15-редактор, 16-аккаунты, 17-boot, 18-voice,
               19-mobile-reader — читалка ≤880px, 20-sync — серверная
               синхронизация, 21-shared — чужие книги (только чтение),
-              доступ и hash-роут #/read/.
+              доступ и hash-роут #/read/, 22-assistant — ИИ-ассистент
+              (чат по книге, исправление/улучшение выделения).
 
   Добавлено относительно src: #btnVoice/#micPill (голосовой ввод),
   <div id="veil"> перенесён внутрь #workspace, js/18-voice.js,
@@ -43,6 +44,7 @@
 <link rel="stylesheet" href="css/09-mobile-reader.css?v=04">
 <link rel="stylesheet" href="css/10-shared.css?v=04">
 <link rel="stylesheet" href="css/11-access.css?v=04">
+<link rel="stylesheet" href="css/12-assistant.css?v=04">
 </head>
 <body>
 
@@ -457,6 +459,72 @@
 <button id="micPill" type="button" title="Остановить диктовку"><span class="mp-dot"></span><span class="mp-txt">Слушаю…</span><span class="mp-hint">нажмите, чтобы остановить</span></button>
 <input type="file" id="restoreInput" accept=".json,application/json" aria-label="Файл резервной копии">
 
+<button id="aiFab" type="button" title="ИИ-ассистент" aria-label="ИИ-ассистент" aria-expanded="false" aria-controls="aiPanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5l1.7 4.3 4.3 1.7-4.3 1.7L11 15.5 9.3 11.2 5 9.5l4.3-1.7z"/><path d="M17.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></button>
+
+<div id="aiPanel" role="dialog" aria-label="ИИ-ассистент" aria-live="polite">
+  <div class="ai-head">
+    <span class="wv-dia"></span>
+    <b>ИИ-ассистент</b>
+    <span class="sp"></span>
+    <button class="sibtn" id="aiClear" type="button" title="Очистить диалог" aria-label="Очистить диалог"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button>
+    <button class="sibtn" id="aiGear" type="button" title="Настройки ИИ" aria-label="Настройки ИИ" aria-expanded="false" aria-controls="aiSet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
+    <button class="sibtn" id="aiClose" type="button" title="Закрыть" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="ai-status" id="aiStatus" role="status">
+    <span class="dot" aria-hidden="true"></span>
+    <span class="txt">Проверяю связь с ИИ…</span>
+    <span class="ctx" id="aiCtx"></span>
+  </div>
+  <div class="ai-msgs" id="aiMsgs"></div>
+  <div class="ai-chips">
+    <button type="button" data-aiq="Краткий пересказ главы">Пересказ главы</button>
+    <button type="button" data-aiq="Ключевые образы и темы этой главы">Образы и темы</button>
+    <button type="button" data-aiq="Составь вопросы к тексту для обсуждения">Вопросы к тексту</button>
+  </div>
+  <div class="ai-foot">
+    <textarea id="aiInput" rows="1" placeholder="Вопрос по книге… Enter — отправить" aria-label="Сообщение ассистенту"></textarea>
+    <button class="ai-send" id="aiSend" type="button" title="Отправить (Enter)" aria-label="Отправить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+  </div>
+  <div class="ai-set" id="aiSet" hidden>
+    <label><span class="lbl">Адрес прокси</span><input id="aiBase" type="url" spellcheck="false" placeholder="пусто = через сайт (как сейчас)"></label>
+    <label><span class="lbl">API-ключ</span><input id="aiKey" type="password" spellcheck="false" autocomplete="off" placeholder="нужен только для своего прокси"></label>
+    <label><span class="lbl">Модель</span>
+      <select id="aiModel">
+        <option value="deepseek-chat">deepseek-chat — быстрый</option>
+        <option value="deepseek-reasoner">deepseek-reasoner — эксперт</option>
+      </select>
+    </label>
+    <div class="ai-set-row">
+      <button class="m-btn primary" id="aiSave" type="button">СОХРАНИТЬ</button>
+      <a class="ai-link" id="aiPanelLink" href="#" target="_blank" rel="noopener">Панель прокси ↗</a>
+    </div>
+    <p class="ai-hint">По умолчанию вопросы идут через сам сайт: сервер сам обращается к ИИ, ключи вводить не нужно и работает это с любого устройства. Заполните адрес и ключ, только если хотите ходить в свой локальный прокси (тогда ключ хранится в этом браузере).</p>
+  </div>
+</div>
+
+<div id="aiResModal" role="dialog" aria-modal="true" aria-labelledby="aiResTitle">
+  <div class="ai-res-card">
+    <div class="ai-res-head">
+      <span class="wv-dia"></span>
+      <b id="aiResTitle">Исправлено ИИ</b>
+      <span class="sp"></span>
+      <button class="sibtn" id="aiResClose" type="button" title="Закрыть" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="ai-res-body">
+      <details class="ai-res-src"><summary>Исходный текст</summary><pre id="aiResSrc"></pre></details>
+      <div class="ai-res-out loading" id="aiResOut"></div>
+    </div>
+    <div class="ai-res-foot">
+      <span class="ai-res-note" id="aiResNote"></span>
+      <span class="sp"></span>
+      <button class="m-btn" id="aiResRetry" type="button" hidden>ПОВТОРИТЬ</button>
+      <button class="m-btn" id="aiResCopy" type="button">КОПИРОВАТЬ</button>
+      <button class="m-btn" id="aiResCancel" type="button">ЗАКРЫТЬ</button>
+      <button class="m-btn primary" id="aiResApply" type="button">ПРИМЕНИТЬ</button>
+    </div>
+  </div>
+</div>
+
 <div id="wikiModal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
   <div class="wm-card">
     <div class="wm-head">
@@ -538,6 +606,10 @@
     <button data-cmd="italic" title="Курсив · Ctrl+I"><i>К</i></button>
     <button data-cmd="wiki" title="Добавить выделенное в энциклопедию"><span class="wplus">Э+</span></button>
   </div>
+  <div class="sb-ai">
+    <button data-ai="fix" type="button" title="Исправить орфографию и пунктуацию выделенного (ИИ)">Испр.</button>
+    <button data-ai="improve" type="button" title="Улучшить стиль выделенного, сохранив смысл (ИИ)">Улучш.</button>
+  </div>
 </div>
 
 <div id="synbar">
@@ -580,5 +652,6 @@
 <script src="js/19-mobile-reader.js?v=04"></script>
 <script src="js/20-sync.js?v=04"></script>
 <script src="js/21-shared.js?v=04"></script>
+<script src="js/22-assistant.js?v=04"></script>
 </body>
 </html>

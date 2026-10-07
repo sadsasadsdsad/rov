@@ -1,2 +1,4 @@
 # пароль базы данных, который генерирует setup-server.sh на сервере
 .dbpass
+# ключ ИИ-релея (api/ai.php → прокси) — генерирует setup-server.sh/setup-ai.sh
+.aikey
