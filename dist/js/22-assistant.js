@@ -50,10 +50,14 @@ var aiLastBtn=null;            /* кнопка, запустившая прав�
    эвристике): ассеты подгружаются свежие, а разметка — прошлая, и панель ИИ
    в ней просто отсутствует. document.currentScript живёт только во время
    выполнения скрипта, поэтому значение фиксируем здесь, сразу. */
-var AI_HTML_V='07';
+var AI_HTML_V='08';
 var AI_SRC=(typeof document!=='undefined'&&document.currentScript&&document.currentScript.src)||'';
 
 function aiEl(id){return document.getElementById(id)}
+/* Искра — единая иконка ИИ: кнопки в шапках, шапка панели, пустое
+   состояние, карточка действия. Минималистичная 4-лучевая звезда
+   с вогнутыми гранями (quadri-кривые), заливка currentColor */
+var AI_SPARK='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg>';
 /* Все кнопки открытия панели: #aiFab (в #topbar редактора) и
    #aiFabLib (в шапке библиотеки); устаревшая разметка содержит только
    #aiFab (плавающая пилюля) — она тоже попадает в список */
@@ -141,8 +145,10 @@ function aiSystemPrompt(extra){
   if(txt)s+='\n\nТекущий текст главы (может быть обрезан):\n"""\n'+aiCut(txt,9000)+'\n"""';
   if(extra)s+='\n\n'+extra;
   /* Действия: модель сама создаёт книги/главы — отвечает JSON, лента
-     рисует карточку с планом, исполняет пользователь по кнопке */
-  s+='\n\nДействия. Если тебя прямо просят создать книгу, написать новую главу или переписать текущую — ответь ТОЛЬКО одним JSON-объектом, без пояснений и без ``` :'+
+     рисует карточку с планом, исполняет пользователь по кнопке.
+     Формулировка жёсткая: модель часто отвечала текстом «нажмите
+     "Создать книгу"» — а кнопка появляется только из JSON (см. aiTryAction) */
+  s+='\n\nДействия. Если тебя прямо просят создать книгу, написать новую главу или переписать текущую — ответь ТОЛЬКО одним JSON-объектом: первый символ {, последний }, вокруг ровно ничего. Без ``` , без пояснений, без списков и без фразы «нажмите кнопку» — кнопку пользователь увидит сам после твоего ответа:'+
      '\n{"action":"create_book","title":"Название книги","chapters":[{"title":"Заголовок главы","content":"2–5 абзацев, разделённых пустой строкой, до 800 знаков"}]} — 3–8 глав;'+
      '\n{"action":"create_chapter","title":"Заголовок","content":"текст главы до 6000 знаков, абзацы через пустую строку"};'+
      '\n{"action":"replace_chapter","title":"Заголовок","content":"новый текст главы до 6000 знаков"}.'+
@@ -370,29 +376,67 @@ function aiSaveSettings(){
   aiPing();
 }
 
+/* Пунктуация ответа в ленте: русские кавычки, тире, троеточие,
+   списки, markdown-шум. Экранирование (esc) — ПОСЛЕ этой функции */
+function aiChatFmt(s){
+  var t=String(s==null?'':s).replace(/\r/g,'');
+  /* markdown-шум: заголовки, жирный, подчёркнутый, инлайн-код */
+  t=t.replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm,'')
+     .replace(/\*\*([^*\n]+)\*\*/g,'$1')
+     .replace(/__([^_\n]+)__/g,'$1')
+     .replace(/`([^`\n]+)`/g,'$1');
+  /* маркеры списков → единое тире */
+  t=t.replace(/^[ \t]*[-*•][ \t]+/gm,'— ');
+  /* троеточие; диапазоны 5–10 (соединительное); тире между словами.
+     Дефис внутри слова (какой-то, северо-запад) не трогаем */
+  t=t.replace(/\.\.\./g,'…')
+     .replace(/(\d)\s*-\s*(?=\d)/g,'$1–')
+     .replace(/(\s)-(\s)/g,'$1—$2');
+  /* заграничные прямые кавычки → обычные, затем пары → «ёлочки» */
+  t=t.replace(/[\u201c\u201d\u201e]/g,'"')
+     .replace(/"[^"\n]*"/g,function(m){return '«'+m.slice(1,-1)+'»'});
+  /* пробелы перед знаками и внутри кавычек */
+  t=t.replace(/[ \t]+([,.;:!?…])/g,'$1')
+     .replace(/«[ \t]+/g,'«').replace(/[ \t]+»/g,'»');
+  /* схлопываем лишние пробелы, переводы строк сохраняем */
+  t=t.replace(/[ \t]{2,}/g,' ').replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n');
+  return t;
+}
 /* Рендер ленты (innerHTML + esc — как в остальных модулях) */
 function aiRender(){
   var box=aiEl('aiMsgs');
   if(!box)return;
   var pinned=(box.scrollHeight-box.scrollTop-box.clientHeight)<48;
-  var h='';
+  var h='',prevRole='';
   if(!aiHist.length){
-    h+='<div class="ai-empty"><b>ИИ-ассистент</b>Спросите что угодно по текущей книге — '+
-       'контекст главы подхватится сам. Выделенный фрагмент тоже попадёт в запрос.</div>';
+    h+='<div class="ai-empty"><span class="ai-spark">'+AI_SPARK+'</span><b>ИИ-ассистент</b>'+
+       'Спросите что угодно по текущей книге — контекст главы подхватится сам. '+
+       'Выделенный фрагмент тоже попадёт в запрос.</div>';
   }else{
     aiHist.forEach(function(m,i){
       if(m.think){
-        h+='<div class="ai-think"><b>Рассуждение</b>'+esc(aiCut(m.think,1200))+'</div>';
+        h+='<details class="ai-think"><summary>Рассуждение</summary>'+
+           '<span class="ai-think-b">'+esc(aiChatFmt(aiCut(m.think,1200)))+'</span></details>';
       }
       if(m.role==='user'){
-        h+='<div class="ai-msg user">'+esc(m.content)+'</div>';
+        h+='<div class="ai-msg user'+(prevRole==='user'?' tight':'')+'">'+esc(m.content)+'</div>';
+        prevRole='user';
       }else{
         /* модель в потоке пишет JSON-действие — прячем его за статусом */
         var pend=!m.action&&aiBusy&&aiLooksAction(m.content);
-        var txt=m.content||(aiBusy?'…':'(пустой ответ)');
-        if(pend)txt='ИИ готовит структуру…';
-        h+='<div class="ai-msg bot'+(!m.content||pend?' empty':'')+'">'+esc(txt)+'</div>';
-        if(m.action)h+=aiActCard(m.action,i);
+        if(!m.content&&m.think&&!aiBusy&&!m.repairing){
+          prevRole='';                   /* остановили во время рассуждения —
+                                            текста нет, think показан выше */
+        }else{
+          var txt=m.content?aiChatFmt(m.content):(aiBusy?'…':'(пустой ответ)');
+          if(m.noFmt)txt=m.content;
+          if(m.repairing)txt='Уточняю структуру…';
+          if(pend)txt='ИИ готовит структуру…';
+          var empty=!m.content||pend||m.repairing;
+          h+='<div class="ai-msg bot'+(empty?' empty':'')+(prevRole==='bot'&&!empty?' tight':'')+'">'+esc(txt)+'</div>';
+          if(m.action)h+=aiActCard(m.action,i);
+          prevRole=m.action?'':'bot';
+        }
       }
     });
   }
@@ -439,7 +483,7 @@ function aiAsk(q,isRetry){
 
   var apiMsgs=[{role:'system',content:sys}];
   hist.slice(-12).forEach(function(m){     /* think в API не отправляем */
-    apiMsgs.push({role:m.role,content:m.content});
+    apiMsgs.push({role:m.role,content:aiActionMsg(m)});
   });
   apiMsgs.push({role:'user',content:q});
 
@@ -460,7 +504,7 @@ function aiAsk(q,isRetry){
     function(){
       aiBusy=false;aiSetBusy(false);
       if(!ass.content)ass.content=ass.think?'(без текста — см. рассуждение выше)':'(пустой ответ)';
-      aiTryAction(ass);                     /* вдруг модель прислала действие */
+      aiTryAction(ass,q);                   /* вдруг модель прислала действие */
       aiRetried=false;aiRetryPending=false;
       aiRender();
     },
@@ -526,8 +570,10 @@ function aiRetryNow(){
 
 function aiLooksAction(s){
   s=String(s==null?'':s);
-  if(!/^\s*(\{|```)/.test(s))return false;
-  return s.indexOf('"action"')>=0;
+  /* достаточно «{"action":… где угодно в ответе» — так во время потока
+     уже видно, что модель пишет JSON, даже если начала с пары слов */
+  if(s.indexOf('{')<0)return false;
+  return /"action"\s*:/.test(s);
 }
 /* Поиск парной скобки с учётом строк — JSON может быть длинным и содержать } */
 function aiMatchBrace(s,i){
@@ -551,25 +597,30 @@ function aiStr(v,n){
   return s.length>n?s.slice(0,n):s;
 }
 function aiValidateAction(o){
-  if(!o||typeof o!=='object'||typeof o.action!=='string')return null;
-  if(o.action==='create_book'){
+  if(!o||typeof o!=='object')return null;
+  var act=(typeof o.action==='string'&&o.action)||
+          (typeof o.type==='string'&&o.type)||(typeof o.name==='string'&&o.name);
+  if(!act)return null;
+  if(act==='create_book'){
     var title=aiStr(o.title,200);
     if(!title||!Array.isArray(o.chapters))return null;
     var chs=[];
     for(var i=0;i<o.chapters.length&&chs.length<40;i++){
       var c=o.chapters[i];
-      if(!c||typeof c!=='object')continue;
-      var ct=aiStr(c.title,200);
+      var ct='';
+      if(typeof c==='string')ct=aiStr(c,200);   /* модель отдавала список строк */
+      else if(c&&typeof c==='object')ct=aiStr(c.title,200);
       if(!ct)continue;
-      chs.push({title:ct,content:aiStr(c.content,40000)});
+      chs.push({title:ct,content:(c&&typeof c==='object')?aiStr(c.content,40000):''});
     }
     if(!chs.length)return null;
     return {action:'create_book',title:title,chapters:chs};
   }
-  if(o.action==='create_chapter'||o.action==='replace_chapter'){
-    var content=aiStr(o.content,40000);
+  if(act==='create_chapter'||act==='replace_chapter'){
+    var raw=(o.content!=null?o.content:(o.text!=null?o.text:o.body));
+    var content=aiStr(raw,40000);
     if(!content)return null;
-    return {action:o.action,title:aiStr(o.title,200),content:content};
+    return {action:act,title:aiStr(o.title,200),content:content};
   }
   return null;
 }
@@ -636,7 +687,7 @@ function aiActCard(a,i){
   var p=a.plan;
   var head=p.action==='create_book'?'Новая книга'
     :p.action==='create_chapter'?'Новая глава':'Переписанная глава';
-  var h='<div class="ai-act"><div class="ai-act-h">'+esc(head)+'</div>';
+  var h='<div class="ai-act"><div class="ai-act-h"><span class="ai-spark">'+AI_SPARK+'</span>'+esc(head)+'</div>';
   var note='';
   if(p.action==='create_book'){
     h+='<ol class="ai-act-list">';
@@ -654,17 +705,74 @@ function aiActCard(a,i){
      '<button class="go" type="button" data-aiact="'+i+'">'+esc(go)+'</button></div></div>';
   return h;
 }
+/* Текст обещает кнопку («Нажмите "Создать книгу"»), но JSON не пришёл:
+   чаще всего модель подхватила наше саммити из истории и повторила его */
+function aiPromisedAction(s){
+  s=String(s==null?'':s);
+  if(!/(Создать книгу|Добавить главу|Заменить главу)/.test(s))return false;
+  return /(Нажмите|нажмите|нажми|по кнопке|кнопку|кнопка)/.test(s);
+}
+/* Для истории API: у сообщений с действием отдаём компактный JSON —
+   модель видит свой «формат ответа», а не саммити «нажмите кнопку»
+   (иначе она начинает повторять саммити текстом без JSON) */
+function aiActionMsg(m){
+  var p=m&&m.action&&m.action.plan;
+  if(!p)return m?m.content:'';
+  try{
+    if(p.action==='create_book'){
+      return JSON.stringify({action:'create_book',title:p.title,
+        chapters:p.chapters.slice(0,10).map(function(c){
+          return {title:c.title,content:aiCut(c.content,240)};
+        })});
+    }
+    return JSON.stringify({action:p.action,title:p.title,content:aiCut(p.content,700)});
+  }catch(e){return m.content}
+}
+/* Одна автопопытка: модель ответила текстом вместо JSON-действия —
+   уточняем прямо в этом же диалоге (без записи в историю) */
+function aiFixAction(m,q){
+  m.actFix=true;m.repairing=true;
+  var saved=m.content;
+  m.content='';
+  var msgs=[{role:'system',content:aiSystemPrompt('')+
+    '\n\nВАЖНО: твой предыдущий ответ был обычным текстом, а нужен ответ-действие — РОВНО один JSON-объект из инструкции выше: первый символ {, последний }. Без пояснений, без списков и без фразы «нажмите кнопку».'}];
+  var idx=aiHist.indexOf(m);
+  aiHist.slice(0,idx<0?aiHist.length:idx).slice(-10).forEach(function(x){
+    msgs.push({role:x.role,content:aiActionMsg(x)});
+  });
+  aiBusy=true;aiSetBusy(true);aiRender();
+  aiRequest(msgs,
+    function(t,isThink){if(!isThink)m.content+=t;aiRender()},
+    function(){
+      aiBusy=false;aiSetBusy(false);m.repairing=false;
+      var plan=aiExtractAction(m.content);
+      if(plan){
+        m.action={plan:plan,done:''};
+        m.content=aiActionSummary(plan);
+      }else{
+        m.content=saved;               /* не вышло — оставляем исходный ответ */
+      }
+      aiRender();
+    },
+    function(){
+      aiBusy=false;aiSetBusy(false);m.repairing=false;
+      m.content=saved;aiRender();      /* сбой уточнения — не трогаем ответ */
+    });
+}
 /* Завершённый ответ: распознаём действие и подменяем текст резюме */
-function aiTryAction(m){
+function aiTryAction(m,q){
   if(!m||m.role!=='assistant'||!m.content||m.action)return;
   var looks=aiLooksAction(m.content);
-  if(!looks&&m.content.indexOf('{')<0)return;
+  if(!looks&&m.content.indexOf('{')<0&&!aiPromisedAction(m.content))return;
   var plan=aiExtractAction(m.content);
   if(plan){
     m.action={plan:plan,done:''};
     m.content=aiActionSummary(plan);
+  }else if(aiPromisedAction(m.content)&&q!=null&&!m.actFix){
+    aiFixAction(m,q);                  /* пообещала кнопку без JSON — уточняем */
   }else if(looks){
     m.content=aiCut(m.content,600)+'\n\n(структура не разобралась — попросите ещё раз)';
+    m.noFmt=true;                     /* это остаток JSON — не трогаем кавычки */
   }
 }
 
