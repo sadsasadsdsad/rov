@@ -1,10 +1,15 @@
 /* ==========================================================================
  * 22-assistant.js — ИИ-ассистент — чат по книге + исправление/улучшение
  *   выделенного текста. Проект: «Черновик» — веб-редактор рукописей.
- * Что делает: #aiFab открывает панель чата (#aiPanel) с контекстом текущей
- *   книги/главы и живого выделения; кнопки .sb-ai в #selbar («Испр.»/«Улуч.»)
- *   прогоняют выделение через модель и показывают результат в #aiResModal
- *   («Применить» подменяет выделение через replaceSelectionWith).
+ * Что делает: #aiFab (пилюля «Спросить ИИ») открывает панель чата (#aiPanel)
+ *   с контекстом текущей книги/главы и живого выделения; кнопки .sb-ai в
+ *   #selbar («Испр.»/«Улуч.») прогоняют выделение через модель и показывают
+ *   результат в #aiResModal («Применить» подменяет выделение с сохранением
+ *   абзацев, заголовков и инлайн-форматирования). Модель умеет создавать
+ *   книги и главы: попросите словами или чипом «＋ Новая книга» — она
+ *   ответит JSON-действием (create_book / create_chapter / replace_chapter),
+ *   лента покажет карточку с планом, а по кнопке действие исполнится
+ *   (см. aiTryAction/aiRunAction).
  * Ключевое: по умолчанию ходит через свой сервер — /api/ai.php (релей в
  *   src/api/ai.php), который сам идёт в прокси deepseek-web2api на сервере
  *   (127.0.0.1:8080) с ключом, лежащим там же. Работает с любого устройства
@@ -93,6 +98,17 @@ function aiChText(){
 function aiSelection(){
   try{return String(getSelection()||'').replace(/\s+/g,' ').trim()}catch(e){return ''}
 }
+/* То же выделение, но с сохранением абзацов — для «Испр./Улуч.»: иначе
+   модель не видит разбивку и не может её сохранить */
+function aiSelectionRaw(){
+  try{
+    return String(getSelection()||'')
+      .replace(/\u00a0/g,' ')
+      .replace(/[ \t]+\n/g,'\n')
+      .replace(/\n{3,}/g,'\n\n')
+      .replace(/^\s+|\s+$/g,'');
+  }catch(e){return ''}
+}
 
 /* Системный промпт: книга + глава + её текст + опциональное выделение */
 function aiSystemPrompt(extra){
@@ -102,6 +118,13 @@ function aiSystemPrompt(extra){
   var txt=aiChText();
   if(txt)s+='\n\nТекущий текст главы (может быть обрезан):\n"""\n'+aiCut(txt,9000)+'\n"""';
   if(extra)s+='\n\n'+extra;
+  /* Действия: модель сама создаёт книги/главы — отвечает JSON, лента
+     рисует карточку с планом, исполняет пользователь по кнопке */
+  s+='\n\nДействия. Если тебя прямо просят создать книгу, написать новую главу или переписать текущую — ответь ТОЛЬКО одним JSON-объектом, без пояснений и без ``` :'+
+     '\n{"action":"create_book","title":"Название книги","chapters":[{"title":"Заголовок главы","content":"2–5 абзацев, разделённых пустой строкой, до 800 знаков"}]} — 3–8 глав;'+
+     '\n{"action":"create_chapter","title":"Заголовок","content":"текст главы до 6000 знаков, абзацы через пустую строку"};'+
+     '\n{"action":"replace_chapter","title":"Заголовок","content":"новый текст главы до 6000 знаков"}.'+
+     '\ncontent — простой текст без HTML и markdown; заголовок в content не включай. Если не просят создать или переписать — отвечай обычным текстом.';
   s+='\n\nОтвечай по-русски, по существу, без воды. Если вопрос о конкретном месте — процитируй его.';
   return s;
 }
@@ -252,6 +275,9 @@ function aiPing(){
         el.classList.toggle('err',!s.ok);
       }
       aiRenderCtx();
+      /* индикатор связи на закрытой пилюле #aiFab */
+      var fab=aiEl('aiFab');
+      if(fab){fab.classList.toggle('ok',!!s.ok);fab.classList.toggle('err',!s.ok)}
       if(s.ok){
         if(aiPingTimer){clearTimeout(aiPingTimer);aiPingTimer=0}
       }else if(!aiPingTimer){
@@ -335,15 +361,19 @@ function aiRender(){
     h+='<div class="ai-empty"><b>ИИ-ассистент</b>Спросите что угодно по текущей книге — '+
        'контекст главы подхватится сам. Выделенный фрагмент тоже попадёт в запрос.</div>';
   }else{
-    aiHist.forEach(function(m){
+    aiHist.forEach(function(m,i){
       if(m.think){
         h+='<div class="ai-think"><b>Рассуждение</b>'+esc(aiCut(m.think,1200))+'</div>';
       }
       if(m.role==='user'){
         h+='<div class="ai-msg user">'+esc(m.content)+'</div>';
       }else{
-        h+='<div class="ai-msg bot'+(m.content?'':' empty')+'">'+
-           esc(m.content||(aiBusy?'…':'(пустой ответ)'))+'</div>';
+        /* модель в потоке пишет JSON-действие — прячем его за статусом */
+        var pend=!m.action&&aiBusy&&aiLooksAction(m.content);
+        var txt=m.content||(aiBusy?'…':'(пустой ответ)');
+        if(pend)txt='ИИ готовит структуру…';
+        h+='<div class="ai-msg bot'+(!m.content||pend?' empty':'')+'">'+esc(txt)+'</div>';
+        if(m.action)h+=aiActCard(m.action,i);
       }
     });
   }
@@ -411,6 +441,7 @@ function aiAsk(q,isRetry){
     function(){
       aiBusy=false;aiSetBusy(false);
       if(!ass.content)ass.content=ass.think?'(без текста — см. рассуждение выше)':'(пустой ответ)';
+      aiTryAction(ass);                     /* вдруг модель прислала действие */
       aiRetried=false;aiRetryPending=false;
       aiRender();
     },
@@ -469,10 +500,264 @@ function aiRetryNow(){
   if(last&&last.role==='user')aiAsk(last.content,true);
 }
 
+/* ── Действия ИИ: модель создаёт книги и главы по JSON-плану ───────────── */
+/* Модель отвечает JSON-объектом (см. блок «Действия» в aiSystemPrompt);
+   в ленте рисуется карточка с планом, а книга/глава создаётся по кнопке —
+   пользователь всегда видит, что именно будет создано. */
+
+function aiLooksAction(s){
+  s=String(s==null?'':s);
+  if(!/^\s*(\{|```)/.test(s))return false;
+  return s.indexOf('"action"')>=0;
+}
+/* Поиск парной скобки с учётом строк — JSON может быть длинным и содержать } */
+function aiMatchBrace(s,i){
+  var depth=0,inStr=false,escd=false;
+  for(var k=i;k<s.length;k++){
+    var c=s.charAt(k);
+    if(inStr){
+      if(escd)escd=false;
+      else if(c==='\\')escd=true;
+      else if(c==='"')inStr=false;
+      continue;
+    }
+    if(c==='"')inStr=true;
+    else if(c==='{')depth++;
+    else if(c==='}'){depth--;if(depth===0)return k}
+  }
+  return -1;
+}
+function aiStr(v,n){
+  var s=String(v==null?'':v).replace(/^\s+/,'').replace(/\s+$/,'');
+  return s.length>n?s.slice(0,n):s;
+}
+function aiValidateAction(o){
+  if(!o||typeof o!=='object'||typeof o.action!=='string')return null;
+  if(o.action==='create_book'){
+    var title=aiStr(o.title,200);
+    if(!title||!Array.isArray(o.chapters))return null;
+    var chs=[];
+    for(var i=0;i<o.chapters.length&&chs.length<40;i++){
+      var c=o.chapters[i];
+      if(!c||typeof c!=='object')continue;
+      var ct=aiStr(c.title,200);
+      if(!ct)continue;
+      chs.push({title:ct,content:aiStr(c.content,40000)});
+    }
+    if(!chs.length)return null;
+    return {action:'create_book',title:title,chapters:chs};
+  }
+  if(o.action==='create_chapter'||o.action==='replace_chapter'){
+    var content=aiStr(o.content,40000);
+    if(!content)return null;
+    return {action:o.action,title:aiStr(o.title,200),content:content};
+  }
+  return null;
+}
+/* JSON из ответа: ```json-фенсы и текст вокруг — не помеха */
+function aiExtractAction(text){
+  var t=String(text==null?'':text);
+  var fence=t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if(fence)t=fence[1];
+  else{
+    var i=t.indexOf('{');
+    if(i<0)return null;
+    var j=aiMatchBrace(t,i);
+    if(j<0)return null;
+    t=t.slice(i,j+1);
+  }
+  t=t.replace(/^\s+|\s+$/g,'');
+  var o;
+  try{o=JSON.parse(t)}
+  catch(e){
+    /* модели бывают ленивы и вставляют «сырой» перевод строки внутрь
+       JSON-строки — чиним управляющие символы только внутри кавычек */
+    try{o=JSON.parse(aiJsonFix(t))}catch(e2){return null}
+  }
+  return aiValidateAction(o);
+}
+function aiJsonFix(t){
+  var out='',inStr=false,escd=false;
+  for(var i=0;i<t.length;i++){
+    var c=t.charAt(i);
+    if(inStr){
+      if(escd)escd=false;
+      else if(c==='\\')escd=true;
+      else if(c==='"')inStr=false;
+      else if(c==='\n'){out+='\\n';continue}
+      else if(c==='\r'){out+='\\r';continue}
+      else if(c==='\t'){out+='\\t';continue}
+    }else if(c==='"')inStr=true;
+    out+=c;
+  }
+  return out;
+}
+function aiActionSummary(p){
+  if(p.action==='create_book'){
+    return 'Структура книги «'+aiCut(p.title,70)+'» готова — '+
+      p.chapters.length+' '+plural(p.chapters.length,'глава','главы','глав')+
+      '. Нажмите «Создать книгу», чтобы добавить её в библиотеку.';
+  }
+  if(p.action==='create_chapter'){
+    return 'Новая глава «'+aiCut(p.title||'Без названия',70)+'» готова — '+
+      fmt(countWords(p.content))+' слов. Нажмите «Добавить главу».';
+  }
+  return 'Новый вариант главы «'+aiCut(p.title||'Без названия',70)+'» готов — '+
+    fmt(countWords(p.content))+' слов. Нажмите «Заменить главу», чтобы применить.';
+}
+function aiActCard(a,i){
+  if(!a||!a.plan)return '';
+  if(a.done)return '<div class="ai-act done">✓ '+esc(a.done)+'</div>';
+  var p=a.plan;
+  var head=p.action==='create_book'?'Новая книга'
+    :p.action==='create_chapter'?'Новая глава':'Переписанная глава';
+  var h='<div class="ai-act"><div class="ai-act-h">'+esc(head)+'</div>';
+  var note='';
+  if(p.action==='create_book'){
+    h+='<ol class="ai-act-list">';
+    p.chapters.forEach(function(c){h+='<li>'+esc(c.title)+'</li>'});
+    h+='</ol>';
+    note=p.chapters.length+' · '+
+      fmt(countWords(p.chapters.map(function(c){return c.content}).join(' ')))+' слов';
+  }else{
+    h+='<div class="ai-act-prev">'+esc(aiCut(p.content,500))+'</div>';
+    note=fmt(countWords(p.content))+' слов';
+  }
+  var go=p.action==='create_book'?'Создать книгу'
+    :p.action==='create_chapter'?'Добавить главу':'Заменить главу';
+  h+='<div class="ai-act-foot"><span class="note">'+esc(note)+'</span>'+
+     '<button class="go" type="button" data-aiact="'+i+'">'+esc(go)+'</button></div></div>';
+  return h;
+}
+/* Завершённый ответ: распознаём действие и подменяем текст резюме */
+function aiTryAction(m){
+  if(!m||m.role!=='assistant'||!m.content||m.action)return;
+  var looks=aiLooksAction(m.content);
+  if(!looks&&m.content.indexOf('{')<0)return;
+  var plan=aiExtractAction(m.content);
+  if(plan){
+    m.action={plan:plan,done:''};
+    m.content=aiActionSummary(plan);
+  }else if(looks){
+    m.content=aiCut(m.content,600)+'\n\n(структура не разобралась — попросите ещё раз)';
+  }
+}
+
+/* Markdown-обвязка — на случай если модель всё же её прислала */
+function aiStripMd(s){
+  return String(s==null?'':s)
+    .replace(/^\s{0,3}#{1,6}[ \t]+/,'')
+    .replace(/\*\*([^*]+)\*\*/g,'$1')
+    .replace(/__([^_]+)__/g,'$1')
+    .replace(/^\s*[-*][ \t]+/,'')
+    .replace(/^\s+/,'').replace(/\s+$/,'');
+}
+/* Разбивка текста на абзацы: пустая строка, иначе перевод строки */
+function aiSplitParas(t,sep){
+  return String(t==null?'':t).replace(/\r/g,'').split(sep)
+    .map(function(s){
+      return s.replace(/[ \t]*\n[ \t]*/g,' ').replace(/[ \t]{2,}/g,' ')
+              .replace(/^\s+/,'').replace(/\s+$/,'');
+    })
+    .filter(function(s){return s.length>0});
+}
+function aiParasAny(t){
+  var a=aiSplitParas(t,/\n{2,}/);
+  return a.length>1?a:aiSplitParas(t,/\n/);
+}
+/* Абзацы ровно n — иначе null (вызывающий решает, что делать) */
+function aiParasFor(out,n){
+  var a=aiSplitParas(out,/\n{2,}/);
+  if(a.length===n)return a;
+  var b=aiSplitParas(out,/\n/);
+  if(b.length===n)return b;
+  if(n===1)return [String(out==null?'':out).replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'')];
+  return null;
+}
+/* Глава в формате приложения: <h1>заголовок</h1> + <p>абзацы</p> */
+function aiChapterHtml(title,content){
+  var ps=aiParasAny(content);
+  var h='<h1>'+esc(aiStripMd(title||'Без названия'))+'</h1>';
+  if(!ps.length)h+='<p></p>';
+  ps.forEach(function(p){h+='<p>'+esc(aiStripMd(p))+'</p>'});
+  return h;
+}
+
+function aiCreateBook(p){
+  if(typeof state==='undefined'||!state)throw new Error('сначала войдите в профиль');
+  if(isReadOnly())throw new Error('сейчас открыт чужой файл — действие недоступно');
+  var chapters=p.chapters.map(function(c){
+    return {id:uid(),html:aiChapterHtml(c.title,c.content),pos:0,marks:[]};
+  });
+  if(!chapters.length)chapters.push({id:uid(),html:aiChapterHtml(p.title,''),pos:0,marks:[]});
+  var first=chapters[0];
+  /* служебные главы — как в обычной книге (createBook в 15-editor) */
+  chapters.push({id:uid(),html:pamatkaHtml(),pos:0,marks:[]});
+  chapters.push({id:uid(),kind:'notes',html:notesChapterHtml(),pos:0,marks:[]});
+  var b={
+    id:uid(),title:p.title,
+    color:COLORS[state.books.length%COLORS.length],
+    updated:Date.now(),
+    chapters:chapters,current:first.id,customTypes:[],wiki:[]
+  };
+  state.books.push(b);state.activeBookId=b.id;persist();invalidateCo();
+  enterEditor(first.id);
+  return 'Книга «'+aiCut(p.title,60)+'» создана — '+
+    p.chapters.length+' '+plural(p.chapters.length,'глава','главы','глав');
+}
+function aiCreateChapter(p){
+  if(typeof state==='undefined'||!state)throw new Error('сначала войдите в профиль');
+  if(isReadOnly())throw new Error('нельзя менять чужую книгу');
+  var b=book();if(!b)throw new Error('сначала откройте книгу');
+  var title=p.title||'Без названия';
+  var n={id:uid(),html:aiChapterHtml(title,p.content),pos:0,marks:[]};
+  b.chapters.push(n);
+  b.updated=Date.now();                 /* структурная правка должна уехать на сервер */
+  persist();
+  enterEditor(n.id);
+  return 'Глава «'+aiCut(title,60)+'» добавлена в книгу «'+aiCut(b.title||'Без названия',40)+'»';
+}
+function aiReplaceChapter(p){
+  if(typeof state==='undefined'||!state)throw new Error('сначала войдите в профиль');
+  if(isReadOnly())throw new Error('нельзя менять чужую книгу');
+  var b=book();if(!b)throw new Error('сначала откройте книгу');
+  var ch=currentCh();if(!ch)throw new Error('нет текущей главы');
+  if(isNotesCh(ch))throw new Error('глава «Заметки» — служебная, заменять нельзя');
+  if(typeof isPamatka==='function'&&isPamatka(ch))throw new Error('глава «Памятка» — заменять нельзя');
+  var title=p.title||chapterTitle(ch);
+  ch.html=aiChapterHtml(title,p.content);
+  ch.pos=0;
+  b.updated=Date.now();
+  /* та же глава: DOM просто перечитывается из ch.html (без save поверх) */
+  loadChapter(ch);
+  renderList(false);updateCrumb();updateStats();
+  if(typeof selbar!=='undefined'&&selbar)selbar.classList.remove('on');
+  if(typeof hideSynbar==='function')hideSynbar();
+  persist();
+  return 'Глава «'+aiCut(title,60)+'» заменена';
+}
+function aiRunAction(idx){
+  var m=aiHist[idx];
+  if(!m||!m.action||m.action.done)return;
+  if(aiBusy){toast('Дождитесь ответа ИИ');return}
+  var p=m.action.plan,done='',err='';
+  try{
+    if(p.action==='create_book')done=aiCreateBook(p);
+    else if(p.action==='create_chapter')done=aiCreateChapter(p);
+    else if(p.action==='replace_chapter')done=aiReplaceChapter(p);
+    else err='неизвестное действие';
+  }catch(ex){err=String(ex&&ex.message?ex.message:ex)}
+  if(err){toast(err);return}
+  m.action.done=done;
+  aiRender();
+  toast(done);
+}
+
 /* ── Исправить / улучшить выделение ────────────────────────────────────── */
 function aiTransform(kind,btn){
   if(aiBusy)return;
-  var src=aiSelection();
+  /* с абзацами — иначе модель не видит разбивку и не может её сохранить */
+  var src=aiSelectionRaw()||aiSelection();
   if(!src){toast('Сначала выделите текст');return}
   if(aiOwnProxy()&&!aiCfg.key){
     aiOpenPanel();
@@ -487,6 +772,7 @@ function aiTransform(kind,btn){
   aiResult.apply=captureSelectionRange();
   aiResult.src=src;
   aiResult.out='';
+  aiResult.token=(aiResult.token||0)+1;   /* ответ устаревшей правки не примем */
   aiLastKind=kind;aiLastBtn=btn;
   aiShowRes(kind);
   aiTransformRun(kind);
@@ -495,20 +781,31 @@ function aiTransform(kind,btn){
 /* Общий прогон запроса — его же дёргает «ПОВТОРИТЬ» в модалке после сбоя */
 function aiTransformRun(kind){
   var btn=aiLastBtn;
+  var tok=aiResult.token;
   var src=aiResult.src;
+  /* общее требование: структура входа = структура выхода */
+  var keep='Разбивку на абзацы и заголовки сохрани ровно как во входе (то же число абзацев, тот же порядок); символы-разделители (✦, ✎), цитаты и кавычки-«ёлочки» не трогай; никакого markdown, списков и эмодзи.';
   var prompt=kind==='fix'
-    ? 'Ты — вычитчик русского текста. Исправь только орфографические, пунктуационные и грамматические ошибки. Ничего не переписывай: сохраняй формулировки, стиль, объём, язык и разбивку на абзацы. Фрагмент может начинаться с середины предложения — не меняй регистр первой буквы (не делай её заглавной, если в оригинале строчная) и не добавляй его в кавычки. Не добавляй пояснений и заголовков. Ответь только исправленным текстом. Если ошибок нет — верни фрагмент дословно, без единого изменения.'
-    : 'Ты — редактор русского текста. Улучши текст: сделай его яснее и живее, сохранив смысл, объём, язык и авторский голос. Не меняй факты, имена и разбивку на абзацы. Фрагмент может начинаться с середины предложения — не меняй регистр первой буквы. Не добавляй пояснений и заголовков. Ответь только готовым текстом.';
+    ? 'Ты — вычитчик русского текста. Исправь только орфографические, пунктуационные и грамматические ошибки. Ничего не переписывай: сохраняй формулировки, стиль, объём, язык, имена, цифры и разбивку на абзацы. Фрагмент может начинаться с середины предложения — не меняй регистр первой буквы (не делай её заглавной, если в оригинале строчная) и не добавляй его в кавычки. Не добавляй пояснений и заголовков. Ответь только исправленным текстом. Если ошибок нет — верни фрагмент дословно, без единого изменения. '+keep
+    : 'Ты — редактор русского текста. Улучши текст, сохранив смысл, объём (±10%), язык и авторский голос: сделай фразы яснее, убери повторы и канцелярит, оживи стиль — но не добавляй новых фактов, цифр, эмодзи и штампов («играет важную роль», «стоит отметить», «в мире» и подобных). Не превращай разговорный текст в официальный и не выравнивай его в «красивый» шаблон. Не добавляй пояснений и заголовков. Фрагмент может начинаться с середины предложения — не меняй регистр первой буквы и не добавляй финальную точку, если её не было. Ответь только готовым текстом. '+keep;
 
   aiComplete([
     {role:'system',content:prompt},
     {role:'user',content:src}
   ]).then(function(out){
+    if(tok!==aiResult.token){            /* пользователь уже начал новую правку */
+      if(btn&&btn!==aiLastBtn)btn.classList.remove('busy');
+      return;
+    }
     if(btn)btn.classList.remove('busy');
     if(!out)throw new Error('пустой ответ модели');
     aiResult.out=out;
     aiFillRes();
   }).catch(function(e){
+    if(tok!==aiResult.token){
+      if(btn&&btn!==aiLastBtn)btn.classList.remove('busy');
+      return;
+    }
     if(btn)btn.classList.remove('busy');
     aiResFail(e);
   });
@@ -566,13 +863,191 @@ function aiCopyRes(){
     );
   }else toast('Браузер не даёт скопировать');
 }
+/* ── Применение результата: сохраняем абзацы, заголовки и форматирование ─ */
+/* Стратегия: модель отдаёт текст с той же разбивкой, что и вход. Мы
+   сопоставляем абзацы с блоками выделения и подменяем текст ПО МЕСТУ —
+   теги <h1>/<b>/<i> и не тронутая часть абзаца остаются на месте. Любая
+   нестыковка → запасной путь replaceSelectionWith (как раньше). */
+
+function aiCaretAt(el){                            /* каретка в конец блока */
+  try{
+    var r=document.createRange();
+    r.selectNodeContents(el);r.collapse(false);
+    var s=getSelection();s.removeAllRanges();s.addRange(r);
+  }catch(e){}
+}
+function aiCaretPos(node,pos){                     /* каретка в позицию узла */
+  try{
+    var r=document.createRange();
+    r.setStart(node,Math.min(pos,node.data.length));r.collapse(true);
+    var s=getSelection();s.removeAllRanges();s.addRange(r);
+  }catch(e){}
+}
+function aiNodeWords(node,from,to){                /* слова куска узла [from,to) */
+  var re=/\S+/g,s=node.data.slice(from,to),m,spans=[];
+  while((m=re.exec(s)))spans.push({node:node,from:from+m.index,to:from+m.index+m[0].length});
+  return spans;
+}
+function aiTextNodeWords(el){
+  var spans=[],w,n;
+  try{w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null)}catch(e){return spans}
+  while((n=w.nextNode()))spans=spans.concat(aiNodeWords(n,0,n.data.length));
+  return spans;
+}
+/* Подмена слов по месту: теги и форматирование остаются как были.
+   false — слов поровну нет; иначе {node,pos} — конец последнего слова */
+function aiPatchSpans(spans,words){
+  if(!words||!spans.length||spans.length!==words.length)return false;
+  var last=null;
+  for(var i=spans.length-1;i>=0;i--){             /* с конца — сдвиги не мешают */
+    var sp=spans[i],w=words[i],d=sp.node.data;
+    if(d.slice(sp.from,sp.to)!==w)sp.node.data=d.slice(0,sp.from)+w+d.slice(sp.to);
+    if(!last)last={node:sp.node,pos:sp.from+w.length};
+  }
+  return last;
+}
+function aiRangeTextNodes(range){                 /* текстовые узлы внутри Range */
+  var root=range.commonAncestorContainer;
+  if(root.nodeType===3)root=root.parentNode;
+  var res=[],w,n;
+  if(!root)return res;
+  try{w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null)}catch(e){return res}
+  while((n=w.nextNode())){
+    var inside=true;
+    try{if(range.intersectsNode)inside=range.intersectsNode(n)}catch(e){}
+    if(!inside)continue;
+    var from=(n===range.startContainer)?range.startOffset:0;
+    var to=(n===range.endContainer)?range.endOffset:n.data.length;
+    if(to>from)res.push({node:n,from:from,to:to});
+  }
+  return res;
+}
+function aiPatchRangeWords(range,out){
+  var words=String(out==null?'':out).match(/\S+/g);
+  var nodes=aiRangeTextNodes(range);
+  if(!words||!nodes.length)return false;
+  var spans=[];
+  nodes.forEach(function(x){spans=spans.concat(aiNodeWords(x.node,x.from,x.to))});
+  return aiPatchSpans(spans,words);
+}
+function aiInterBlocks(range){                    /* блоки editor, пересекающие Range */
+  var res=[],kids;
+  try{kids=Array.prototype.slice.call(editor.children||[])}catch(e){return res}
+  kids.forEach(function(el){
+    var ok=false;
+    try{if(range.intersectsNode)ok=range.intersectsNode(el)}catch(e){}
+    if(ok)res.push(el);
+  });
+  return res;
+}
+function aiEdgeAligned(range,el,which){           /* совпадает ли край Range с краем блока */
+  try{
+    var r=document.createRange();
+    r.selectNodeContents(el);
+    return range.compareBoundaryPoints(
+      which==='start'?Range.START_TO_START:Range.END_TO_END,r)===0;
+  }catch(e){return false}
+}
+function aiSetText(el,text){                      /* замена содержимого блока */
+  text=String(text==null?'':text);
+  if(el.textContent===text)return;
+  var old=el.textContent.match(/\S+/g)||[];
+  var neo=text.match(/\S+/g)||[];
+  if(old.length&&old.length===neo.length&&aiPatchSpans(aiTextNodeWords(el),neo))return;
+  el.textContent=text;
+}
+function aiRebuildBlocks(blocks,paras){           /* когда абзацев не хватает/лишние */
+  if(!paras.length)return false;
+  var i;
+  if(paras.length<blocks.length){
+    for(i=0;i<paras.length;i++)aiSetText(blocks[i],paras[i]);
+    for(i=paras.length;i<blocks.length;i++){
+      var b=blocks[i];
+      if(b.parentNode)b.parentNode.removeChild(b);
+    }
+    aiCaretAt(blocks[paras.length-1]);
+    return true;
+  }
+  for(i=0;i<blocks.length;i++)aiSetText(blocks[i],paras[i]);
+  var last=blocks[blocks.length-1];
+  for(i=blocks.length;i<paras.length;i++){
+    var p=mk('p');
+    p.textContent=paras[i];
+    last.parentNode.insertBefore(p,last.nextSibling);
+    last=p;
+  }
+  aiCaretAt(last);
+  return true;
+}
+/* Выделение начато/кончено внутри крайнего абзаца: режем только выбранную
+   часть, заголовки и не тронутый хвост соседа остаются на месте */
+function aiSpliceBlocks(range,inter,paras){
+  var f=inter[0],l=inter[inter.length-1],last=inter.length-1,i;
+  for(i=1;i<last;i++)aiSetText(inter[i],paras[i]);       /* середина — целиком */
+  if(aiEdgeAligned(range,f,'start'))aiSetText(f,paras[0]);
+  else{
+    var s1=document.createRange();
+    s1.setStart(range.startContainer,range.startOffset);
+    s1.setEnd(f,f.childNodes.length);
+    s1.deleteContents();
+    f.appendChild(document.createTextNode(paras[0]));
+  }
+  if(aiEdgeAligned(range,l,'end')){
+    aiSetText(l,paras[last]);
+    aiCaretAt(l);
+  }else{
+    var s2=document.createRange();
+    s2.setStart(l,0);
+    s2.setEnd(range.endContainer,range.endOffset);
+    s2.deleteContents();
+    var t1=document.createTextNode(paras[last]);
+    l.insertBefore(t1,l.firstChild);
+    aiCaretPos(t1,t1.data.length);
+  }
+  return true;
+}
+
 function aiApplyRes(){
   var ok=aiResult.apply&&aiResult.out
     &&typeof activeSelRange!=='undefined'&&activeSelRange
     &&activeSelRange.startContainer&&document.contains(activeSelRange.startContainer)
     &&!isReadOnly();
   if(!ok){toast('Выделение устарело — скопируйте текст вручную');return}
-  replaceSelectionWith(aiResult.out);
+  var out=String(aiResult.out).replace(/^\s+/,'').replace(/\s+$/,'');
+  if(!out){toast('ИИ вернул пустой текст');return}
+  var range=activeSelRange,applied=false;
+  try{
+    var inter=aiInterBlocks(range);
+    if(inter.length>=2){
+      var f=inter[0],l=inter[inter.length-1];
+      var aligned=aiEdgeAligned(range,f,'start')&&aiEdgeAligned(range,l,'end');
+      var paras=aiParasFor(out,inter.length);
+      if(aligned&&paras){
+        paras.forEach(function(p,i){aiSetText(inter[i],p)});
+        aiCaretAt(l);
+        applied=true;
+      }else if(paras
+        &&(aiEdgeAligned(range,f,'start')||f.contains(range.startContainer))
+        &&(aiEdgeAligned(range,l,'end')||l.contains(range.endContainer))){
+        applied=aiSpliceBlocks(range,inter,paras);
+      }else if(aligned){
+        applied=aiRebuildBlocks(inter,aiParasAny(out));
+      }
+    }else{
+      /* один блок/внутри абзаца: сначала подмена слов (теги живут)… */
+      var patched=aiPatchRangeWords(range,out);
+      if(patched){aiCaretPos(patched.node,patched.pos);applied=true}
+      else if(inter.length===1
+        &&aiEdgeAligned(range,inter[0],'start')&&aiEdgeAligned(range,inter[0],'end')){
+        /* …иначе весь блок, если выделен целиком (текст останется в нём) */
+        aiSetText(inter[0],(aiParasFor(out,1)||[out])[0]);
+        aiCaretAt(inter[0]);
+        applied=true;
+      }
+    }
+  }catch(e){applied=false}
+  if(applied)activeSelRange=null;
+  else replaceSelectionWith(out);                 /* запасной путь — как раньше */
   try{updateStats();scheduleSave();refreshFloats()}catch(e){}
   aiCloseRes();
   toast('Текст заменён');
@@ -590,15 +1065,20 @@ function aiInit(){
   aiEl('aiClear').addEventListener('click',aiClearHist);
   aiEl('aiSend').addEventListener('click',aiSendMsg);
   aiEl('aiSave').addEventListener('click',aiSaveSettings);
-  /* «Повторить» в ленте — делегирование, кнопку рисует aiRender */
+  /* «Повторить» и кнопки действий (карточки) — делегирование, их рисует aiRender */
   aiEl('aiMsgs').addEventListener('click',function(e){
-    var b=e.target&&e.target.closest?e.target.closest('[data-airetry]'):null;
-    if(b)aiRetryNow();
+    if(!e.target||!e.target.closest)return;
+    var a=e.target.closest('[data-aiact]');
+    if(a){aiRunAction(+a.getAttribute('data-aiact')||0);return}
+    if(e.target.closest('[data-airetry]'))aiRetryNow();
   });
 
   var inp=aiEl('aiInput');
   inp.addEventListener('keydown',function(e){
-    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();aiSendMsg()}
+    /* isComposable/229 — Enter во время ввода через IME не должен отправлять */
+    if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){
+      e.preventDefault();aiSendMsg();
+    }
   });
   inp.addEventListener('input',function(){
     inp.style.height='auto';

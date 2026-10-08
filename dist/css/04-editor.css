@@ -56,14 +56,18 @@ body.zen #zenpill{transform:translate(-50%,0);opacity:1;visibility:visible}
 #saveDot.pulse{background:var(--accent);animation:pulse .9s ease}
 @keyframes pulse{0%{box-shadow:0 0 0 0 var(--sel)}100%{box-shadow:0 0 0 10px transparent}}
 #selbar{position:fixed;z-index:70;background:var(--card-glass);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 40px -18px rgba(0,0,0,.45),0 3px 10px -4px rgba(0,0,0,.18);backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,-4px) scale(.96);transform-origin:50% 100%;transition:opacity .16s,transform .16s,visibility .16s;padding:4px}
-#selbar.on{opacity:1;visibility:visible;transform:translate(-50%,0) scale(1);pointer-events:auto}
+/* показ — с паузой (transition-delay читается из конечного состояния):
+   выделение «успокоилось» ~0.85 с, и только потом выезжает менюшка;
+   скрытие мгновенное (в базовом правиле задержки нет) */
+#selbar.on{opacity:1;visibility:visible;transform:translate(-50%,0) scale(1);pointer-events:auto;transition-delay:.85s,.85s,.85s}
 .sb-row{display:flex;gap:2px;position:relative;z-index:1}
 .sb-row button{min-width:34px;height:28px;padding:0 8px;border-radius:8px;font-family:var(--f-serif);font-size:14px;color:var(--ink2);display:grid;place-items:center;transition:background .12s,color .12s}
 .sb-row button:hover{background:var(--hover);color:var(--accent)}
 .sb-row button.active{color:var(--accent);background:var(--sel)}
 .sb-row button .wplus{font-family:var(--f-ui);font-size:10px;letter-spacing:0}
 #synbar{position:fixed;z-index:70;min-width:260px;max-width:500px;background:var(--card-glass);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 60px -24px rgba(0,0,0,.55),0 4px 12px -6px rgba(0,0,0,.2);backdrop-filter:blur(24px) saturate(1.3);-webkit-backdrop-filter:blur(24px) saturate(1.3);opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,4px) scale(.96);transform-origin:50% 0%;transition:opacity .18s,transform .18s,visibility .18s;padding:4px}
-#synbar.on{opacity:1;visibility:visible;transform:translate(-50%,0) scale(1);pointer-events:auto}
+/* вместе с THESAURUS_DELAY (450 мс) синонимы появляются ≈ когда и менюшка */
+#synbar.on{opacity:1;visibility:visible;transform:translate(-50%,0) scale(1);pointer-events:auto;transition-delay:.42s,.42s,.42s}
 .sb-sec{padding:8px 10px 9px;position:relative;z-index:1}
 .sb-sec+.sb-sec{border-top:1px solid var(--line2)}
 .sb-label{font-family:var(--f-ui);font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink3);margin-bottom:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}

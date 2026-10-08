@@ -1,8 +1,10 @@
 /* ==========================================================================
  * 12-assistant.css — ИИ-ассистент — плавающая кнопка, панель чата,
  *   модальный результат правки. Проект: «Черновик» — веб-редактор рукописей.
- * Что делает: оформляет #aiFab (кнопка у правого края), #aiPanel (чат с
- *   контекстом книги), #aiResModal (результат «исправить/улучшить») и
+ * Что делает: оформляет #aiFab (пилюля «Спросить ИИ» с индикатором связи
+ *   в закрытом виде), #aiPanel (чат с контекстом книги и чипами действий
+ *   «новая книга/глава»), карточки действия .ai-act (модель прислала план —
+ *   создаём по кнопке), #aiResModal (результат «исправить/улучшить») и
  *   кнопки ИИ внутри #selbar (.sb-ai).
  * Ключевое: только токены темы из 01-base.css (--card-glass, --line,
  *   --accent, --r-*, --f-*), поэтому светлая/тёмная/сепия темы работают
@@ -10,20 +12,29 @@
  *   (над #wikiPanel), модальный результат 110 (как #dayModal).
  * ========================================================================== */
 
-/* ── Плавающая кнопка ──────────────────────────────────────────────── */
+/* ── Плавающая кнопка (закрытое состояние) ──────────────────────────── */
 #aiFab{
   position:fixed;right:16px;bottom:18px;z-index:96;
-  width:46px;height:46px;border-radius:50%;
-  display:grid;place-items:center;
-  background:var(--card-glass);border:1px solid var(--line);color:var(--accent);
-  box-shadow:0 18px 40px -18px rgba(0,0,0,.45),0 3px 10px -4px rgba(0,0,0,.18);
-  backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
-  cursor:pointer;transition:transform .16s,background .16s,color .16s;
+  height:44px;padding:0 16px;border-radius:22px;
+  display:flex;align-items:center;gap:10px;
+  background:var(--ink);border:1px solid var(--ink);color:var(--bg);
+  box-shadow:0 18px 40px -18px rgba(0,0,0,.5),0 4px 12px -5px rgba(0,0,0,.28);
+  cursor:pointer;
+  transition:transform .16s,box-shadow .16s,background .16s,color .16s;
 }
-#aiFab:hover{transform:translateY(-2px);background:var(--sel);color:var(--accent)}
+#aiFab:hover{transform:translateY(-2px);box-shadow:0 22px 46px -18px rgba(0,0,0,.5),0 0 0 3px var(--sel)}
 #aiFab:active{transform:translateY(0)}
-#aiFab svg{width:22px;height:22px}
-#aiFab.busy{pointer-events:none;color:var(--ink3)}
+#aiFab svg{width:17px;height:17px;flex:0 0 auto;color:var(--accent);transition:transform .25s}
+#aiFab:hover svg{transform:rotate(14deg) scale(1.06)}
+#aiFab .t{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
+#aiFab .dot{
+  width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+  background:currentColor;opacity:.35;
+  transition:background .2s,opacity .2s,box-shadow .2s;
+}
+#aiFab.ok .dot{background:var(--neg);opacity:1;box-shadow:0 0 7px var(--neg)}
+#aiFab.err .dot{background:var(--accent);opacity:1;box-shadow:0 0 7px var(--accent)}
+#aiFab.busy{pointer-events:none;opacity:.6}
 body.reader #aiFab{display:none}
 body.zen #aiFab{display:none}
 @media print{#aiFab{display:none}}
@@ -103,6 +114,59 @@ body.zen #aiFab{display:none}
   cursor:pointer;transition:border-color .12s,color .12s,background .12s;
 }
 .ai-chips button:hover{border-color:var(--accent);color:var(--accent);background:var(--sel)}
+/* чипы действий: создать книгу/главу, переписать главу — акцентом */
+.ai-chips.ai-acts button{
+  color:var(--accent);border-color:var(--sel);
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+}
+.ai-chips.ai-acts button:hover{border-color:var(--accent);background:var(--sel)}
+
+/* ── Карточка действия (модель прислала план книги/главы) ──────────── */
+.ai-act{
+  align-self:stretch;border:1px solid var(--line2);border-radius:12px;
+  background:var(--card);overflow:hidden;
+  animation:aiActIn .22s ease;
+}
+@keyframes aiActIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.ai-act-h{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 11px;border-bottom:1px solid var(--line2);
+  font-family:var(--f-disp);font-size:9px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink2);
+}
+.ai-act-h::before{content:'✦';color:var(--accent);font-size:11px;letter-spacing:0}
+.ai-act-list{
+  margin:0;padding:8px 12px 9px 30px;
+  font-size:12.5px;line-height:1.75;color:var(--ink2);
+  max-height:170px;overflow-y:auto;scrollbar-width:thin;
+}
+.ai-act-list li::marker{color:var(--accent);font-family:var(--f-ui);font-size:10px}
+.ai-act-prev{
+  padding:8px 11px;font-size:12.5px;line-height:1.55;color:var(--ink3);
+  white-space:pre-wrap;word-break:break-word;max-height:132px;overflow-y:auto;
+}
+.ai-act-foot{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 9px;border-top:1px solid var(--line2);background:var(--hover);
+}
+.ai-act-foot .note{
+  flex:1;min-width:0;
+  font-family:var(--f-ui);font-size:9px;letter-spacing:.05em;color:var(--ink3);
+}
+.ai-act-foot .go{
+  flex:0 0 auto;
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  padding:7px 13px;border-radius:9px;cursor:pointer;
+  background:var(--ink);border:1px solid var(--ink);color:var(--bg);
+  transition:background .12s,color .12s,transform .12s,border-color .12s;
+}
+.ai-act-foot .go:hover{background:var(--accent);border-color:var(--accent);color:var(--bg);transform:translateY(-1px)}
+.ai-act-foot .go[disabled]{opacity:.5;pointer-events:none}
+.ai-act.done{
+  padding:9px 11px;background:transparent;
+  border-color:rgba(93,166,120,.4);color:var(--neg);
+  font-family:var(--f-ui);font-size:10.5px;letter-spacing:.03em;
+}
 
 /* ── Поле ввода ────────────────────────────────────────────────────── */
 .ai-foot{border-top:1px solid var(--line2);padding:10px 12px;display:flex;gap:7px;align-items:flex-end}
