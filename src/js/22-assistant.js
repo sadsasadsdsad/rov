@@ -594,9 +594,15 @@ function aiJsonFix(t){
 }
 function aiActionSummary(p){
   if(p.action==='create_book'){
+    /* названия глав уходят в историю API — иначе в следующем вопросе
+       модель придумывает их заново */
+    var names=p.chapters.slice(0,10).map(function(c){
+      return '«'+aiCut(c.title,40)+'»';
+    }).join(', ');
+    if(p.chapters.length>10)names+='…';
     return 'Структура книги «'+aiCut(p.title,70)+'» готова — '+
       p.chapters.length+' '+plural(p.chapters.length,'глава','главы','глав')+
-      '. Нажмите «Создать книгу», чтобы добавить её в библиотеку.';
+      ': '+names+'. Нажмите «Создать книгу», чтобы добавить её в библиотеку.';
   }
   if(p.action==='create_chapter'){
     return 'Новая глава «'+aiCut(p.title||'Без названия',70)+'» готова — '+
