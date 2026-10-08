@@ -42,6 +42,15 @@ var aiPingTimer=0;             /* автоперепроверка связи, �
 var aiLastKind='';             /* последний режим правки (fix|improve) */
 var aiLastBtn=null;            /* кнопка, запустившая правку (для busy) */
 
+/* Версия разметки, под которую написан этот файл (см. ?v=.. в index.html) и
+   адрес, с которого файл загрузился. Нужно, чтобы заметить устаревший
+   index.html в кэше браузера (без Cache-Control браузер держит его по
+   эвристике): ассеты подгружаются свежие, а разметка — прошлая, и панель ИИ
+   в ней просто отсутствует. document.currentScript живёт только во время
+   выполнения скрипта, поэтому значение фиксируем здесь, сразу. */
+var AI_HTML_V='06';
+var AI_SRC=(typeof document!=='undefined'&&document.currentScript&&document.currentScript.src)||'';
+
 function aiEl(id){return document.getElementById(id)}
 function aiBase(){return String(aiCfg.base||'').replace(/\/+$/,'')}
 /* base пусто → через свой сервер (/api/ai.php, ключ не нужен, любой девайс);
@@ -1060,7 +1069,45 @@ function aiApplyRes(){
 }
 
 /* ── Инициализация ─────────────────────────────────────────────────────── */
+/* Старый index.html в кэше: JS/CSS берутся свежие (адреса те же), а разметка
+   — прошлая версия: пилюли/панели может не быть вовсе, и ИИ «просто не
+   появляется» без единой ошибки в консоли. Говорим об этом явно. */
+function aiCheckHtmlVer(){
+  try{
+    var m=String(AI_SRC).match(/[?&]v=([\w.-]+)/);
+    var v=m?m[1]:'';
+    if(v===AI_HTML_V||aiEl('aiStaleBar'))return;
+    if(!document.body)return;
+    var bar=document.createElement('div');
+    bar.id='aiStaleBar';
+    bar.setAttribute('role','status');
+    bar.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99999;'+
+      'display:flex;gap:12px;align-items:center;background:#22242c;color:#f5f5f7;'+
+      'border:1px solid #3c3f4b;border-radius:12px;padding:10px 14px;'+
+      'font:14px/1.4 -apple-system,system-ui,sans-serif;box-shadow:0 10px 34px rgba(0,0,0,.4)';
+    var txt=document.createElement('span');
+    txt.textContent='Сайт обновился, а страница в кэше устарела'+
+      (v?' (v'+v+' → v'+AI_HTML_V+')':'')+' — обновите её, пожалуйста.';
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.textContent='Обновить';
+    btn.style.cssText='background:#6c8cff;color:#fff;border:0;border-radius:8px;'+
+      'padding:7px 14px;font:600 13px -apple-system,system-ui,sans-serif;cursor:pointer';
+    btn.addEventListener('click',function(){location.reload()});
+    var x=document.createElement('button');
+    x.type='button';
+    x.textContent='×';
+    x.setAttribute('aria-label','Закрыть');
+    x.style.cssText='background:none;border:0;color:#9a9daa;font:20px/1 system-ui,sans-serif;'+
+      'cursor:pointer;padding:0 2px';
+    x.addEventListener('click',function(){if(bar.parentNode)bar.parentNode.removeChild(bar)});
+    bar.appendChild(txt);bar.appendChild(btn);bar.appendChild(x);
+    document.body.appendChild(bar);
+  }catch(e){}
+}
+
 function aiInit(){
+  aiCheckHtmlVer();
   if(!aiEl('aiFab'))return;
   aiLoadCfg();
   aiSyncLink();
