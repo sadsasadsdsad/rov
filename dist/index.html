@@ -33,18 +33,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Unbounded:wght@300;400;500;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/01-base.css?v=08">
-<link rel="stylesheet" href="css/02-library.css?v=08">
-<link rel="stylesheet" href="css/03-bookview-workspace.css?v=08">
-<link rel="stylesheet" href="css/04-editor.css?v=08">
-<link rel="stylesheet" href="css/05-modals-notes.css?v=08">
-<link rel="stylesheet" href="css/06-graph.css?v=08">
-<link rel="stylesheet" href="css/07-wiki-modals.css?v=08">
-<link rel="stylesheet" href="css/08-responsive-auth.css?v=08">
-<link rel="stylesheet" href="css/09-mobile-reader.css?v=08">
-<link rel="stylesheet" href="css/10-shared.css?v=08">
-<link rel="stylesheet" href="css/11-access.css?v=08">
-<link rel="stylesheet" href="css/12-assistant.css?v=08">
+<link rel="stylesheet" href="css/01-base.css?v=09">
+<link rel="stylesheet" href="css/02-library.css?v=09">
+<link rel="stylesheet" href="css/03-bookview-workspace.css?v=09">
+<link rel="stylesheet" href="css/04-editor.css?v=09">
+<link rel="stylesheet" href="css/05-modals-notes.css?v=09">
+<link rel="stylesheet" href="css/06-graph.css?v=09">
+<link rel="stylesheet" href="css/07-wiki-modals.css?v=09">
+<link rel="stylesheet" href="css/08-responsive-auth.css?v=09">
+<link rel="stylesheet" href="css/09-mobile-reader.css?v=09">
+<link rel="stylesheet" href="css/10-shared.css?v=09">
+<link rel="stylesheet" href="css/11-access.css?v=09">
+<link rel="stylesheet" href="css/12-assistant.css?v=09">
 </head>
 <body>
 
@@ -102,11 +102,6 @@
     <div class="lib-actions">
       <button class="ibtn ai-tb ai-open" id="aiFabLib" type="button" title="Спросить ИИ" aria-label="Спросить ИИ" aria-expanded="false" aria-controls="aiPanel">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg>
-        <span class="t">ИИ</span><span class="dot" aria-hidden="true"></span>
-      </button>
-      <button class="ibtn lib-new" id="btnAddBook" type="button" title="Создать книгу">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-        <span class="lb">Создать книгу</span>
       </button>
       <button class="acc-btn" type="button" title="Аккаунт"><span class="ava">?</span><span class="nm"></span></button>
       <button class="ibtn" id="btnBackup" title="Резервная копия: скачать все книги">
@@ -269,7 +264,6 @@
         </button>
         <button class="ibtn ai-tb ai-open" id="aiFab" type="button" title="Спросить ИИ" aria-label="Спросить ИИ" aria-expanded="false" aria-controls="aiPanel">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg>
-          <span class="t">ИИ</span><span class="dot" aria-hidden="true"></span>
         </button>
         <button class="ibtn" id="btnVoice" title="Диктовка голосом · Ctrl+Alt+R" aria-pressed="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9.3" y="3" width="5.4" height="11" rx="2.7"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/></svg>
@@ -468,7 +462,7 @@
 <button id="micPill" type="button" title="Остановить диктовку"><span class="mp-dot"></span><span class="mp-txt">Слушаю…</span><span class="mp-hint">нажмите, чтобы остановить</span></button>
 <input type="file" id="restoreInput" accept=".json,application/json" aria-label="Файл резервной копии">
 
-<div id="aiPanel" role="dialog" aria-label="ИИ-ассистент" aria-live="polite">
+<div id="aiPanel" role="dialog" aria-label="ИИ-ассистент">
   <div class="ai-head">
     <span class="ai-spark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg></span>
     <b>ИИ-ассистент</b>
@@ -643,27 +637,27 @@
 <div id="toast" role="status"></div>
 <div id="printBook" aria-hidden="true"></div>
 
-<script src="js/01-core.js?v=08"></script>
-<script src="js/02-thesaurus.js?v=08"></script>
-<script src="js/03-snapshots.js?v=08"></script>
-<script src="js/04-state-seed.js?v=08"></script>
-<script src="js/05-chart.js?v=08"></script>
-<script src="js/06-marks.js?v=08"></script>
-<script src="js/07-layout.js?v=08"></script>
-<script src="js/08-declensions.js?v=08"></script>
-<script src="js/09-cooccurrence.js?v=08"></script>
-<script src="js/10-wiki-panel.js?v=08"></script>
-<script src="js/11-notes.js?v=08"></script>
-<script src="js/12-graph.js?v=08"></script>
-<script src="js/13-wiki-modal.js?v=08"></script>
-<script src="js/14-search.js?v=08"></script>
-<script src="js/15-editor.js?v=08"></script>
-<script src="js/16-accounts.js?v=08"></script>
-<script src="js/17-start.js?v=08"></script>
-<script src="js/18-voice.js?v=08"></script>
-<script src="js/19-mobile-reader.js?v=08"></script>
-<script src="js/20-sync.js?v=08"></script>
-<script src="js/21-shared.js?v=08"></script>
-<script src="js/22-assistant.js?v=08"></script>
+<script src="js/01-core.js?v=09"></script>
+<script src="js/02-thesaurus.js?v=09"></script>
+<script src="js/03-snapshots.js?v=09"></script>
+<script src="js/04-state-seed.js?v=09"></script>
+<script src="js/05-chart.js?v=09"></script>
+<script src="js/06-marks.js?v=09"></script>
+<script src="js/07-layout.js?v=09"></script>
+<script src="js/08-declensions.js?v=09"></script>
+<script src="js/09-cooccurrence.js?v=09"></script>
+<script src="js/10-wiki-panel.js?v=09"></script>
+<script src="js/11-notes.js?v=09"></script>
+<script src="js/12-graph.js?v=09"></script>
+<script src="js/13-wiki-modal.js?v=09"></script>
+<script src="js/14-search.js?v=09"></script>
+<script src="js/15-editor.js?v=09"></script>
+<script src="js/16-accounts.js?v=09"></script>
+<script src="js/17-start.js?v=09"></script>
+<script src="js/18-voice.js?v=09"></script>
+<script src="js/19-mobile-reader.js?v=09"></script>
+<script src="js/20-sync.js?v=09"></script>
+<script src="js/21-shared.js?v=09"></script>
+<script src="js/22-assistant.js?v=09"></script>
 </body>
 </html>
