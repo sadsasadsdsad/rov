@@ -5,7 +5,7 @@
  * Раздел оригинала: src/index.html, строки 2958–3054 (раздел 10 из 18).
  * Что делает: плавающая нижняя панель с вкладками (карта связей / заметки / сущности), переключение и сворачивание.
  * Ключевое: toggleWikiPanel, setPanelTab, panelTab, updatePanelTabs.
- * Зависимости: 01-core, 09-cooccurrence, 11-notes; кнопки #btnWiki/#btnNotesPanel в 15-editor.
+ * Зависимости: 01-core, 09-cooccurrence, 11-notes; кнопка #btnWiki в index.html («Все заметки» убраны — заметки открываются через Энциклопедию → вкладка «Заметки»).
  * ========================================================================== */
 "use strict";
 /* ===== ПАНЕЛЬ: плавающие вкладки в шапке ===== */
@@ -78,7 +78,10 @@ function toggleWikiPanel(force,tab){
     setTimeout(positionEdRz,450);
   }else{
     $('#btnWiki').classList.remove('on');
-    $('#btnNotesPanel').classList.remove('on');
+    /* «Все заметки» переехали в Энциклопедию (вкладка «Заметки»), кнопки
+       #btnNotesPanel в новой разметке уже нет — в устаревшей она ещё есть */
+    var bnp=$('#btnNotesPanel');
+    if(bnp)bnp.classList.remove('on');
     updatePanelTabs();
   }
   renderMarksRail();
@@ -93,7 +96,7 @@ $('#btnWiki').addEventListener('click',function(){
   if(open && panelTab==='world'){toggleWikiPanel(false);return}
   toggleWikiPanel(true,'world');
 });
-$('#btnNotesPanel').addEventListener('click',function(){
+$('#btnNotesPanel')&&$('#btnNotesPanel').addEventListener('click',function(){
   var open=$('#wikiPanel').classList.contains('on');
   if(open && panelTab==='notes'){toggleWikiPanel(false);return}
   toggleWikiPanel(true,'notes');

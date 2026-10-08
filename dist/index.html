@@ -33,18 +33,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Unbounded:wght@300;400;500;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/01-base.css?v=06">
-<link rel="stylesheet" href="css/02-library.css?v=06">
-<link rel="stylesheet" href="css/03-bookview-workspace.css?v=06">
-<link rel="stylesheet" href="css/04-editor.css?v=06">
-<link rel="stylesheet" href="css/05-modals-notes.css?v=06">
-<link rel="stylesheet" href="css/06-graph.css?v=06">
-<link rel="stylesheet" href="css/07-wiki-modals.css?v=06">
-<link rel="stylesheet" href="css/08-responsive-auth.css?v=06">
-<link rel="stylesheet" href="css/09-mobile-reader.css?v=06">
-<link rel="stylesheet" href="css/10-shared.css?v=06">
-<link rel="stylesheet" href="css/11-access.css?v=06">
-<link rel="stylesheet" href="css/12-assistant.css?v=06">
+<link rel="stylesheet" href="css/01-base.css?v=07">
+<link rel="stylesheet" href="css/02-library.css?v=07">
+<link rel="stylesheet" href="css/03-bookview-workspace.css?v=07">
+<link rel="stylesheet" href="css/04-editor.css?v=07">
+<link rel="stylesheet" href="css/05-modals-notes.css?v=07">
+<link rel="stylesheet" href="css/06-graph.css?v=07">
+<link rel="stylesheet" href="css/07-wiki-modals.css?v=07">
+<link rel="stylesheet" href="css/08-responsive-auth.css?v=07">
+<link rel="stylesheet" href="css/09-mobile-reader.css?v=07">
+<link rel="stylesheet" href="css/10-shared.css?v=07">
+<link rel="stylesheet" href="css/11-access.css?v=07">
+<link rel="stylesheet" href="css/12-assistant.css?v=07">
 </head>
 <body>
 
@@ -100,6 +100,14 @@
   <header class="lib-top">
     <div class="brand"><span class="dia"></span><b>ЧЕРНОВИК</b><small>для книг</small></div>
     <div class="lib-actions">
+      <button class="ibtn ai-tb ai-open" id="aiFabLib" type="button" title="Спросить ИИ" aria-label="Спросить ИИ" aria-expanded="false" aria-controls="aiPanel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5l1.7 4.3 4.3 1.7-4.3 1.7L11 15.5 9.3 11.2 5 9.5l4.3-1.7z"/><path d="M17.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
+        <span class="t">ИИ</span><span class="dot" aria-hidden="true"></span>
+      </button>
+      <button class="ibtn lib-new" id="btnAddBook" type="button" title="Создать книгу">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="lb">Создать книгу</span>
+      </button>
       <button class="acc-btn" type="button" title="Аккаунт"><span class="ava">?</span><span class="nm"></span></button>
       <button class="ibtn" id="btnBackup" title="Резервная копия: скачать все книги">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
@@ -259,8 +267,9 @@
         <button class="ibtn" id="btnNote" title="Вставить заметку · Ctrl+Alt+N">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16.5 4.5a1.8 1.8 0 0 1 2.6 0l.4.4a1.8 1.8 0 0 1 0 2.6L8 19l-4 1Z"/><path d="M14 7l3 3"/></svg>
         </button>
-        <button class="ibtn" id="btnNotesPanel" title="Все заметки">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h9L19 7.5v13H6z"/><path d="M9 9h6M9 12.5h6M9 16h4"/></svg>
+        <button class="ibtn ai-tb ai-open" id="aiFab" type="button" title="Спросить ИИ" aria-label="Спросить ИИ" aria-expanded="false" aria-controls="aiPanel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5l1.7 4.3 4.3 1.7-4.3 1.7L11 15.5 9.3 11.2 5 9.5l4.3-1.7z"/><path d="M17.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>
+          <span class="t">ИИ</span><span class="dot" aria-hidden="true"></span>
         </button>
         <button class="ibtn" id="btnVoice" title="Диктовка голосом · Ctrl+Alt+R" aria-pressed="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9.3" y="3" width="5.4" height="11" rx="2.7"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/></svg>
@@ -459,8 +468,6 @@
 <button id="micPill" type="button" title="Остановить диктовку"><span class="mp-dot"></span><span class="mp-txt">Слушаю…</span><span class="mp-hint">нажмите, чтобы остановить</span></button>
 <input type="file" id="restoreInput" accept=".json,application/json" aria-label="Файл резервной копии">
 
-<button id="aiFab" type="button" title="ИИ-ассистент" aria-label="ИИ-ассистент" aria-expanded="false" aria-controls="aiPanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5l1.7 4.3 4.3 1.7-4.3 1.7L11 15.5 9.3 11.2 5 9.5l4.3-1.7z"/><path d="M17.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span class="t">Спросить ИИ</span><span class="dot" aria-hidden="true"></span></button>
-
 <div id="aiPanel" role="dialog" aria-label="ИИ-ассистент" aria-live="polite">
   <div class="ai-head">
     <span class="wv-dia"></span>
@@ -636,27 +643,27 @@
 <div id="toast" role="status"></div>
 <div id="printBook" aria-hidden="true"></div>
 
-<script src="js/01-core.js?v=06"></script>
-<script src="js/02-thesaurus.js?v=06"></script>
-<script src="js/03-snapshots.js?v=06"></script>
-<script src="js/04-state-seed.js?v=06"></script>
-<script src="js/05-chart.js?v=06"></script>
-<script src="js/06-marks.js?v=06"></script>
-<script src="js/07-layout.js?v=06"></script>
-<script src="js/08-declensions.js?v=06"></script>
-<script src="js/09-cooccurrence.js?v=06"></script>
-<script src="js/10-wiki-panel.js?v=06"></script>
-<script src="js/11-notes.js?v=06"></script>
-<script src="js/12-graph.js?v=06"></script>
-<script src="js/13-wiki-modal.js?v=06"></script>
-<script src="js/14-search.js?v=06"></script>
-<script src="js/15-editor.js?v=06"></script>
-<script src="js/16-accounts.js?v=06"></script>
-<script src="js/17-start.js?v=06"></script>
-<script src="js/18-voice.js?v=06"></script>
-<script src="js/19-mobile-reader.js?v=06"></script>
-<script src="js/20-sync.js?v=06"></script>
-<script src="js/21-shared.js?v=06"></script>
-<script src="js/22-assistant.js?v=06"></script>
+<script src="js/01-core.js?v=07"></script>
+<script src="js/02-thesaurus.js?v=07"></script>
+<script src="js/03-snapshots.js?v=07"></script>
+<script src="js/04-state-seed.js?v=07"></script>
+<script src="js/05-chart.js?v=07"></script>
+<script src="js/06-marks.js?v=07"></script>
+<script src="js/07-layout.js?v=07"></script>
+<script src="js/08-declensions.js?v=07"></script>
+<script src="js/09-cooccurrence.js?v=07"></script>
+<script src="js/10-wiki-panel.js?v=07"></script>
+<script src="js/11-notes.js?v=07"></script>
+<script src="js/12-graph.js?v=07"></script>
+<script src="js/13-wiki-modal.js?v=07"></script>
+<script src="js/14-search.js?v=07"></script>
+<script src="js/15-editor.js?v=07"></script>
+<script src="js/16-accounts.js?v=07"></script>
+<script src="js/17-start.js?v=07"></script>
+<script src="js/18-voice.js?v=07"></script>
+<script src="js/19-mobile-reader.js?v=07"></script>
+<script src="js/20-sync.js?v=07"></script>
+<script src="js/21-shared.js?v=07"></script>
+<script src="js/22-assistant.js?v=07"></script>
 </body>
 </html>

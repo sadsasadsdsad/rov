@@ -1,7 +1,9 @@
 /* ==========================================================================
  * 22-assistant.js — ИИ-ассистент — чат по книге + исправление/улучшение
  *   выделенного текста. Проект: «Черновик» — веб-редактор рукописей.
- * Что делает: #aiFab (пилюля «Спросить ИИ») открывает панель чата (#aiPanel)
+ * Что делает: кнопки «Спросить ИИ» (.ai-open — #aiFab в #topbar редактора
+ *   на месте «Все заметки» и #aiFabLib в шапке библиотеки; пилюля .ai-tb
+ *   с точкой связи) открывают панель чата (#aiPanel)
  *   с контекстом текущей книги/главы и живого выделения; кнопки .sb-ai в
  *   #selbar («Испр.»/«Улуч.») прогоняют выделение через модель и показывают
  *   результат в #aiResModal («Применить» подменяет выделение с сохранением
@@ -48,10 +50,21 @@ var aiLastBtn=null;            /* кнопка, запустившая прав�
    эвристике): ассеты подгружаются свежие, а разметка — прошлая, и панель ИИ
    в ней просто отсутствует. document.currentScript живёт только во время
    выполнения скрипта, поэтому значение фиксируем здесь, сразу. */
-var AI_HTML_V='06';
+var AI_HTML_V='07';
 var AI_SRC=(typeof document!=='undefined'&&document.currentScript&&document.currentScript.src)||'';
 
 function aiEl(id){return document.getElementById(id)}
+/* Все кнопки открытия панели: #aiFab (в #topbar редактора) и
+   #aiFabLib (в шапке библиотеки); устаревшая разметка содержит только
+   #aiFab (плавающая пилюля) — она тоже попадает в список */
+function aiFabs(){
+  var out=[],ids=['aiFab','aiFabLib'];
+  for(var i=0;i<ids.length;i++){
+    var el=aiEl(ids[i]);
+    if(el)out.push(el);
+  }
+  return out;
+}
 function aiBase(){return String(aiCfg.base||'').replace(/\/+$/,'')}
 /* base пусто → через свой сервер (/api/ai.php, ключ не нужен, любой девайс);
    иначе — напрямую в заданный прокси (локальная разработка, ключ обязателен) */
@@ -284,9 +297,8 @@ function aiPing(){
         el.classList.toggle('err',!s.ok);
       }
       aiRenderCtx();
-      /* индикатор связи на закрытой пилюле #aiFab */
-      var fab=aiEl('aiFab');
-      if(fab){fab.classList.toggle('ok',!!s.ok);fab.classList.toggle('err',!s.ok)}
+      /* индикатор связи на кнопках открытия (.ai-open) */
+      aiFabs().forEach(function(f){f.classList.toggle('ok',!!s.ok);f.classList.toggle('err',!s.ok)});
       if(s.ok){
         if(aiPingTimer){clearTimeout(aiPingTimer);aiPingTimer=0}
       }else if(!aiPingTimer){
@@ -311,16 +323,14 @@ function aiOpenPanel(){
   var p=aiEl('aiPanel');
   if(!p)return;
   p.classList.add('on');
-  var fab=aiEl('aiFab');
-  if(fab)fab.setAttribute('aria-expanded','true');
+  aiFabs().forEach(function(f){f.setAttribute('aria-expanded','true')});
   aiRender();aiRenderCtx();aiSyncLink();aiPing();
   setTimeout(function(){var i=aiEl('aiInput');if(i&&!aiBusy)i.focus()},60);
 }
 function aiClosePanel(){
   var p=aiEl('aiPanel');
   if(p)p.classList.remove('on');
-  var fab=aiEl('aiFab');
-  if(fab)fab.setAttribute('aria-expanded','false');
+  aiFabs().forEach(function(f){f.setAttribute('aria-expanded','false')});
 }
 /* ссылка «Панель прокси ↗» есть только у своего прокси (на сервере её нет) */
 function aiSyncLink(){
@@ -1108,11 +1118,17 @@ function aiCheckHtmlVer(){
 
 function aiInit(){
   aiCheckHtmlVer();
-  if(!aiEl('aiFab'))return;
+  var fabs=aiFabs();
+  if(!fabs.length)return;
   aiLoadCfg();
   aiSyncLink();
 
-  aiEl('aiFab').addEventListener('click',aiTogglePanel);
+  /* .ai-open — общий класс для стилей (индикатор связи); у устаревшей
+     разметки (плавающая пилюля) его нет — добавляем сами */
+  fabs.forEach(function(f){
+    f.classList.add('ai-open');
+    f.addEventListener('click',aiTogglePanel);
+  });
   aiEl('aiClose').addEventListener('click',aiClosePanel);
   aiEl('aiGear').addEventListener('click',aiToggleSettings);
   aiEl('aiClear').addEventListener('click',aiClearHist);

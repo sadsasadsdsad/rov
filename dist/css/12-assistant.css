@@ -1,19 +1,53 @@
 /* ==========================================================================
- * 12-assistant.css — ИИ-ассистент — плавающая кнопка, панель чата,
+ * 12-assistant.css — ИИ-ассистент — кнопки открытия, панель чата,
  *   модальный результат правки. Проект: «Черновик» — веб-редактор рукописей.
- * Что делает: оформляет #aiFab (пилюля «Спросить ИИ» с индикатором связи
- *   в закрытом виде), #aiPanel (чат с контекстом книги и чипами действий
- *   «новая книга/глава»), карточки действия .ai-act (модель прислала план —
- *   создаём по кнопке), #aiResModal (результат «исправить/улучшить») и
- *   кнопки ИИ внутри #selbar (.sb-ai).
+ * Что делает: оформляет кнопки «Спросить ИИ» с классом .ai-open —
+ *   #aiFab в #topbar редактора (на месте «Все заметки») и #aiFabLib в шапке
+ *   библиотеки (там, где раньше была только плавающая пилюля); обе — вариант
+ *   .ai-tb (пилюля с искрой и точкой связи: зелёная — онлайн, красная —
+ *   сбой). Старая плавающая пилюля #aiFab осталась только для устаревшей
+ *   разметки в кэше браузера, #aiPanel (чат с контекстом книги и чипами
+ *   действий «новая книга/глава»), карточки действия .ai-act (модель
+ *   прислала план — создаём по кнопке), #aiResModal (результат
+ *   «исправить/улучшить») и кнопки ИИ внутри #selbar (.sb-ai).
  * Ключевое: только токены темы из 01-base.css (--card-glass, --line,
  *   --accent, --r-*, --f-*), поэтому светлая/тёмная/сепия темы работают
- *   без переопределений; z-index: кнопка 96 (рядом с #micPill), панель 100
- *   (над #wikiPanel), модальный результат 110 (как #dayModal).
+ *   без переопределений; z-index: панель 100 (над #wikiPanel), модальный
+ *   результат 110 (как #dayModal), у старой плавающей пилюли — 96 (у #micPill).
  * ========================================================================== */
 
-/* ── Плавающая кнопка (закрытое состояние) ──────────────────────────── */
-#aiFab{
+/* ── Кнопки ИИ (.ai-open): индикатор связи и запреты ────────────────── */
+.ai-open .dot{
+  width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+  background:currentColor;opacity:.35;
+  transition:background .2s,opacity .2s,box-shadow .2s;
+}
+.ai-open.ok .dot{background:var(--neg);opacity:1;box-shadow:0 0 7px var(--neg)}
+.ai-open.err .dot{background:var(--accent);opacity:1;box-shadow:0 0 7px var(--accent)}
+.ai-open.busy{pointer-events:none;opacity:.6}
+body.reader .ai-open,body.zen .ai-open{display:none}
+@media print{.ai-open{display:none}}
+
+/* ── Вариант .ai-tb: пилюля в панели (#topbar) и шапке библиотеки ────── */
+.ai-tb{
+  position:relative;
+  width:auto;height:34px;padding:0 11px;gap:7px;
+  display:flex;align-items:center;
+  background:var(--card);border:1px solid var(--line2);border-radius:99px;
+  color:var(--ink2);
+  transition:border-color .16s,color .16s,background .16s;
+}
+.ai-tb:hover{border-color:var(--accent);color:var(--accent);background:var(--sel)}
+.ai-tb svg{width:15px;height:15px;flex:0 0 auto;color:var(--accent);transition:transform .25s}
+.ai-tb:hover svg{transform:rotate(14deg) scale(1.06)}
+.ai-tb .t{font-family:var(--f-ui);font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.ai-tb .dot{position:absolute;top:-2px;right:-2px;box-shadow:0 0 0 2px var(--bg)}
+.ai-tb.ok .dot{box-shadow:0 0 7px var(--neg)}
+.ai-tb.err .dot{box-shadow:0 0 7px var(--accent)}
+@media (max-width:640px){.ai-tb{padding:0 9px}.ai-tb .t{display:none}}
+
+/* ── Старый вариант: плавающая пилюля (для устаревшей разметки в кэше) ─ */
+#aiFab:not(.ai-tb){
   position:fixed;right:16px;bottom:18px;z-index:96;
   height:44px;padding:0 16px;border-radius:22px;
   display:flex;align-items:center;gap:10px;
@@ -22,26 +56,15 @@
   cursor:pointer;
   transition:transform .16s,box-shadow .16s,background .16s,color .16s;
 }
-#aiFab:hover{transform:translateY(-2px);box-shadow:0 22px 46px -18px rgba(0,0,0,.5),0 0 0 3px var(--sel)}
-#aiFab:active{transform:translateY(0)}
-#aiFab svg{width:17px;height:17px;flex:0 0 auto;color:var(--accent);transition:transform .25s}
-#aiFab:hover svg{transform:rotate(14deg) scale(1.06)}
-#aiFab .t{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
-#aiFab .dot{
-  width:7px;height:7px;border-radius:50%;flex:0 0 auto;
-  background:currentColor;opacity:.35;
-  transition:background .2s,opacity .2s,box-shadow .2s;
-}
-#aiFab.ok .dot{background:var(--neg);opacity:1;box-shadow:0 0 7px var(--neg)}
-#aiFab.err .dot{background:var(--accent);opacity:1;box-shadow:0 0 7px var(--accent)}
-#aiFab.busy{pointer-events:none;opacity:.6}
-body.reader #aiFab{display:none}
-body.zen #aiFab{display:none}
-@media print{#aiFab{display:none}}
+#aiFab:not(.ai-tb):hover{transform:translateY(-2px);box-shadow:0 22px 46px -18px rgba(0,0,0,.5),0 0 0 3px var(--sel)}
+#aiFab:not(.ai-tb):active{transform:translateY(0)}
+#aiFab:not(.ai-tb) svg{width:17px;height:17px;flex:0 0 auto;color:var(--accent);transition:transform .25s}
+#aiFab:not(.ai-tb):hover svg{transform:rotate(14deg) scale(1.06)}
+#aiFab:not(.ai-tb) .t{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
 
 /* ── Панель чата ───────────────────────────────────────────────────── */
 #aiPanel{
-  position:fixed;right:16px;bottom:74px;z-index:100;
+  position:fixed;right:16px;bottom:18px;z-index:100;
   width:min(400px,calc(100vw - 24px));height:min(74vh,640px);
   display:flex;flex-direction:column;
   background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-lg);

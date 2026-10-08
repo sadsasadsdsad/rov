@@ -10,6 +10,20 @@
 #library{height:100dvh;display:flex;flex-direction:column;overflow-y:auto;background:radial-gradient(1100px 420px at 50% -8%,var(--glow),transparent 62%),var(--bg)}
 .lib-top{height:54px;flex:0 0 54px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--line2);user-select:none;position:sticky;top:0;background:var(--bg);z-index:10;transition:background-color .4s}
 .lib-actions{display:flex;gap:6px;align-items:center}
+/* кнопка «Создать книгу» в шапке: карточка «Новая книга» на узких экранах
+   скрыта читалкой (.cover.new в 09-mobile-reader.css), поэтому главный
+   вход в создание — здесь, он виден на любой ширине */
+#btnAddBook{
+  width:auto;height:34px;padding:0 13px;gap:7px;
+  display:flex;align-items:center;
+  background:var(--ink);border:1px solid var(--ink);color:var(--bg);
+  border-radius:99px;cursor:pointer;
+  transition:background .12s,border-color .12s,transform .12s;
+}
+#btnAddBook svg{width:15px;height:15px;flex:0 0 auto}
+#btnAddBook .lb{font-family:var(--f-ui);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+#btnAddBook:hover{background:var(--accent);border-color:var(--accent);transform:translateY(-1px)}
+@media (max-width:700px){#btnAddBook{padding:0 9px}#btnAddBook .lb{display:none}}
 .lib-body{max-width:1120px;width:100%;margin:0 auto;padding:48px 32px 70px}
 .lib-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;border-bottom:3px double var(--line);padding-bottom:24px}
 .lib-title{font-family:var(--f-disp);font-weight:400;font-size:clamp(24px,4vw,32px);letter-spacing:.01em;margin-top:12px}

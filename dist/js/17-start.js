@@ -68,6 +68,10 @@ function bindSkipLink(){
 }
 
 loadAccounts();
+/* кнопка «Создать книгу» в шапке библиотеки (карточка «Новая книга» на
+   узких экранах скрыта читалкой — кнопка видна всегда) */
+var addBookBtn=$('#btnAddBook');
+if(addBookBtn)addBookBtn.addEventListener('click',createBook);
 function localBoot(){
   var sess=accounts.users.filter(function(u){return u.id===accounts.session})[0];
   if(sess){enterApp(sess);return}
