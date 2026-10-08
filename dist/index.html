@@ -33,18 +33,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=Unbounded:wght@300;400;500;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/01-base.css?v=09">
-<link rel="stylesheet" href="css/02-library.css?v=09">
-<link rel="stylesheet" href="css/03-bookview-workspace.css?v=09">
-<link rel="stylesheet" href="css/04-editor.css?v=09">
-<link rel="stylesheet" href="css/05-modals-notes.css?v=09">
-<link rel="stylesheet" href="css/06-graph.css?v=09">
-<link rel="stylesheet" href="css/07-wiki-modals.css?v=09">
-<link rel="stylesheet" href="css/08-responsive-auth.css?v=09">
-<link rel="stylesheet" href="css/09-mobile-reader.css?v=09">
-<link rel="stylesheet" href="css/10-shared.css?v=09">
-<link rel="stylesheet" href="css/11-access.css?v=09">
-<link rel="stylesheet" href="css/12-assistant.css?v=09">
+<link rel="stylesheet" href="css/01-base.css?v=10">
+<link rel="stylesheet" href="css/02-library.css?v=10">
+<link rel="stylesheet" href="css/03-bookview-workspace.css?v=10">
+<link rel="stylesheet" href="css/04-editor.css?v=10">
+<link rel="stylesheet" href="css/05-modals-notes.css?v=10">
+<link rel="stylesheet" href="css/06-graph.css?v=10">
+<link rel="stylesheet" href="css/07-wiki-modals.css?v=10">
+<link rel="stylesheet" href="css/08-responsive-auth.css?v=10">
+<link rel="stylesheet" href="css/09-mobile-reader.css?v=10">
+<link rel="stylesheet" href="css/10-shared.css?v=10">
+<link rel="stylesheet" href="css/11-access.css?v=10">
+<link rel="stylesheet" href="css/12-assistant.css?v=10">
 </head>
 <body>
 
@@ -466,17 +466,15 @@
   <div class="ai-head">
     <span class="ai-spark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg></span>
     <b>ИИ-ассистент</b>
+    <span class="ai-dot" data-aidot aria-hidden="true"></span>
+    <span class="ctx" id="aiPanelCtx"></span>
     <span class="sp"></span>
+    <button class="sibtn" id="aiExpand" type="button" title="Открыть полный чат с историей диалогов" aria-label="Открыть полный чат"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></svg></button>
     <button class="sibtn" id="aiClear" type="button" title="Очистить диалог" aria-label="Очистить диалог"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button>
-    <button class="sibtn" id="aiGear" type="button" title="Настройки ИИ" aria-label="Настройки ИИ" aria-expanded="false" aria-controls="aiSet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
+    <button class="sibtn" id="aiGear" type="button" title="Настройки ИИ" aria-label="Настройки ИИ" aria-expanded="false" aria-controls="aiSetModal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
     <button class="sibtn" id="aiClose" type="button" title="Закрыть" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
-  <div class="ai-status" id="aiStatus" role="status">
-    <span class="dot" aria-hidden="true"></span>
-    <span class="txt">Проверяю связь с ИИ…</span>
-    <span class="ctx" id="aiCtx"></span>
-  </div>
-  <div class="ai-msgs" id="aiMsgs"></div>
+  <div class="ai-msgs" id="aiMsgs" data-aimsgs></div>
   <div class="ai-chips ai-acts">
     <button type="button" data-aiq="Создай новую книгу про " title="ИИ придумает книгу и создаст её в библиотеке">＋ Новая книга</button>
     <button type="button" data-aiq="Создай новую главу в этой книге про " title="ИИ напишет главу и добавит её в книгу">＋ Новая глава</button>
@@ -490,21 +488,6 @@
   <div class="ai-foot">
     <textarea id="aiInput" rows="1" placeholder="Вопрос по книге… Enter — отправить" aria-label="Сообщение ассистенту"></textarea>
     <button class="ai-send" id="aiSend" type="button" title="Отправить (Enter)" aria-label="Отправить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
-  </div>
-  <div class="ai-set" id="aiSet" hidden>
-    <label><span class="lbl">Адрес прокси</span><input id="aiBase" type="url" spellcheck="false" placeholder="пусто = через сайт (как сейчас)"></label>
-    <label><span class="lbl">API-ключ</span><input id="aiKey" type="password" spellcheck="false" autocomplete="off" placeholder="нужен только для своего прокси"></label>
-    <label><span class="lbl">Модель</span>
-      <select id="aiModel">
-        <option value="deepseek-chat">deepseek-chat — быстрый</option>
-        <option value="deepseek-reasoner">deepseek-reasoner — эксперт</option>
-      </select>
-    </label>
-    <div class="ai-set-row">
-      <button class="m-btn primary" id="aiSave" type="button">СОХРАНИТЬ</button>
-      <a class="ai-link" id="aiPanelLink" href="#" target="_blank" rel="noopener">Панель прокси ↗</a>
-    </div>
-    <p class="ai-hint">По умолчанию вопросы идут через сам сайт: сервер сам обращается к ИИ, ключи вводить не нужно и работает это с любого устройства. Заполните адрес и ключ, только если хотите ходить в свой локальный прокси (тогда ключ хранится в этом браузере).</p>
   </div>
 </div>
 
@@ -527,6 +510,75 @@
       <button class="m-btn" id="aiResCopy" type="button">КОПИРОВАТЬ</button>
       <button class="m-btn" id="aiResCancel" type="button">ЗАКРЫТЬ</button>
       <button class="m-btn primary" id="aiResApply" type="button">ПРИМЕНИТЬ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Полностраничный чат ИИ (стиль DeepSeek): слева история диалогов,
+     справа лента. Общие движок/данные с панелью #aiPanel: активный
+     диалог один, рендер идёт в обе ленты (data-aimsgs) -->
+<section id="aiPage" hidden aria-label="ИИ-чат">
+  <div class="ai-side" id="aiSide">
+    <div class="ai-side-head">
+      <span class="ai-spark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg></span>
+      <b>ДИАЛОГИ</b>
+      <span class="sp"></span>
+      <button class="sibtn" id="aiSideClose" type="button" title="Скрыть список" aria-label="Скрыть список"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <button class="ai-new" id="aiNewChat" type="button">＋ Новый чат</button>
+    <div class="ai-threads" id="aiThreads" role="list"></div>
+  </div>
+  <div class="ai-pg">
+    <header class="ai-pg-head">
+      <button class="ibtn" id="aiPgBack" type="button" title="Назад" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+      <button class="ibtn ai-side-btn" id="aiPgSide" type="button" title="История диалогов" aria-label="История диалогов"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+      <b id="aiPgTitle">Новый чат</b>
+      <span class="ai-dot" data-aidot aria-hidden="true"></span>
+      <span class="ctx" id="aiPgCtx"></span>
+      <span class="sp"></span>
+      <button class="ibtn" id="aiPgGear" type="button" title="Настройки ИИ" aria-label="Настройки ИИ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></button>
+    </header>
+    <div class="ai-msgs" id="aiPgMsgs" data-aimsgs></div>
+    <div class="ai-chips ai-acts">
+      <button type="button" data-aiq="Создай новую книгу про " title="ИИ придумает книгу и создаст её в библиотеке">＋ Новая книга</button>
+      <button type="button" data-aiq="Создай новую главу в этой книге про " title="ИИ напишет главу и добавит её в книгу">＋ Новая глава</button>
+      <button type="button" data-aiq="Перепиши текущую главу — сделай её короче и плотнее, сохранив сюжет" title="ИИ заменит текст главы, заголовок сохранится">↻ Переписать главу</button>
+    </div>
+    <div class="ai-chips">
+      <button type="button" data-aiq="Краткий пересказ главы">Пересказ главы</button>
+      <button type="button" data-aiq="Ключевые образы и темы этой главы">Образы и темы</button>
+      <button type="button" data-aiq="Составь вопросы к тексту для обсуждения">Вопросы к тексту</button>
+    </div>
+    <div class="ai-foot">
+      <textarea id="aiPgInput" rows="1" placeholder="Сообщение… Enter — отправить" aria-label="Сообщение ассистенту"></textarea>
+      <button class="ai-send" id="aiPgSend" type="button" title="Отправить (Enter)" aria-label="Отправить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </div>
+  </div>
+</section>
+
+<!-- Настройки ИИ — общая модалка для панели и страницы -->
+<div id="aiSetModal" role="dialog" aria-modal="true" aria-labelledby="aiSetTitle">
+  <div class="ai-set-card">
+    <div class="ai-res-head">
+      <span class="ai-spark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg></span>
+      <b id="aiSetTitle">Настройки ИИ</b>
+      <span class="sp"></span>
+      <button class="sibtn" id="aiSetClose" type="button" title="Закрыть" aria-label="Закрыть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="ai-set-body">
+      <label><span class="lbl">Адрес прокси</span><input id="aiBase" type="url" spellcheck="false" placeholder="пусто = через сайт (как сейчас)"></label>
+      <label><span class="lbl">API-ключ</span><input id="aiKey" type="password" spellcheck="false" autocomplete="off" placeholder="нужен только для своего прокси"></label>
+      <label><span class="lbl">Модель</span>
+        <select id="aiModel">
+          <option value="deepseek-chat">deepseek-chat — быстрый</option>
+          <option value="deepseek-reasoner">deepseek-reasoner — эксперт</option>
+        </select>
+      </label>
+      <div class="ai-set-row">
+        <button class="m-btn primary" id="aiSave" type="button">СОХРАНИТЬ</button>
+        <a class="ai-link" id="aiPanelLink" href="#" target="_blank" rel="noopener">Панель прокси ↗</a>
+      </div>
+      <p class="ai-hint">По умолчанию вопросы идут через сам сайт: сервер сам обращается к ИИ, ключи вводить не нужно и работает это с любого устройства. Заполните адрес и ключ, только если хотите ходить в свой локальный прокси (тогда ключ хранится в этом браузере).</p>
     </div>
   </div>
 </div>
@@ -637,27 +689,27 @@
 <div id="toast" role="status"></div>
 <div id="printBook" aria-hidden="true"></div>
 
-<script src="js/01-core.js?v=09"></script>
-<script src="js/02-thesaurus.js?v=09"></script>
-<script src="js/03-snapshots.js?v=09"></script>
-<script src="js/04-state-seed.js?v=09"></script>
-<script src="js/05-chart.js?v=09"></script>
-<script src="js/06-marks.js?v=09"></script>
-<script src="js/07-layout.js?v=09"></script>
-<script src="js/08-declensions.js?v=09"></script>
-<script src="js/09-cooccurrence.js?v=09"></script>
-<script src="js/10-wiki-panel.js?v=09"></script>
-<script src="js/11-notes.js?v=09"></script>
-<script src="js/12-graph.js?v=09"></script>
-<script src="js/13-wiki-modal.js?v=09"></script>
-<script src="js/14-search.js?v=09"></script>
-<script src="js/15-editor.js?v=09"></script>
-<script src="js/16-accounts.js?v=09"></script>
-<script src="js/17-start.js?v=09"></script>
-<script src="js/18-voice.js?v=09"></script>
-<script src="js/19-mobile-reader.js?v=09"></script>
-<script src="js/20-sync.js?v=09"></script>
-<script src="js/21-shared.js?v=09"></script>
-<script src="js/22-assistant.js?v=09"></script>
+<script src="js/01-core.js?v=10"></script>
+<script src="js/02-thesaurus.js?v=10"></script>
+<script src="js/03-snapshots.js?v=10"></script>
+<script src="js/04-state-seed.js?v=10"></script>
+<script src="js/05-chart.js?v=10"></script>
+<script src="js/06-marks.js?v=10"></script>
+<script src="js/07-layout.js?v=10"></script>
+<script src="js/08-declensions.js?v=10"></script>
+<script src="js/09-cooccurrence.js?v=10"></script>
+<script src="js/10-wiki-panel.js?v=10"></script>
+<script src="js/11-notes.js?v=10"></script>
+<script src="js/12-graph.js?v=10"></script>
+<script src="js/13-wiki-modal.js?v=10"></script>
+<script src="js/14-search.js?v=10"></script>
+<script src="js/15-editor.js?v=10"></script>
+<script src="js/16-accounts.js?v=10"></script>
+<script src="js/17-start.js?v=10"></script>
+<script src="js/18-voice.js?v=10"></script>
+<script src="js/19-mobile-reader.js?v=10"></script>
+<script src="js/20-sync.js?v=10"></script>
+<script src="js/21-shared.js?v=10"></script>
+<script src="js/22-assistant.js?v=10"></script>
 </body>
 </html>

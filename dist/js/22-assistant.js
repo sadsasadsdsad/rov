@@ -31,8 +31,13 @@
 
 /* ── Конфигурация ──────────────────────────────────────────────────────── */
 var AI_LS='chernovik.ai.v1';
+var AI_TH_LS='chernovik.ai.threads.v1'; /* история диалогов (localStorage) */
 var aiCfg={base:'',key:'',model:'deepseek-chat'}; /* base='' → релей /api/ai.php */
-var aiHist=[];                 /* [{role,content,think?}] — история чата */
+var aiThreads=[];               /* [{id,title,ctx,hist,ts}] — диалоги (страница) */
+var aiCur=null;                 /* активный диалог */
+var aiHist=[];                  /* hist активного диалога (алиас — код ниже не менялся) */
+var aiSeq=0;                    /* номер запроса: старый колбэк не гасит busy нового */
+var aiSaveTimer=0;              /* отложенный save истории */
 var aiBusy=false;              /* идёт ли генерация */
 var aiAbort=null;              /* AbortController текущего запроса */
 var aiErrMsg='';               /* текст последней ошибки в ленте */
@@ -52,7 +57,7 @@ var aiThinkOpen=-1;            /* индекс сообщения с раскр�
    эвристике): ассеты подгружаются свежие, а разметка — прошлая, и панель ИИ
    в ней просто отсутствует. document.currentScript живёт только во время
    выполнения скрипта, поэтому значение фиксируем здесь, сразу. */
-var AI_HTML_V='09';
+var AI_HTML_V='10';
 var AI_SRC=(typeof document!=='undefined'&&document.currentScript&&document.currentScript.src)||'';
 
 function aiEl(id){return document.getElementById(id)}
@@ -142,13 +147,174 @@ function aiSelectionRaw(){
   }catch(e){return ''}
 }
 
+/* ── Диалоги: история в localStorage (страница #aiPage + панель) ───────── */
+/* Активный диалог один на обе ленты (data-aimsgs): aiHist — алиас его hist.
+   ctx снимается при создании диалога (книга/глава/текст), чтобы вопросы
+   с страницы шли с тем же контекстом, с каким диалог начат. */
+function aiCtxSnap(){
+  var b=null;try{b=book()}catch(e){}
+  var t=aiBookTitle(),ch=aiChTitle(),txt=aiChText();
+  /* книга не открыта (страница без редактора) — берём контекст активного
+     диалога, если он есть (быстрый чат продолжается) */
+  if(!t&&aiCur&&aiCur.ctx){t=aiCur.ctx.book;ch=aiCur.ctx.ch;txt=aiCur.ctx.chText}
+  return {bookId:b&&b.id?b.id:'',book:t,ch:ch,chText:aiCut(txt||'',9000)};
+}
+/* Контекст для промпта: живой текст — если открыта та же книга, о которой
+   диалог; иначе снимок из диалога (не подмешиваем чужую книгу) */
+function aiCtxNow(){
+  var c=(aiCur&&aiCur.ctx)||{};
+  var live=aiCtxSnap();
+  if(c.bookId&&live.bookId&&c.bookId!==live.bookId)
+    return {title:c.book,ch:c.ch,text:c.chText};
+  if(c.bookId)
+    return {title:live.bookId===c.bookId?live.book:c.book,
+            ch:live.bookId===c.bookId?live.ch:c.ch,
+            text:live.bookId===c.bookId?(live.chText||c.chText):c.chText};
+  return {title:live.book,ch:live.ch,text:live.chText};
+}
+/* Массив истории, которому принадлежит сообщение m (на время потока
+   активный диалог может смениться — работаем с найденным массивом) */
+function aiFeedOf(m){
+  if(!m)return aiHist;
+  if(aiHist.indexOf(m)>=0)return aiHist;
+  for(var i=0;i<aiThreads.length;i++)
+    if(aiThreads[i].hist.indexOf(m)>=0)return aiThreads[i].hist;
+  return aiHist;
+}
+function aiThreadTouch(q){
+  if(!aiCur)return;
+  if(!aiCur.title&&q)aiCur.title=aiCut(q,42);   /* имя диалога = первый вопрос */
+  aiCur.ts=Date.now();
+  var i=aiThreads.indexOf(aiCur);
+  if(i>0){aiThreads.splice(i,1);aiThreads.unshift(aiCur)} /* активный — наверх */
+  aiSaveThreads();
+}
+function aiNewThread(){
+  var th={id:uid()+'-'+Date.now().toString(36),title:'',ctx:aiCtxSnap(),hist:[],ts:Date.now()};
+  aiThreads.unshift(th);
+  aiCur=th;aiHist=th.hist;aiThinkOpen=-1;
+  aiTrimThreads();aiSaveThreads();
+  aiRenderThreads();aiRenderCtx();aiRender();
+  return th;
+}
+function aiSwitchThread(id){
+  var th=null;
+  for(var i=0;i<aiThreads.length;i++)if(aiThreads[i].id===id)th=aiThreads[i];
+  if(!th||th===aiCur)return;
+  aiStop();aiBusy=false;aiErrMsg='';aiRetryPending=false;
+  if(aiRetryTimer){clearTimeout(aiRetryTimer);aiRetryTimer=0}
+  aiCur=th;aiHist=th.hist;aiThinkOpen=-1;
+  aiSetBusy(false);aiSaveThreads();
+  aiRenderThreads();aiRenderCtx();aiRender();
+}
+function aiDelThread(id){
+  var i,th=null;
+  for(i=0;i<aiThreads.length;i++)if(aiThreads[i].id===id){th=aiThreads[i];break}
+  if(!th)return;
+  if(th===aiCur){aiStop();aiBusy=false;aiSetBusy(false)}
+  aiThreads.splice(i,1);
+  if(th===aiCur){
+    if(aiThreads.length)aiSwitchThread(aiThreads[0].id);
+    else aiNewThread();
+    return;
+  }
+  aiSaveThreads();aiRenderThreads();
+}
+function aiTrimThreads(){while(aiThreads.length>20)aiThreads.pop()}
+/* Сериализация: режем поля по размеру — история живёт в localStorage.
+   Форма action — такая же, как в памяти: {plan:{…}, done} (раньше здесь
+   была плоская форма, и загрузчик отбрасывал карточку — баг) */
+function aiThreadSave(t){
+  return {id:t.id,title:t.title,ts:t.ts,ctx:t.ctx,
+    hist:t.hist.slice(-40).map(function(m){
+      var a=null;
+      if(m.action&&m.action.plan){
+        var p=m.action.plan;
+        a={done:m.action.done||'',
+           plan:{action:p.action,title:p.title,
+                 content:p.content?aiCut(p.content,2000):''}};
+        if(p.chapters)a.plan.chapters=p.chapters.slice(0,10).map(function(c){
+          return {title:c.title,content:aiCut(c.content,1500)};
+        });
+      }
+      return {role:m.role,content:aiCut(String(m.content==null?'':m.content),4000),
+              think:m.think?aiCut(m.think,1200):'',action:a,noFmt:m.noFmt?1:0};
+    })};
+}
+function aiSaveThreads(){
+  if(aiSaveTimer)return;
+  aiSaveTimer=setTimeout(function(){
+    aiSaveTimer=0;
+    if(!aiThreads.length)return;
+    try{
+      localStorage.setItem(AI_TH_LS,JSON.stringify(aiThreads.map(aiThreadSave)));
+    }catch(e){                                   /* квота — отсекаем старое */
+      try{
+        aiThreads=aiThreads.slice(0,6);
+        localStorage.setItem(AI_TH_LS,JSON.stringify(aiThreads.map(aiThreadSave)));
+        if(aiThreads.indexOf(aiCur)<0){aiCur=aiThreads[0];aiHist=aiCur.hist}
+        aiRenderThreads();
+      }catch(e2){}
+    }
+  },400);
+}
+function aiLoadThreads(){
+  aiThreads=[];
+  try{
+    var raw=localStorage.getItem(AI_TH_LS);
+    var arr=raw?JSON.parse(raw):[];
+    if(Array.isArray(arr))arr.forEach(function(t){
+      if(!t||typeof t!=='object'||!Array.isArray(t.hist)||!t.hist.length)return;
+      aiThreads.push({
+        id:String(t.id||uid()),title:String(t.title||''),ts:+t.ts||Date.now(),
+        ctx:{bookId:String(t.ctx&&t.ctx.bookId||''),book:String(t.ctx&&t.ctx.book||''),
+             ch:String(t.ctx&&t.ctx.ch||''),chText:String(t.ctx&&t.ctx.chText||'')},
+        hist:t.hist.filter(function(m){return m&&(m.role==='user'||m.role==='assistant')})
+          .map(function(m){
+            /* принимаем обе формы: {plan:{…},done} и плоскую (старые записи) */
+            var a=(m.action&&(m.action.plan||m.action.action))?m.action:null;
+            var plan=a?(a.plan||a):null;
+            return {role:m.role,content:String(m.content||''),think:String(m.think||''),
+                    noFmt:!!m.noFmt,
+                    action:(plan&&(plan.action||plan.title))?
+                      {plan:plan,done:String(a.done||plan.done||'')}:null};
+          })
+      });
+    });
+  }catch(e){}
+  aiThreads.sort(function(a,b){return b.ts-a.ts});
+  aiTrimThreads();
+  if(aiThreads.length){aiCur=aiThreads[0];aiHist=aiCur.hist}
+  else aiNewThread();
+}
+function aiFmtTs(ts){
+  var d=new Date(ts),n=new Date();
+  function p2(x){return('0'+x).slice(-2)}
+  if(d.toDateString()===n.toDateString())return p2(d.getHours())+':'+p2(d.getMinutes());
+  var y=new Date(n.getTime()-86400000);
+  if(d.toDateString()===y.toDateString())return 'вчера';
+  return p2(d.getDate())+'.'+p2(d.getMonth()+1);
+}
+function aiRenderThreads(){
+  var box=aiEl('aiThreads');
+  if(!box)return;
+  var h='';
+  aiThreads.forEach(function(t){
+    var meta=(t.ctx&&t.ctx.book?'«'+aiCut(t.ctx.book,18)+'» · ':'')+aiFmtTs(t.ts);
+    h+='<div class="ai-thread'+(t===aiCur?' on':'')+'" role="listitem" data-aith="'+esc(t.id)+'" title="'+esc(t.title||'Новый чат')+'">'+
+       '<span class="t">'+esc(t.title||'Новый чат')+'</span>'+
+       '<span class="m">'+esc(meta)+'</span>'+
+       '<button class="del" type="button" data-aithdel="'+esc(t.id)+'" title="Удалить диалог" aria-label="Удалить диалог">×</button></div>';
+  });
+  box.innerHTML=h;
+}
+
 /* Системный промпт: книга + глава + её текст + опциональное выделение */
 function aiSystemPrompt(extra){
   var s='Ты — ассистент в приложении «Черновик» (чтение и правка рукописей).';
-  var title=aiBookTitle(), ch=aiChTitle();
+  var cx=aiCtxNow(), title=cx.title, ch=cx.ch;
   if(title)s+='\nКнига: «'+title+'».'+(ch?'\nТекущая глава: «'+ch+'».':'');
-  var txt=aiChText();
-  if(txt)s+='\n\nТекущий текст главы (может быть обрезан):\n"""\n'+aiCut(txt,9000)+'\n"""';
+  if(cx.text)s+='\n\nТекущий текст главы (может быть обрезан):\n"""\n'+aiCut(cx.text,9000)+'\n"""';
   if(extra)s+='\n\n'+extra;
   /* Действия: модель сама создаёт книги/главы — отвечает JSON, лента
      рисует карточку с планом, исполняет пользователь по кнопке.
@@ -236,10 +402,10 @@ function aiRequest(messages,onDelta,onDone,onErr){
       onDelta(t,isThink);
     });
   }).then(function(){
-    aiAbort=null;
+    if(aiAbort===ctrl)aiAbort=null;
     onDone(full);
   }).catch(function(e){
-    aiAbort=null;
+    if(aiAbort===ctrl)aiAbort=null;
     onErr(e);                                /* AbortError обрабатывает вызывающий */
   });
 }
@@ -283,34 +449,16 @@ function aiCleanOut(t){
   return t;
 }
 
-/* ── Индикаторы в шапке панели ─────────────────────────────────────────── */
+/* ── Индикатор связи: крохотная точка в шапках (без надписей) ─────────── */
 function aiPing(){
-  var st=aiEl('aiStatus');
-  if(!st)return Promise.resolve(false);
-  var txt=st.querySelector('.txt');
-  if(txt)txt.textContent='Проверяю связь с ИИ…';
-  st.classList.remove('err');
   return aiFetch(aiUrl('models'),{headers:aiHeaders(),method:'GET'},6000)
     .then(function(r){return {ok:r.ok,status:r.status}})
     .catch(function(){return {ok:false,status:0}})
     .then(function(s){
-      var el=aiEl('aiStatus');
-      if(el){
-        var t=el.querySelector('.txt');
-        var msg;
-        if(s.ok)msg='DeepSeek на связи'+(aiOwnProxy()?' (свой прокси)':' (через сайт)');
-        else if(s.status===401||s.status===403)msg=aiOwnProxy()?'Нужен API-ключ — настройки ⚙':'Доступ к ИИ запрещён';
-        else if(s.status===404)msg='Эндпоинт ИИ не найден — обновите сайт';
-        else if(s.status===429)msg='Слишком много запросов — минуту и снова';
-        else if(s.status>=500)msg='DeepSeek временно недоступен — проверим через минуту';
-        else if(s.status)msg='Запрос отклонён (HTTP '+s.status+')';
-        else msg='Сервер не отвечает';
-        if(t)t.textContent=msg;
-        el.classList.toggle('err',!s.ok);
-      }
-      aiRenderCtx();
-      /* индикатор связи на кнопках открытия (.ai-open) */
-      aiFabs().forEach(function(f){f.classList.toggle('ok',!!s.ok);f.classList.toggle('err',!s.ok)});
+      Array.prototype.forEach.call(document.querySelectorAll('[data-aidot]'),function(d){
+        d.classList.toggle('ok',!!s.ok);
+        d.classList.toggle('err',!s.ok);
+      });
       if(s.ok){
         if(aiPingTimer){clearTimeout(aiPingTimer);aiPingTimer=0}
       }else if(!aiPingTimer){
@@ -320,14 +468,23 @@ function aiPing(){
     });
 }
 
-/* Строка контекста: глава + выделение (живое, по selectionchange) */
-function aiRenderCtx(){
-  var el=aiEl('aiCtx');
-  if(!el)return;
-  var ch=aiChTitle(), sel=aiSelection(), parts=[];
-  if(ch)parts.push('глава «'+aiCut(ch,26)+'»');
+/* Строка контекста: книга/глава диалога + живое выделение (selectionchange) */
+function aiCtxLabel(){
+  var c=(aiCur&&aiCur.ctx)||{}, parts=[];
+  var cx=aiCtxNow();
+  var bt=cx.title||c.book;
+  if(bt)parts.push('«'+aiCut(bt,22)+'»');
+  if(cx.ch||c.ch)parts.push('глава «'+aiCut(cx.ch||c.ch,18)+'»');
+  var sel=aiSelection();
   if(sel)parts.push('выделено '+sel.length+' зн.');
-  el.textContent=parts.length?('Контекст: '+parts.join(' · ')):'Контекст: вся глава';
+  return parts.length?parts.join(' · '):'без контекста книги';
+}
+function aiRenderCtx(){
+  var t=aiCtxLabel();
+  var a=aiEl('aiPanelCtx');if(a)a.textContent=t;
+  var b=aiEl('aiPgCtx');if(b)b.textContent=t;
+  var ti=aiEl('aiPgTitle');
+  if(ti)ti.textContent=(aiCur&&aiCur.title)?aiCur.title:'Новый чат';
 }
 
 /* ── Панель чата ───────────────────────────────────────────────────────── */
@@ -357,18 +514,50 @@ function aiTogglePanel(){
   if(!p)return;
   if(p.classList.contains('on'))aiClosePanel();else aiOpenPanel();
 }
+
+/* ── Полностраничный чат (#aiPage): поверх всех видов, «Назад» = закрыть ─ */
+var aiPgFromPanel=false;         /* открыта из панели — по «Назад» вернуть её */
+function aiShowPage(){
+  var pg=aiEl('aiPage');
+  if(!pg)return;
+  if(!aiCur)aiNewThread();
+  var panel=aiEl('aiPanel');
+  aiPgFromPanel=!!(panel&&panel.classList.contains('on'));
+  pg.hidden=false;
+  viewIn(pg);
+  aiClosePanel();
+  aiRenderThreads();aiRenderCtx();aiRender();
+  aiPing();
+  var side=aiEl('aiSide');if(side)side.classList.remove('open');
+  setTimeout(function(){var i=aiEl('aiPgInput');if(i&&!aiBusy)i.focus()},60);
+}
+function aiHidePage(){
+  var pg=aiEl('aiPage');
+  if(!pg||pg.hidden)return;
+  pg.hidden=true;
+  var side=aiEl('aiSide');if(side)side.classList.remove('open');
+  if(aiPgFromPanel){aiPgFromPanel=false;aiOpenPanel()}
+}
+
 function aiToggleSettings(){
-  var s=aiEl('aiSet');
-  if(!s)return;
-  s.hidden=!s.hidden;
+  var m=aiEl('aiSetModal');
+  if(!m)return;
+  var open=!m.classList.contains('on');
+  m.classList.toggle('on',open);
   var g=aiEl('aiGear');
-  if(g)g.setAttribute('aria-expanded',String(!s.hidden));
-  if(!s.hidden){
+  if(g)g.setAttribute('aria-expanded',String(open));
+  if(open){
     aiEl('aiBase').value=aiCfg.base;
     aiEl('aiKey').value=aiCfg.key;
     aiEl('aiModel').value=aiCfg.model;
     aiEl('aiBase').focus();
   }
+}
+function aiCloseSettings(){
+  var m=aiEl('aiSetModal');
+  if(m)m.classList.remove('on');
+  var g=aiEl('aiGear');
+  if(g)g.setAttribute('aria-expanded','false');
 }
 function aiSaveSettings(){
   var b=String(aiEl('aiBase').value||'').trim().replace(/\/+$/,'');
@@ -377,7 +566,7 @@ function aiSaveSettings(){
   aiCfg.key=String(aiEl('aiKey').value||'').trim();
   aiCfg.model=String(aiEl('aiModel').value||'deepseek-chat');
   aiSaveCfg();
-  aiEl('aiSet').hidden=true;
+  aiCloseSettings();
   aiSyncLink();
   aiPing();
 }
@@ -408,11 +597,19 @@ function aiChatFmt(s){
   t=t.replace(/[ \t]{2,}/g,' ').replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n');
   return t;
 }
-/* Рендер ленты (innerHTML + esc — как в остальных модулях) */
+/* Рендер ленты (innerHTML + esc — как в остальных модулях).
+   Ленты две (панель + страница, data-aimsgs) — собираем html один раз */
 function aiRender(){
-  var box=aiEl('aiMsgs');
-  if(!box)return;
-  var pinned=(box.scrollHeight-box.scrollTop-box.clientHeight)<48;
+  var boxes=document.querySelectorAll('[data-aimsgs]');
+  if(!boxes.length)return;
+  var h=aiRenderHtml();
+  Array.prototype.forEach.call(boxes,function(box){
+    var pinned=(box.scrollHeight-box.scrollTop-box.clientHeight)<48;
+    box.innerHTML=h;
+    if(pinned)box.scrollTop=box.scrollHeight;
+  });
+}
+function aiRenderHtml(){
   var h='',prevRole='';
   if(!aiHist.length){
     h+='<div class="ai-empty"><span class="ai-spark">'+AI_SPARK+'</span><b>ИИ-ассистент</b>'+
@@ -449,8 +646,7 @@ function aiRender(){
   }
   if(aiErrMsg)h+='<div class="ai-err"><span>'+esc(aiErrMsg)+'</span>'+
     (aiRetryPending?'<button class="retry" type="button" data-airetry="1">ПОВТОРИТЬ</button>':'')+'</div>';
-  box.innerHTML=h;
-  if(pinned)box.scrollTop=box.scrollHeight;
+  return h;
 }
 function aiShowErr(e){
   aiErrMsg='Не получилось: '+(e&&e.message?e.message:String(e));
@@ -459,11 +655,47 @@ function aiShowErr(e){
 }
 
 /* ── Отправка сообщения ────────────────────────────────────────────────── */
+/* Активное поле ввода: страница открыта — её поле, иначе панельное */
+function aiField(){
+  var pg=aiEl('aiPage');
+  if(pg&&!pg.hidden)return aiEl('aiPgInput');
+  return aiEl('aiInput');
+}
+function aiAutosize(el){
+  el.style.height='auto';
+  var h=Math.min(el.scrollHeight,110);
+  el.style.height=h+'px';
+  /* полоса прокрутки — только когда текст реально не влезает (баг:
+     полоса мигала на одной строке из-за округления scrollHeight) */
+  el.style.overflowY=el.scrollHeight>h?'auto':'hidden';
+}
+function aiBindInput(el){
+  if(!el)return;
+  el.addEventListener('keydown',function(e){
+    /* isComposable/229 — Enter во время ввода через IME не должен отправлять */
+    if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){
+      e.preventDefault();aiSendMsg();
+    }
+  });
+  el.addEventListener('input',function(){aiAutosize(el)});
+}
 function aiSendMsg(){
   if(aiBusy){aiStop();return}
-  var inp=aiEl('aiInput');
-  var q=String(inp&&inp.value||'').trim();
+  /* первым делом — поле той поверхности, где пользователь (страница или
+     панель): брать «первое непустое» было неверно — текст из свёрнутой
+     панели уезжал вместо набранного на странице */
+  var primary=aiField();
+  var q='',used=null;
+  if(primary&&String(primary.value||'').trim()){
+    q=String(primary.value).trim();used=primary;
+  }else{
+    Array.prototype.forEach.call(document.querySelectorAll('.ai-foot textarea'),function(t){
+      var v=String(t.value||'').trim();
+      if(v&&!q){q=v;used=t}
+    });
+  }
   if(!q)return;
+  if(used){used.value='';used.style.height='auto';used.style.overflowY='hidden'}
   aiAsk(q,false);
 }
 
@@ -471,7 +703,7 @@ function aiSendMsg(){
    не дублируем его и не трогаем поле ввода */
 function aiAsk(q,isRetry){
   if(aiOwnProxy()&&!aiCfg.key){
-    if(aiEl('aiSet')&&aiEl('aiSet').hidden)aiToggleSettings();
+    if(aiEl('aiSetModal')&&!aiEl('aiSetModal').classList.contains('on'))aiToggleSettings();
     aiShowErr(new Error('укажите API-ключ прокси (⚙ настройки)'));
     return;
   }
@@ -479,13 +711,18 @@ function aiAsk(q,isRetry){
   if(!isRetry){
     aiRetried=false;
     if(aiRetryTimer){clearTimeout(aiRetryTimer);aiRetryTimer=0}
+    aiThreadTouch(q);                        /* имя диалога + наверх списка */
+    if(aiCur&&!aiCur.ctx.bookId)aiCur.ctx=aiCtxSnap(); /* пустой контекст — подхватываем книгу */
   }
   var sel=isRetry?'':aiSelection();   /* выделение к моменту повтора могло сняться */
   var sys=aiSystemPrompt(sel?('\nВыделенный фрагмент (учти в ответе):\n«'+aiCut(sel,4000)+'»'):'' );
 
-  var last=aiHist[aiHist.length-1];
+  var feed=aiHist;                /* история ЭТОГО диалога: во время потока её можно
+                                     сменить — колбэки работают с feed, не с aiHist */
+  var my=++aiSeq;
+  var last=feed[feed.length-1];
   var inHist=isRetry&&last&&last.role==='user'&&last.content===q;
-  var hist=aiHist.slice();
+  var hist=feed.slice();
   if(inHist)hist.pop();               /* последний user-q добавим сами ниже */
 
   var apiMsgs=[{role:'system',content:sys}];
@@ -494,12 +731,13 @@ function aiAsk(q,isRetry){
   });
   apiMsgs.push({role:'user',content:q});
 
-  if(!inHist)aiHist.push({role:'user',content:q});
+  if(!inHist)feed.push({role:'user',content:q});
   var ass={role:'assistant',content:'',think:''};
-  aiHist.push(ass);
+  feed.push(ass);
   aiBusy=true;
-  var inp=aiEl('aiInput');
-  if(inp&&!isRetry){inp.value='';inp.style.height='auto'}
+  Array.prototype.forEach.call(document.querySelectorAll('.ai-foot textarea'),function(t){
+    if(!isRetry){t.value='';t.style.height='auto';t.style.overflowY='hidden'}
+  });
   aiSetBusy(true);
   aiRender();
 
@@ -509,39 +747,46 @@ function aiAsk(q,isRetry){
       aiRender();
     },
     function(){
-      aiBusy=false;aiSetBusy(false);
+      if(my===aiSeq){aiBusy=false;aiSetBusy(false)}
       if(!ass.content)ass.content=ass.think?'(без текста — см. рассуждение выше)':'(пустой ответ)';
       aiTryAction(ass,q);                   /* вдруг модель прислала действие */
-      aiRetried=false;aiRetryPending=false;
+      if(my===aiSeq){aiRetried=false;aiRetryPending=false}
+      aiSaveThreads();
       aiRender();
     },
     function(e){
-      aiBusy=false;aiSetBusy(false);
+      var same=my===aiSeq&&feed===aiHist;   /* тот же диалог и запрос — показываем ошибку */
+      if(same){aiBusy=false;aiSetBusy(false)}
       if(e&&e.name==='AbortError'){           /* «Стоп» — не ошибка */
         if(!ass.content)ass.content='(остановлено)';
-        aiRender();return;
+        aiSaveThreads();aiRender();return;
       }
-      aiHist.pop();                           /* убираем пустого ассистента */
-      aiShowErr(e);
-      aiMaybeRetry(q,e);
+      feed.pop();                           /* убираем пустого ассистента */
+      aiSaveThreads();
+      if(same){aiShowErr(e);aiMaybeRetry(q,e)}
+      else aiRender();
     });
 }
 function aiSetBusy(b){
-  var btn=aiEl('aiSend');
-  if(btn){
+  Array.prototype.forEach.call(document.querySelectorAll('.ai-send'),function(btn){
     btn.classList.toggle('busy',!!b);
     btn.title=b?'Остановить генерацию':'Отправить (Enter)';
     /* во время генерации кнопка — «Стоп» (квадрат), а не стрелка:
        иначе клик «остановить» выглядит как повторная отправка */
     btn.innerHTML=b?AI_STOP_SVG:AI_SEND_SVG;
-  }
+  });
 }
 function aiStop(){if(aiAbort){try{aiAbort.abort()}catch(e){}}}
 function aiClearHist(){
   aiStop();
-  aiHist=[];aiBusy=false;aiErrMsg='';aiSetBusy(false);
+  if(aiCur){                          /* aiHist — алиас hist активного диалога */
+    aiCur.hist.length=0;aiHist=aiCur.hist;
+    aiCur.title='';aiCur.ts=Date.now();aiSaveThreads();
+  }else aiHist=[];
+  aiBusy=false;aiErrMsg='';aiSetBusy(false);
   aiRetryPending=false;aiRetried=false;aiThinkOpen=-1;
   if(aiRetryTimer){clearTimeout(aiRetryTimer);aiRetryTimer=0}
+  aiRenderThreads();aiRenderCtx();
   aiRender();
 }
 
@@ -722,6 +967,15 @@ function aiPromisedAction(s){
   if(!/(Создать книгу|Добавить главу|Заменить главу)/.test(s))return false;
   return /(Нажмите|нажмите|нажми|по кнопке|кнопку|кнопка)/.test(s);
 }
+/* Честная замена: вместо вводящего в заблуждение «нажмите кнопку»
+   (кнопки-то не из чего построить) — прямой ответ. Вызывается, когда
+   и исходный ответ, и автопочинка закончились без JSON */
+function aiActionFailed(m){
+  var s=String(m.content==null?'':m.content);
+  if(!aiPromisedAction(s))return;         /* обычный текст — не трогаем */
+  m.content='Модель не прислала данные для создания — кнопка не появилась. '+
+            'Попробуйте спросить ещё раз.';
+}
 /* Для истории API: у сообщений с действием отдаём компактный JSON —
    модель видит свой «формат ответа», а не саммити «нажмите кнопку»
    (иначе она начинает повторять саммити текстом без JSON) */
@@ -746,8 +1000,9 @@ function aiFixAction(m,q){
   m.content='';
   var msgs=[{role:'system',content:aiSystemPrompt('')+
     '\n\nВАЖНО: твой предыдущий ответ был обычным текстом, а нужен ответ-действие — РОВНО один JSON-объект из инструкции выше: первый символ {, последний }. Без пояснений, без списков и без фразы «нажмите кнопку».'}];
-  var idx=aiHist.indexOf(m);
-  aiHist.slice(0,idx<0?aiHist.length:idx).slice(-10).forEach(function(x){
+  var feed=aiFeedOf(m);               /* m может жить не в активном диалоге */
+  var idx=feed.indexOf(m);
+  feed.slice(0,idx<0?feed.length:idx).slice(-10).forEach(function(x){
     msgs.push({role:x.role,content:aiActionMsg(x)});
   });
   aiBusy=true;aiSetBusy(true);aiRender();
@@ -761,12 +1016,14 @@ function aiFixAction(m,q){
         m.content=aiActionSummary(plan);
       }else{
         m.content=saved;               /* не вышло — оставляем исходный ответ */
+        aiActionFailed(m);             /* …но честно, если там «нажмите кнопку» */
       }
-      aiRender();
+      aiSaveThreads();aiRender();
     },
     function(){
       aiBusy=false;aiSetBusy(false);m.repairing=false;
-      m.content=saved;aiRender();      /* сбой уточнения — не трогаем ответ */
+      m.content=saved;aiActionFailed(m);
+      aiSaveThreads();aiRender(); /* сбой уточнения — не трогаем ответ */
     });
 }
 /* Завершённый ответ: распознаём действие и подменяем текст резюме */
@@ -780,6 +1037,9 @@ function aiTryAction(m,q){
     m.content=aiActionSummary(plan);
   }else if(aiPromisedAction(m.content)&&q!=null&&!m.actFix){
     aiFixAction(m,q);                  /* пообещала кнопку без JSON — уточняем */
+  }else if(aiPromisedAction(m.content)){
+    /* уточнение уже было и не помогло — говорим честно (без «нажмите кнопку») */
+    aiActionFailed(m);
   }else if(looks){
     m.content=aiCut(m.content,600)+'\n\n(структура не разобралась — попросите ещё раз)';
     m.noFmt=true;                     /* это остаток JSON — не трогаем кавычки */
@@ -892,6 +1152,7 @@ function aiRunAction(idx){
   }catch(ex){err=String(ex&&ex.message?ex.message:ex)}
   if(err){toast(err);return}
   m.action.done=done;
+  aiSaveThreads();                       /* «выполнено» переживёт перезагрузку */
   aiRender();
   toast(done);
 }
@@ -904,7 +1165,7 @@ function aiTransform(kind,btn){
   if(!src){toast('Сначала выделите текст');return}
   if(aiOwnProxy()&&!aiCfg.key){
     aiOpenPanel();
-    if(aiEl('aiSet')&&aiEl('aiSet').hidden)aiToggleSettings();
+    if(aiEl('aiSetModal')&&!aiEl('aiSetModal').classList.contains('on'))aiToggleSettings();
     toast('Укажите API-ключ прокси');
     return;
   }
@@ -1256,38 +1517,76 @@ function aiInit(){
   aiEl('aiClear').addEventListener('click',aiClearHist);
   aiEl('aiSend').addEventListener('click',aiSendMsg);
   aiEl('aiSave').addEventListener('click',aiSaveSettings);
-  /* «Повторить» и кнопки действий (карточки) — делегирование, их рисует aiRender */
-  aiEl('aiMsgs').addEventListener('click',function(e){
+
+  /* ── Полностраничный чат: страница #aiPage (история диалогов слева) ── */
+  aiLoadThreads();
+  aiRenderThreads();
+  var expand=aiEl('aiExpand');
+  if(expand)expand.addEventListener('click',aiShowPage);   /* панель → полный чат */
+  var back=aiEl('aiPgBack');
+  if(back)back.addEventListener('click',aiHidePage);
+  var pgSend=aiEl('aiPgSend');
+  if(pgSend)pgSend.addEventListener('click',aiSendMsg);
+  var pgGear=aiEl('aiPgGear');
+  if(pgGear)pgGear.addEventListener('click',aiToggleSettings);
+  var sideBtn=aiEl('aiPgSide'),side=aiEl('aiSide'),sideX=aiEl('aiSideClose');
+  if(sideBtn&&side)sideBtn.addEventListener('click',function(){side.classList.toggle('open')});
+  if(sideX&&side)sideX.addEventListener('click',function(){side.classList.remove('open')});
+  var newChat=aiEl('aiNewChat');
+  if(newChat)newChat.addEventListener('click',function(){
+    aiNewThread();
+    var i=aiEl('aiPgInput');if(i)i.focus();
+  });
+  var thBox=aiEl('aiThreads');                       /* переключение/удаление диалогов */
+  if(thBox)thBox.addEventListener('click',function(e){
     if(!e.target||!e.target.closest)return;
-    var a=e.target.closest('[data-aiact]');
-    if(a){aiRunAction(+a.getAttribute('data-aiact')||0);return}
-    if(e.target.closest('[data-airetry]'))aiRetryNow();
-  });
-  /* раскрытая «Рассуждением» деталь не должна схлопываться при каждом
-     рендере (стриминг пересобирает ленту целиком): запоминаем её индекс,
-     aiRender возвращает open по data-i. toggle не всплывает — фаза capture */
-  aiEl('aiMsgs').addEventListener('toggle',function(e){
-    var d=e.target;
-    if(!d||!d.classList||!d.classList.contains('ai-think'))return;
-    aiThinkOpen=d.open?(+d.getAttribute('data-i')||0):-1;
-  },true);
-
-  var inp=aiEl('aiInput');
-  inp.addEventListener('keydown',function(e){
-    /* isComposable/229 — Enter во время ввода через IME не должен отправлять */
-    if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){
-      e.preventDefault();aiSendMsg();
+    var del=e.target.closest('[data-aithdel]');
+    if(del){
+      var id=del.getAttribute('data-aithdel'),t=null;
+      aiThreads.forEach(function(x){if(x.id===id)t=x});
+      if(t&&(t.title||t.hist.length)&&!confirm('Удалить диалог «'+(t.title||'Без названия')+'»?'))return;
+      aiDelThread(id);return;
     }
-  });
-  inp.addEventListener('input',function(){
-    inp.style.height='auto';
-    inp.style.height=Math.min(inp.scrollHeight,110)+'px';
+    var row=e.target.closest('[data-aith]');
+    if(row)aiSwitchThread(row.getAttribute('data-aith'));
   });
 
-  /* быстрые вопросы под лентой */
+  /* настройки — общая модалка (⚙ панели и страницы);
+     guard: старая разметка в кэше может не содержать #aiSetModal */
+  var setClose=aiEl('aiSetClose');
+  if(setClose)setClose.addEventListener('click',aiCloseSettings);
+  var setModal=aiEl('aiSetModal');
+  if(setModal)setModal.addEventListener('click',function(e){
+    if(e.target===this)aiCloseSettings();
+  });
+
+  /* «Повторить» и кнопки действий (карточки) — делегирование, их рисует aiRender;
+     ленты обе (панель + страница) */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-aimsgs]'),function(box){
+    box.addEventListener('click',function(e){
+      if(!e.target||!e.target.closest)return;
+      var a=e.target.closest('[data-aiact]');
+      if(a){aiRunAction(+a.getAttribute('data-aiact')||0);return}
+      if(e.target.closest('[data-airetry]'))aiRetryNow();
+    });
+    /* раскрытая «Рассуждением» деталь не должна схлопываться при каждом
+       рендере (стриминг пересобирает ленту целиком): запоминаем её индекс,
+       aiRender возвращает open по data-i. toggle не всплывает — фаза capture */
+    box.addEventListener('toggle',function(e){
+      var d=e.target;
+      if(!d||!d.classList||!d.classList.contains('ai-think'))return;
+      aiThinkOpen=d.open?(+d.getAttribute('data-i')||0):-1;
+    },true);
+  });
+
+  aiBindInput(aiEl('aiInput'));
+  aiBindInput(aiEl('aiPgInput'));
+
+  /* быстрые вопросы под лентой — в активное поле ввода */
   Array.prototype.forEach.call(document.querySelectorAll('[data-aiq]'),function(b){
     b.addEventListener('click',function(){
-      var i=aiEl('aiInput');
+      var i=aiField();
+      if(!i)return;
       i.value=b.getAttribute('data-aiq');
       i.dispatchEvent(new Event('input'));
       i.focus();
@@ -1322,21 +1621,30 @@ function aiInit(){
     if(res&&res.classList.contains('on')){
       e.preventDefault();e.stopPropagation();aiCloseRes();return;
     }
+    var set=aiEl('aiSetModal');
+    if(set&&set.classList.contains('on')){
+      e.preventDefault();e.stopPropagation();aiCloseSettings();return;
+    }
     var p=aiEl('aiPanel');
     if(p&&p.classList.contains('on')){
       e.preventDefault();e.stopPropagation();
       if(document.activeElement===aiEl('aiInput'))aiEl('aiInput').blur();
       else aiClosePanel();
+      return;
+    }
+    var pg=aiEl('aiPage');
+    if(pg&&!pg.hidden){
+      e.preventDefault();e.stopPropagation();aiHidePage();
     }
   },true);
 
-  /* живой контекст в шапке панели */
+  /* живой контекст в шапках (панель и страница) */
   document.addEventListener('selectionchange',function(){
     if(aiCtxTimer)return;
     aiCtxTimer=setTimeout(function(){
       aiCtxTimer=0;
-      var p=aiEl('aiPanel');
-      if(p&&p.classList.contains('on'))aiRenderCtx();
+      var p=aiEl('aiPanel'),pg=aiEl('aiPage');
+      if((p&&p.classList.contains('on'))||(pg&&!pg.hidden))aiRenderCtx();
     },250);
   });
 }
