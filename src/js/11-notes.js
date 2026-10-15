@@ -112,9 +112,12 @@ function noteCard(n){
   bJump.addEventListener('click',function(e){e.stopPropagation();jumpToNote(n)});
   var bEdit=mk('button');bEdit.className='note-btn';bEdit.textContent='Изменить';
   bEdit.addEventListener('click',function(e){e.stopPropagation();editNote(n)});
+  var bMove=mk('button');bMove.className='note-btn';bMove.textContent='В главу…';
+  bMove.title='Привязать заметку к другой главе';
+  bMove.addEventListener('click',function(e){e.stopPropagation();moveNoteToChapter(n)});
   var bDel=mk('button');bDel.className='note-btn';bDel.textContent='Удалить';
   bDel.addEventListener('click',function(e){e.stopPropagation();deleteNote(n)});
-  acts.appendChild(bJump);acts.appendChild(bEdit);acts.appendChild(bDel);
+  acts.appendChild(bJump);acts.appendChild(bEdit);acts.appendChild(bMove);acts.appendChild(bDel);
   card.appendChild(acts);
   card.addEventListener('click',function(){card.classList.toggle('open')});
   return card;
@@ -124,7 +127,12 @@ function jumpToNote(n){
   if(b.current!==n.chId)openChapter(n.chId);
   setTimeout(function(){
     var el=null;
-    if(n.nid)el=editor.querySelector('.nb[data-nid="'+escAttr(n.nid)+'"]');
+    if(n.nid){
+      /* CSS.escape: escAttr экранирует HTML, но не спецсимволы CSS —
+        nid со «\» ломал querySelector (SyntaxError) */
+      var nidSel=(window.CSS&&CSS.escape)?CSS.escape(n.nid):escAttr(n.nid);
+      el=editor.querySelector('.nb[data-nid="'+nidSel+'"]');
+    }
     if(!el){
       var all=editor.querySelectorAll('.nb');
       el=all[n.nbIndex]||null;
@@ -135,7 +143,8 @@ function jumpToNote(n){
       }
     }
     if(!el){toast('Не удалось найти врезку');return}
-    el.scrollIntoView({block:'center',behavior:'smooth'});
+    /* prefers-reduced-motion: без плавной прокрутки */
+    el.scrollIntoView({block:'center',behavior:(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)?'auto':'smooth'});
     el.classList.add('nb-flash');
     setTimeout(function(){el.classList.remove('nb-flash')},1700);
     editor.focus();
@@ -149,6 +158,10 @@ function editNote(n){
   var ch=b.chapters.filter(function(c){return c.id===n.chId})[0];if(!ch)return;
   uiAsk({title:'Заметка',value:n.text,placeholder:'текст заметки',input:true,ok:'СОХРАНИТЬ'}).then(function(v){
     if(v===null)return;
+    /* гасим отложенный автосейв и досрочно фиксируем набранное: иначе
+       читка шла из ch.html без последних ≤600 мс, и loadChapter затирал их */
+    clearTimeout(saveTimer);
+    try{commitNow()}catch(e){}
     var d=tmp(ch.html);
     var el=noteElIn(d,n);
     if(!el){toast('Не удалось найти врезку');return}
@@ -156,9 +169,45 @@ function editNote(n){
     ch.html=d.innerHTML;
     b.updated=Date.now();                 /* H5: структурная правка уезжает на сервер */
     persist();invalidateCo();
+    lastCaretOffset=null;
     if(b.current===ch.id&&!workspace.hidden)loadChapter(ch);
     renderNotes();
     toast('Заметка обновлена');
+  });
+}
+/* перенос врезки в другую главу: .nb физически переезжает из ch.html
+   в html целевой главы (перед финальным пустым абзацем) */
+function moveNoteToChapter(n){
+  if(isReadOnly())return;
+  var b=book();if(!b)return;
+  var from=b.chapters.filter(function(c){return c.id===n.chId})[0];if(!from)return;
+  var vis=visibleChapters(b).filter(function(c){return c.id!==from.id});
+  if(!vis.length){toast('В книге нет других глав');return}
+  var names=vis.map(function(c){return (b.chapters.indexOf(c)+1)+'. '+chapterTitle(c)}).join('\n');
+  uiAsk({title:'В какую главу перенести заметку?',message:names,value:String(b.chapters.indexOf(from)+1),placeholder:'номер главы',input:true,ok:'ПЕРЕНЕСТИ'}).then(function(v){
+    if(v===null)return;
+    var idx=parseInt(String(v).replace(/\D/g,''),10)-1;
+    var to=b.chapters[idx];
+    if(!to||to.id===from.id){toast('Некорректный номер главы');return}
+    clearTimeout(saveTimer);
+    try{commitNow()}catch(e){}
+    var d1=tmp(from.html);
+    var el=noteElIn(d1,n);
+    if(!el){toast('Не удалось найти врезку');return}
+    var node=el;
+    el.parentNode.removeChild(el);
+    from.html=d1.innerHTML;
+    var d2=tmp(to.html);
+    var last=d2.lastElementChild;
+    if(last&&last.tagName==='P'&&!last.textContent.trim())d2.insertBefore(node,last);
+    else{d2.appendChild(node);var p=mk('p');d2.appendChild(p)}
+    to.html=d2.innerHTML;
+    b.updated=Date.now();                 /* H5 */
+    persist();invalidateCo();
+    lastCaretOffset=null;
+    if(b.current===from.id&&!workspace.hidden)loadChapter(from);
+    renderNotes();
+    toast('Заметка перенесена в «'+chapterTitle(to)+'»');
   });
 }
 function deleteNote(n){
@@ -167,12 +216,15 @@ function deleteNote(n){
   var ch=b.chapters.filter(function(c){return c.id===n.chId})[0];if(!ch)return;
   uiConfirm('Удалить заметку?','Текст врезки будет стёрт безвозвратно.',true).then(function(ok){
     if(!ok)return;
+    clearTimeout(saveTimer);            /* иначе отложенный автосейв вернёт врезку из DOM */
+    try{commitNow()}catch(e){}          /* и последние ≤600 мс ввода не потерялись */
     var d=tmp(ch.html);
     var el=noteElIn(d,n);
     if(el)el.remove();
     ch.html=d.innerHTML;
     b.updated=Date.now();                 /* H5 */
     persist();invalidateCo();
+    lastCaretOffset=null;
     if(b.current===ch.id&&!workspace.hidden)loadChapter(ch);
     renderNotes();
     toast('Заметка удалена');
@@ -180,6 +232,9 @@ function deleteNote(n){
 }
 function insertNoteAtCursor(){
   if(isReadOnly())return;
+  /* заметка вставляется в каретку открытой главы: при закрытом редакторе
+     правка уехала бы в скрытый DOM и пропала при следующей отрисовке */
+  if(typeof workspace!=='undefined'&&workspace&&workspace.hidden){toast('Откройте главу, чтобы вставить заметку');return}
   var b=book(),ch=currentCh();
   if(!b||!ch){toast('Откройте главу');return}
   var block=null;

@@ -103,6 +103,8 @@ function migrateLegacyData(userId){
     var tsnap='chernovik.snapshots.v1.u:'+userId;
     if(lsnap&&!localStorage.getItem(tsnap))localStorage.setItem(tsnap,lsnap);
   }catch(e){}
+  /* тезаурус из-под общего ключа переезжает в startApp (17-start.js) — там
+     это делается для ЛЮБОГО профиля, не только для первого */
 }
 function authError(msg){
   var e=$('#authErr');
@@ -240,7 +242,17 @@ function doSignup(){
     if(isFirst)migrateLegacyData(u.id);
     enterApp(u);
     if(pass)syncLogin(u,pass);
-  },function(){btn.disabled=false;authError('Не удалось обработать пароль — попробуйте ещё раз')});
+    btn.disabled=false;
+  },function(){btn.disabled=false;authError('Не удалось обработать пароль — попробуйте ещё раз')})
+  /* .catch отдельно от reject-обработчика: исключение внутри then() к нему
+     не попадает, и кнопка оставалась бы нажатой навсегда */
+  .catch(function(){
+    btn.disabled=false;
+    /* сессия уже сохранена — enterApp прошёл, упало что-то после него:
+       не врём, что профиль «не создан» */
+    if(accounts.session){toast('Профиль создан, но что-то пошло не так — перезагрузите страницу');return}
+    authError('Не удалось создать профиль — попробуйте ещё раз');
+  });
 }
 /* серверный вход/регистрация (20-sync.js); при недоступности сервера — тихий переход в локальный режим */
 /* строгий вход в существующий серверный аккаунт (вкладка «Вход») */
@@ -276,6 +288,11 @@ function doSignin(){
     saveAccounts();
     authError('');
     enterApp(loc);           /* startApp сам вызовет afterStart → pull */
+  }).catch(function(){
+    btn.disabled=false;
+    /* enterApp уже выполнился — сообщаем правду, а не «Сервер не ответил» */
+    if(accounts.session){toast('Вход выполнен, но что-то пошло не так — перезагрузите страницу');return}
+    authError('Сервер не ответил — попробуйте позже');
   });
 }
 function syncLogin(u,pass){
@@ -309,7 +326,11 @@ function renderAccButtons(){
     b.title=label+' · @'+currentUser.login;
   });
 }
-function closeAccMenu(){var m=$('#accMenu');if(m)m.classList.remove('on')}
+function closeAccMenu(){
+  var m=$('#accMenu');if(m)m.classList.remove('on');
+  /* aria-expanded: у каждого триггера своя кнопка (их три в разметке) */
+  Array.prototype.forEach.call(document.querySelectorAll('.acc-btn'),function(b){b.setAttribute('aria-expanded','false')});
+}
 /* F13: на чём работает — SQLite/MySQL на сервере, localStorage без синхронизации */
 function dbLabel(){
   if(typeof Sync==='undefined'||!Sync||Sync.mode!=='server')return 'localStorage';
@@ -337,6 +358,7 @@ function openAccMenu(anchor){
   m.querySelector('.al').textContent='@'+currentUser.login+' · с '+new Date(currentUser.created||Date.now()).toLocaleDateString('ru-RU');
   var w=262,r=anchor.getBoundingClientRect();
   m.classList.add('on');
+  if(anchor&&anchor.setAttribute)anchor.setAttribute('aria-expanded','true');
   m.style.top=(r.bottom+8)+'px';
   m.style.left=Math.max(10,Math.min(r.right-w,innerWidth-w-10))+'px';
   m.querySelectorAll('.bm-item').forEach(function(b){
@@ -363,49 +385,123 @@ function accAction(a){
   if(a==='del'){deleteAccount();return}
 }
 function changePassword(){
+  var serverMode=(typeof Sync!=='undefined'&&Sync&&Sync.mode==='server');
   var hasPass=!!currentUser.hash;
-  function askNew(){
+  /* np — новый пароль, oldPass — текущий (null → спросим отдельно) */
+  function askNew(oldPass){
     uiPrompt('Новый пароль','','оставьте пустым, чтобы убрать пароль').then(function(np){
       if(np===null)return;
-      if(np){
-        if(np.length<4){toast('Слишком короткий пароль');return}
-        var salt=randomSalt();
-        hashPassword(np,salt).then(function(h){
-          currentUser.salt=salt;currentUser.hash=h;
-          saveAccounts();toast('Пароль обновлён');
-        });
-      } else {
-        currentUser.hash='';currentUser.salt='';
-        saveAccounts();toast('Пароль убран');
+      if(np&&np.length<4){toast('Слишком короткий пароль');return}
+      function applyLocal(msg){
+        if(np){
+          var salt=randomSalt();
+          hashPassword(np,salt).then(function(h){
+            currentUser.salt=salt;currentUser.hash=h;
+            saveAccounts();toast(msg||(serverMode?'Пароль обновлён — локально и на сервере':'Пароль обновлён'));
+          });
+        } else {
+          currentUser.hash='';currentUser.salt='';
+          saveAccounts();
+          toast(msg||(serverMode?'Локальный пароль убран (на сервере остался прежний)':'Пароль убран'));
+        }
       }
+      /* пароль на сервере тоже меняется — иначе меню обещало бы одно,
+         а вошёл бы по-прежнему старым */
+      if(!serverMode||!np){
+        /* серверный профиль есть, а связи нет — говорим честно, что
+           локальный хеш разошёлся с серверным */
+        var offline=(typeof Sync!=='undefined'&&!!Sync.user);
+        applyLocal(!serverMode&&offline?'Нет связи с сервером — пароль изменён только локально':null);
+        return;
+      }
+      function askOldThenSend(){
+        uiPrompt('Текущий пароль от аккаунта на сервере','','').then(function(o){
+          if(o===null)return;
+          Sync.changePass(o,np).then(sendDone);
+        });
+      }
+      function sendDone(r){
+        if(r&&r.ok){applyLocal();return}
+        if(r&&r.reason==='wrong-password'){
+          toast('Неверный текущий пароль на сервере');
+          /* локальный хеш разошёлся с серверным (смена при офлайне) —
+             спрашиваем пароль СЕРВЕРА, иначе тупик без пути назад */
+          askOldThenSend();
+          return;
+        }
+        if(r&&r.reason==='throttled'){toast('Слишком много попыток — подождите пару минут');return}
+        if(r&&r.reason==='offline'){applyLocal('Нет связи — пароль изменён только локально');return}
+        toast('Сервер не принял новый пароль');
+      }
+      if(oldPass===null||oldPass===undefined)askOldThenSend();
+      else Sync.changePass(oldPass,np).then(sendDone);
     });
   }
-  if(!hasPass){askNew();return}
+  if(!hasPass){askNew(null);return}
   uiPrompt('Текущий пароль','','').then(function(old){
     if(old===null)return;
     verifyPassword(old,currentUser.salt,currentUser.hash).then(function(ok){
       if(!ok){toast('Неверный пароль');return}
-      askNew();
+      askNew(old);
     });
   });
 }
 function deleteAccount(){
-  function finish(){
+  var serverMode=(typeof Sync!=='undefined'&&Sync&&Sync.mode==='server');
+  function finishLocal(){
     try{localStorage.removeItem('chernovik.v2.u:'+currentUser.id)}catch(e){}
     try{localStorage.removeItem('chernovik.snapshots.v1.u:'+currentUser.id)}catch(e){}
     try{localStorage.removeItem('chernovik.thesaurus.v5.u:'+currentUser.id)}catch(e){}
+    /* tombstone удалённых книг иначе переживает профиль (20-sync.js) */
+    try{localStorage.removeItem((typeof LS==='string'&&LS?LS:'chernovik.v2')+'.del')}catch(e){}
+    /* переписка с ИИ-ассистентом (22-assistant) — личные данные профиля:
+       без этого чужой за тем же компьютером читал историю диалогов */
+    try{localStorage.removeItem('chernovik.ai.v1')}catch(e){}
+    try{localStorage.removeItem('chernovik.ai.threads.v1')}catch(e){}
     accounts.users=accounts.users.filter(function(u){return u.id!==currentUser.id});
     accounts.session=null;saveAccounts();
     location.reload();
   }
-  uiConfirm('Удалить аккаунт?','Все книги, энциклопедия, заметки и история этого профиля будут стёрты безвозвратно.',true).then(function(ok){
+  /* pw — пароль серверного аккаунта: без него сервер свои данные не отдаёт */
+  function finish(pw){
+    if(!serverMode||typeof Sync==='undefined'||!Sync.erase){finishLocal();return}
+    Sync.erase(pw||'').then(function(r){
+      if(r&&r.ok){finishLocal();return}
+      if(r&&(r.reason==='wrong-password'||r.reason==='throttled')){
+        /* не блокируем удаление локального профиля, но и не врём про сервер */
+        uiConfirm('Сервер не принял пароль — аккаунт на сервере остался.',
+          'Всё равно удалить локальный профиль? Его книги на сервере останутся.',true).then(function(yes){
+          if(yes)finishLocal();
+        });
+        return;
+      }
+      toast('Нет связи: профиль удалён локально, данные на сервере остались');
+      finishLocal();
+    });
+  }
+  /* без серверного режима различаем: чисто локальный профиль (сервера не
+     было) против серверного профиля при упавшей связи — во втором случае
+     врать «безвозвратно» нельзя, данные на сервере переживут перезагрузку */
+  var hasSrv=(typeof accounts!=='undefined'&&!!accounts.session);
+  uiConfirm('Удалить аккаунт?',serverMode
+    ? 'Все книги, энциклопедия, заметки и история этого профиля будут стёрты безвозвратно — локально и на сервере.'
+    : (hasSrv
+      ? 'Профиль будет удалён только локально. Данные и сессия на сервере останутся — удалите аккаунт, когда будет связь.'
+      : 'Все книги, энциклопедия, заметки и история этого профиля будут стёрты безвозвратно.'),true).then(function(ok){
     if(!ok)return;
-    if(!currentUser.hash){finish();return}
+    if(!currentUser.hash){
+      if(!serverMode){finish();return}
+      uiPrompt('Пароль аккаунта на сервере','','').then(function(p){
+        if(p===null)return;
+        finish(p);
+      });
+      return;
+    }
     uiPrompt('Пароль для подтверждения','','').then(function(p){
       if(p===null)return;
       verifyPassword(p,currentUser.salt,currentUser.hash).then(function(good){
         if(!good){toast('Неверный пароль');return}
-        finish();
+        finish(p);
       });
     });
   });
@@ -444,7 +540,10 @@ $('#authPassToggle').addEventListener('click',function(){
   var inp=$('#authPass');
   var show=inp.type==='password';
   inp.type=show?'text':'password';
-  this.textContent=show?'🙈':'👁';
+  /* SVG-глаз вместо эмодзи 👁/🙈 — штриховой иконографический язык сайта */
+  this.innerHTML=show
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
   this.setAttribute('aria-pressed',show?'true':'false');
   setBtnTitle(this,show?'Скрыть пароль':'Показать пароль');
 });

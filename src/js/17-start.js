@@ -14,6 +14,16 @@ function startApp(user){
   LS='chernovik.v2.u:'+user.id;
   SNAP_LS='chernovik.snapshots.v1.u:'+user.id;
   THESAURUS_LS='chernovik.thesaurus.v5.u:'+user.id;
+  /* тезаурус из-под ОБЩЕГО ключа переезжает в per-user у любого профиля
+     (раньше — только у первого: существующие профили кеш не получали),
+     общий ключ убираем, чтобы не путал следующих */
+  try{
+    var lth=localStorage.getItem('chernovik.thesaurus.v5');
+    if(lth){
+      if(!localStorage.getItem(THESAURUS_LS))localStorage.setItem(THESAURUS_LS,lth);
+      localStorage.removeItem('chernovik.thesaurus.v5');
+    }
+  }catch(e){}
   /* новый профиль без локальных данных — сид книги не должен дублироваться при синхронизации */
   if(typeof Sync!=='undefined')Sync.freshSeed=!localStorage.getItem(LS);
 

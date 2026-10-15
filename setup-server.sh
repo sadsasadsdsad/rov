@@ -12,6 +12,13 @@
 # =============================================================================
 set -euo pipefail
 
+# safe.directory — добавляем только если ещё нет (повторный запуск скрипта
+# не должен плодить дубли в ~/.gitconfig)
+add_safe_dir() {
+  git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$1" \
+    || git config --global --add safe.directory "$1" >/dev/null 2>&1 || true
+}
+
 DOMAIN="${1:-rov.smartliba.ru}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SITE_ROOT="$SCRIPT_DIR/src"
@@ -122,6 +129,8 @@ MAIN_CONF+="  client_max_body_size 20m;
   add_header X-Frame-Options \"SAMEORIGIN\" always;
   add_header X-Content-Type-Options \"nosniff\" always;
   add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;
+  # HTTPS: браузеры заголовок на http игнорируют, на https держат год
+  add_header Strict-Transport-Security \"max-age=31536000\" always;
 
   # брутфорс пароля: nginx режет только паводок (GET ?action=me ходит при
   # каждой загрузке — потому burst такой большой), точный лимит — 15 неудач
@@ -150,7 +159,10 @@ $TLS_LINE
 $TLS_LINE
   }
 
+  # state/book/read/discover — тяжёлые эндпоинты тоже под общим лимитом
   location ~ \.php\$ {
+    limit_req zone=ch_auth burst=40 nodelay;
+    limit_req_status 429;
     include snippets/fastcgi-php.conf;
     fastcgi_pass unix:$FPM_SOCK;
 $TLS_LINE
@@ -206,6 +218,18 @@ else
   TARGET="$CONF_DIR/$DOMAIN.conf"
   ln -sf "$TARGET" "$ENABLED_DIR/$DOMAIN.conf"
 fi
+# перезаписываем конфиг только после бэкапа и только «свой»: если в файле
+# живёт чужой сайт (см. комментарий nginx-ai-patch.sh) — не трогаем
+if [[ -f "$TARGET" ]]; then
+  BACKUP_DIR=/root/nginx-backup
+  mkdir -p "$BACKUP_DIR"
+  cp -a "$TARGET" "$BACKUP_DIR/$(basename "$TARGET").$(date +%Y%m%d%H%M%S)"
+  if grep -E '^[[:space:]]*server_name' "$TARGET" 2>/dev/null | grep -qv "$DOMAIN"; then
+    echo "ОШИБКА: в $TARGET есть server_name чужого сайта — перезапись запрещена."
+    echo "Вынеси чужой блок в отдельный conf и запусти скрипт снова."
+    exit 1
+  fi
+fi
 printf '%s\n' "$MAIN_CONF" > "$TARGET"
 chmod 600 "$TARGET"   # в конфиге пароль БД — не давать читать всем
 rm -f "$ENABLED_DIR/default"   # стоковый сайт nginx не нужен
@@ -222,9 +246,10 @@ echo "==> 5/5 Проверка"
 nginx -t
 systemctl reload nginx
 if [[ -n "${SUDO_USER:-}" ]]; then
-  sudo -u "$SUDO_USER" git config --global --add safe.directory "$SCRIPT_DIR" 2>/dev/null || true
+  sudo -u "$SUDO_USER" git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$SCRIPT_DIR" \
+    || sudo -u "$SUDO_USER" git config --global --add safe.directory "$SCRIPT_DIR" 2>/dev/null || true
 fi
-git config --global --add safe.directory "$SCRIPT_DIR" 2>/dev/null || true
+add_safe_dir "$SCRIPT_DIR"
 
 if [[ $HAVE_SSL == yes ]]; then
   OUT="$(curl -s --max-time 10 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/auth.php?action=me" || true)"

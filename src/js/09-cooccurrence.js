@@ -105,7 +105,7 @@ function flashRange(off,len,ms){
   if(!r)return false;
   var sp=mk('span');sp.className='hit-flash';
   try{sp.appendChild(r.extractContents());r.insertNode(sp)}catch(e){return false}
-  sp.scrollIntoView({block:'center',behavior:'smooth'});
+  sp.scrollIntoView({block:'center',behavior:(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)?'auto':'smooth'});
   setTimeout(function(){
     if(sp.parentNode){
       sp.replaceWith(document.createTextNode(sp.textContent));

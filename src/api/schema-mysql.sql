@@ -47,3 +47,12 @@ CREATE TABLE IF NOT EXISTS books(
   KEY idx_books_vis(visibility),
   UNIQUE KEY uq_books_token(share_token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- неудачные попытки входа: защита от перебора одного логина (в т.ч. с разных IP)
+CREATE TABLE IF NOT EXISTS login_attempts(
+  login VARCHAR(32) NOT NULL,
+  ip VARCHAR(45) NOT NULL DEFAULT '',
+  ts BIGINT NOT NULL,
+  KEY idx_att_login(login, ts),
+  KEY idx_att_ts(ts)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

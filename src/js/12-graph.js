@@ -380,6 +380,10 @@ function paintGraph(){
   if(!W||!H)return;
     svg.setAttribute('viewBox','0 0 '+W+' '+H);
     svg.setAttribute('width',W);svg.setAttribute('height',H);
+  /* focusId объявляем до aria-label: var поднимается наверх функции,
+     но значение присваивалось ПОЗЖЕ — подпись «фокус на выбранном» не
+     появлялась, пока фокус есть */
+  var focusId=graphState.focusId;
     /* схема — изображение: текстовый эквивалент списка рангов (.gp-row) ниже */
     svg.setAttribute('role','img');
     svg.setAttribute('aria-label','Схема книги: '+d.nodes.length+' '+plural(d.nodes.length,'узел','узла','узлов')+
@@ -390,7 +394,6 @@ function paintGraph(){
   var cx=W/2,cy=H/2;
   var maxW=1;d.links.forEach(function(l){if(l.w>maxW)maxW=l.w});
   var mainId=d.mainId;
-  var focusId=graphState.focusId;
   var activeId=focusId||mainId;
 
   /* связи: если есть фокус — от фокусного узла, иначе от главного */

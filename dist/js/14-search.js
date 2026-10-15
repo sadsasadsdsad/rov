@@ -33,12 +33,20 @@ function clearSearch(){
   searchResults=[];searchIdx=0;hideSearchResults();
 }
 $('#spClose').addEventListener('click',function(e){e.preventDefault();clearSearch();$('#spInput').focus()});
+var spTid=0;
 $('#spInput').addEventListener('input',function(){
   var q=this.value.trim();
   $('#tbSearch').classList.toggle('has-val',!!q);
   spCols.innerHTML='';$('#spCount').textContent='';
   searchResults=[];searchIdx=0;
+  clearTimeout(spTid);
   if(q.length<2){hideSearchResults();return}
+  /* дебаунс: полный обход глав с DOM-парсом (tmp) — не на каждый keystroke */
+  spTid=setTimeout(spRun,140);
+});
+function spRun(){
+  var q=$('#spInput').value.trim();
+  if(q.length<2)return;
   var ql=q.toLowerCase();var b=book();if(!b)return;
   var chHits=[],wkHits=[],noteHits=[];
   visibleChapters(b).forEach(function(ch){
@@ -48,7 +56,7 @@ $('#spInput').addEventListener('input',function(){
     while(idx>=0&&chHits.length<60){
       var from=Math.max(0,idx-46);
       var snip=(from>0?'…':'')+text.slice(from,idx+ql.length+64).replace(/\s+/g,' ');
-      chHits.push({kind:'ch',i:i,idx:idx,len:ql.length,snip:snip,q:ql});
+      chHits.push({kind:'ch',i:i,chId:ch.id,idx:idx,len:ql.length,snip:snip,q:ql});
       idx=lower.indexOf(ql,idx+ql.length);
     }
   });
@@ -83,10 +91,17 @@ $('#spInput').addEventListener('input',function(){
   searchResults=chHits.concat(wkHits).concat(noteHits);
   $('#spCount').textContent=searchResults.length?fmt(searchResults.length):'';
   renderSearchResults(chHits,wkHits,noteHits);showSearchResults();paintSearch();
-});
+}
 $('#spInput').addEventListener('focus',function(){if(this.value.trim().length>=2)showSearchResults()});
 $('#spInput').addEventListener('keydown',function(e){
-  if(e.key==='Escape'){clearSearch();this.blur();return}
+  if(e.key==='Escape'){
+    /* своя обработка: preventDefault — сигнал document-обработчику
+       (15-editor) не закрывать вдобавок панель; НЕ глушим всплытие —
+       диктовка (18-voice) и reader-UI должны получить свой Escape */
+    e.preventDefault();
+    clearSearch();this.blur();return;
+  }
+  if(spTid&&e.key==='Enter'){clearTimeout(spTid);spTid=0;spRun()}  /* Enter не ждёт дебаунса */
   if(!searchResults.length)return;
   if(e.key==='ArrowDown'){e.preventDefault();searchIdx=(searchIdx+1)%searchResults.length;paintSearch();scrollSearchAct()}
   if(e.key==='ArrowUp'){e.preventDefault();searchIdx=(searchIdx-1+searchResults.length)%searchResults.length;paintSearch();scrollSearchAct()}
@@ -112,41 +127,47 @@ function renderSearchResults(chHits,wkHits,noteHits){
     }catch(e){return safe}
   }
   function makeCol(label,items,kind){
+    if(!items.length)return null;   /* раздел без результатов не показываем */
     var col=mk('div');col.className='sp-col';
     var head=mk('div');head.className='sp-col-head';
     head.innerHTML=label+' <span class="cnt">'+items.length+'</span>';
     col.appendChild(head);
     var body=mk('div');body.className='sp-col-body';
-    if(!items.length){
-      var em=mk('div');em.className='sp-col-empty';em.textContent='—';body.appendChild(em);
-    }else{
-      items.forEach(function(r){
-        var it=mk('div');it.className='sp-item';
-        var title,bodyTxt;
-        if(kind==='wiki'){
-          title='<em class="wk">Э</em>'+esc(wikiTypeLabel(r.type))+' · '+esc(r.name);
-          bodyTxt=mark(r.snip,r.q);
-        }else if(kind==='note'){
-          title='<em class="nt">✎</em>'+esc(r.chTitle);
-          bodyTxt=mark(r.snip,r.q);
-        }else{
-          title='<em>гл.'+(r.i+1)+'</em>'+esc(chapterTitle(b2.chapters[r.i]));
-          bodyTxt=mark(r.snip,r.q);
+    items.forEach(function(r){
+      var it=mk('div');it.className='sp-item';
+      var title,bodyTxt;
+      if(kind==='wiki'){
+        title='<em class="wk">Э</em>'+esc(wikiTypeLabel(r.type))+' · '+esc(r.name);
+        bodyTxt=mark(r.snip,r.q);
+      }else if(kind==='note'){
+        title='<em class="nt">✎</em>'+esc(r.chTitle);
+        bodyTxt=mark(r.snip,r.q);
+      }else{
+        /* результаты живут отдельно от списка глав (дедуп/сверка могут
+           сдвинуть индексы) — главу ищем по id, индекс только для номера */
+        var ce=null;
+        if(r.chId&&b2&&Array.isArray(b2.chapters)){
+          for(var ci=0;ci<b2.chapters.length;ci++)if(b2.chapters[ci].id===r.chId){ce={ch:b2.chapters[ci],i:ci};break}
         }
-        it.innerHTML='<span class="t">'+title+'</span><span class="s">'+bodyTxt+'</span>';
-        it.addEventListener('click',function(){
-          if(kind==='wiki'){hideSearchResults();openWikiView(r.id)}
-          else if(kind==='note'){hideSearchResults();jumpToNote(r)}
-          else goToResult(r);
-        });
-        body.appendChild(it);
+        if(!ce&&b2&&b2.chapters[r.i])ce={ch:b2.chapters[r.i],i:r.i};
+        title=ce?('<em>гл.'+(ce.i+1)+'</em>'+esc(chapterTitle(ce.ch))):'<em>гл.</em>—';
+        bodyTxt=mark(r.snip,r.q);
+      }
+      it.innerHTML='<span class="t">'+title+'</span><span class="s">'+bodyTxt+'</span>';
+      it.addEventListener('click',function(){
+        if(kind==='wiki'){hideSearchResults();openWikiView(r.id)}
+        else if(kind==='note'){hideSearchResults();jumpToNote(r)}
+        else goToResult(r);
       });
-    }
+      body.appendChild(it);
+    });
     col.appendChild(body);return col;
   }
-  spCols.appendChild(makeCol('В тексте',chHits,'ch'));
-  spCols.appendChild(makeCol('В энциклопедии',wkHits,'wiki'));
-  spCols.appendChild(makeCol('В заметках',noteHits,'note'));
+  /* колонки без совпадений не добавляем — пустые «—» только шумят */
+  [['В тексте',chHits,'ch'],['В энциклопедии',wkHits,'wiki'],['В заметках',noteHits,'note']].forEach(function(c){
+    var col=makeCol(c[0],c[1],c[2]);
+    if(col)spCols.appendChild(col);
+  });
 }
 function paintSearch(){spCols.querySelectorAll('.sp-item').forEach(function(el,i){el.classList.toggle('act',i===searchIdx)})}
 function scrollSearchAct(){var items=spCols.querySelectorAll('.sp-item');var el=items[searchIdx];if(el)el.scrollIntoView({block:'nearest'})}
@@ -154,7 +175,12 @@ function goToResult(r){
   hideSearchResults();
   if(!r||r.kind==='wiki'||r.kind==='note')return;
   var b=book();if(!b)return;
-  var ch=b.chapters[r.i];if(!ch)return;
+  var ch=null;
+  if(r.chId&&Array.isArray(b.chapters)){
+    for(var k=0;k<b.chapters.length;k++)if(b.chapters[k].id===r.chId){ch=b.chapters[k];break}
+  }
+  if(!ch)ch=b.chapters[r.i];
+  if(!ch){toast('Глава из этого результата больше нет');clearSearch();return}
   enterEditor(ch.id);
   setTimeout(function(){flashRange(r.idx,r.len,2000)},80);
 }

@@ -10,12 +10,25 @@
 "use strict";
 /* ===== ПАНЕЛЬ: плавающие вкладки в шапке ===== */
 var panelTab='world';
+var wpTid=0;                         /* дебаунс ввода в поиск вики */
 function updatePanelTabs(){
   document.querySelectorAll('.wp-tab').forEach(function(b){
     b.classList.toggle('on', b.dataset.tab===panelTab);
   });
   var panel=$('#wikiPanel');
   var open=panel&&panel.classList.contains('on');
+  /* aria-expanded кнопок-триггеров = состояние панели */
+  var bw=$('#btnWiki');if(bw)bw.setAttribute('aria-expanded',String(!!open));
+  var bnp2=$('#btnNotesPanel');if(bnp2)bnp2.setAttribute('aria-expanded',String(!!open));
+  /* чат живёт внутри как раздел (#paneAi): .on панели чата и aria-expanded
+     фабов ИИ = «панель открыта и показан раздел «Чат»» */
+  var chatVis=!!open&&panelTab==='ai';
+  var ap=$('#aiPanel');
+  if(ap)ap.classList.toggle('on',chatVis);
+  if(typeof aiFabs==='function'){
+    var ex=String(chatVis);
+    aiFabs().forEach(function(f){f.setAttribute('aria-expanded',ex)});
+  }
   var ind=$('#wpTabsInd');
   if(ind){
     if(!open){
@@ -59,8 +72,9 @@ function setPanelTab(t){
   $('#paneWorld').hidden=(t!=='world');
   $('#paneNotes').hidden=(t!=='notes');
   $('#paneGraph').hidden=(t!=='graph');
+  $('#paneAi').hidden=(t!=='ai');
   $('#wpAdd').style.display=(t==='world')?'':'none';
-  $('#wpTitleText').textContent=(t==='world')?'Энциклопедия':(t==='notes')?'Заметки':'Карта связей';
+  $('#wpTitleText').textContent=(t==='world')?'Энциклопедия':(t==='notes')?'Заметки':(t==='ai')?'ИИ-ассистент':'Карта связей';
   $('#wpCount').textContent='';
   updatePanelTabs();
   requestAnimationFrame(function(){ updatePanelTabs(); });
@@ -68,6 +82,13 @@ function setPanelTab(t){
   if(t==='world'){renderWikiFilters();renderWiki()}
   else if(t==='notes'){renderNotes()}
   else if(t==='graph'){scheduleGraph()}
+  else if(t==='ai'&&typeof aiRender==='function'){   /* чат — раздел панели */
+    aiRender();aiRenderCtx();
+    setTimeout(function(){
+      var i=$('#aiInput');
+      if(i&&(typeof aiBusy==='undefined'||!aiBusy)&&document.hasFocus())i.focus();
+    },60);
+  }
   renderMarksRail();
 }
 function toggleWikiPanel(force,tab){
@@ -103,7 +124,9 @@ $('#btnNotesPanel')&&$('#btnNotesPanel').addEventListener('click',function(){
 });
 $('#wpClose').addEventListener('click',function(){toggleWikiPanel(false)});
 $('#wpFull').addEventListener('click',function(){
-  $('#wikiPanel').classList.toggle('full');
+  var on=$('#wikiPanel').classList.toggle('win');
+  this.setAttribute('aria-pressed',on?'true':'false');
+  setBtnTitle(this,on?'Во весь экран':'Маленький режим — встроить между хидером и строкой статуса');
   if(!$('#paneGraph').hidden)scheduleGraph();
   setTimeout(positionEdRz,450);
   updatePanelTabs();
@@ -111,5 +134,9 @@ $('#wpFull').addEventListener('click',function(){
   setTimeout(updatePanelTabs,520);
 });
 $('#wpAdd').addEventListener('click',function(){openWikiModal(null)});
-$('#wpSearch').addEventListener('input',function(){wikiFilter=this.value;renderWiki()});
+$('#wpSearch').addEventListener('input',function(){
+  wikiFilter=this.value;
+  /* дебаунс: renderWiki для каждой статьи сканирует все главы (nameStats) */
+  clearTimeout(wpTid);wpTid=setTimeout(renderWiki,140);
+});
 

@@ -30,7 +30,18 @@ var SRClass=window.SpeechRecognition||window.webkitSpeechRecognition;
 var btnVoice=$('#btnVoice'), micPill=$('#micPill');
 var micRec=null, micOn=false, micWanted=false, micRange=null, micRestarts=0;
 var micLastFinalAt=0;
-var micLang='ru-RU', MIC_RESTART_MAX=30, MIC_PAUSE_COMMA=700, MIC_PAUSE_END=2600;
+var micLang=(function(){
+  /* язык распознавания берём из браузера — с телефона с системным языком
+     распознавание иначе «уводит» в чужой язык; ru/uk/be — по-русски */
+  try{
+    var l=(navigator.languages&&navigator.languages[0])||navigator.language||'ru';
+    if(/^(uk|be)/i.test(l))return 'ru-RU';
+    if(/^ru/i.test(l))return 'ru-RU';
+    return l||'ru-RU';
+  }catch(e){return 'ru-RU'}
+})();
+var MIC_RESTART_MAX=30, MIC_PAUSE_COMMA=700, MIC_PAUSE_END=2600;
+var micLastFin='', micLastFinAt=0, micTouched=[];
 
 function micSetUI(on,interim){
   micOn=on;
@@ -216,7 +227,34 @@ function micInsert(text){
     if(i>0){if(!micNewParagraph())break;changed=true;paras[i]=micAttach(paras[i])}
     if(paras[i]&&micInsertOne(paras[i]))changed=true;
   }
-  if(changed)editor.dispatchEvent(new Event('input',{bubbles:true}));
+  if(changed){
+    var bl=micBlockOf();
+    if(bl&&micTouched.indexOf(bl)<0)micTouched.push(bl);
+    editor.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+}
+/* автоисправление после записи: по затронутым диктовкой блокам прогоняем
+   лёгкую типографику — кавычки, многоточие, двойные пробелы, тире */
+function micAutoFix(){
+  if(!micTouched.length)return;
+  var n=0;
+  micTouched.forEach(function(b){
+    if(!b||!editor.contains(b))return;
+    var w=document.createTreeWalker(b,NodeFilter.SHOW_TEXT,null),tn;
+    while((tn=w.nextNode())){
+      var s=tn.nodeValue||'';
+      var f=s
+        .replace(/ {2,}/g,' ')
+        .replace(/\s+([,.;:!?…])/g,'$1')
+        .replace(/\.{3,}/g,'…')
+        .replace(/\s+-{1,2}\s+/g,' — ')
+        .replace(/"([^"\n]+)"/g,'«$1»');
+      if(f!==s){tn.nodeValue=f;n++}
+    }
+    b.normalize();
+  });
+  micTouched=[];
+  if(n)editor.dispatchEvent(new Event('input',{bubbles:true}));
 }
 function micHalt(){
   micWanted=false;
@@ -235,6 +273,7 @@ function micStart(){
   micPlaceCaret();
   micRestarts=0;
   micLastFinalAt=0;
+  micLastFin='';micLastFinAt=0;micTouched=[];
   micWanted=true;
   var rec=new SRClass();
   micRec=rec;
@@ -250,7 +289,14 @@ function micStart(){
       else interim+=r[0].transcript;
     }
     if(interim)micSetUI(true,interim.replace(/\s+/g,' ').trim());
-    if(fin){micRestarts=0;micInsert(micFormat(fin));micSetUI(true)}
+    if(fin){
+      /* Android после перезапуска повторяет последний финальный результат —
+         дедуп по тексту и окну в 3 с, иначе фраза печатается дважды */
+      var now=Date.now();
+      if(fin===micLastFin&&now-micLastFinAt<3000){micSetUI(true);return}
+      micLastFin=fin;micLastFinAt=now;
+      micRestarts=0;micInsert(micFormat(fin));micSetUI(true);
+    }
   };
   rec.onerror=function(ev){
     var e=ev&&ev.error;
@@ -281,6 +327,7 @@ function micStop(){
   var wasOn=micOn;
   micHalt();
   micSetUI(false);
+  micAutoFix();
   if(wasOn)toast('Диктовка остановлена');
 }
 function micToggle(){if(isReadOnly()){toast('Чужая книга — только чтение');return}(micOn||micWanted)?micStop():micStart()}

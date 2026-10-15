@@ -34,6 +34,15 @@ function dragX(handle,onMove){
   handle.addEventListener('pointercancel',function(){active=false;handle.classList.remove('on')});
 }
 dragX(edRz,function(dx){state.ui.edW=clamp((state.ui.edW||660)+dx*2,520,1040);document.documentElement.style.setProperty('--ed-w',state.ui.edW+'px');positionEdRz()});
+/* ручка ширины с клавиатуры (role=separator + tabindex в index.html) */
+edRz.addEventListener('keydown',function(e){
+  if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;
+  e.preventDefault();
+  if(typeof state==='undefined'||!state)return;
+  state.ui.edW=clamp((state.ui.edW||660)+(e.key==='ArrowRight'?16:-16),520,1040);
+  document.documentElement.style.setProperty('--ed-w',state.ui.edW+'px');
+  positionEdRz();persist();
+});
 addEventListener('resize',function(){
   positionEdRz();
   if(typeof state==='undefined'||!state)return;   /* M8: ресайз до старта приложения */
@@ -64,6 +73,9 @@ var askResolve=null;
 function uiAsk(cfg){
   return new Promise(function(resolve){
     var m=$('#askModal');
+    /* вторая модалка поверх первой: первую закрываем и отпускаем её
+       ожидание — иначе Promise первого вызова завис бы навсегда */
+    if(m.classList.contains('on')&&askResolve){var prev=askResolve;askResolve=null;prev(null)}
     askResolve=resolve;
     $('#amTitle').textContent=cfg.title||'';
     var msg=$('#amMsg');

@@ -62,10 +62,24 @@ function openWikiView(id){
   var relBox=$('#wvRel');
   var rels=relationsOf(en.id).slice(0,14);
   if(rels.length){
-    relBox.innerHTML='<div class="lbl" style="text-align:center;margin:16px 0 2px">Связи · встречается рядом</div>'+
-      '<div class="wv-cols2">'+rels.map(function(r){
-        return '<button class="wv-rel" data-id="'+escAttr(r.en.id)+'"><span class="wv-rel-d" style="background:'+wikiTypeColor(r.en.type)+'"></span>'+esc(r.en.name)+' <b>'+fmt(r.w)+'</b></button>';
-      }).join('')+'</div>';
+    /* связи-пилюли плавают побокам у краёв модалки (просьба: «перенеси
+       связи, чтобы они плавали побокам, как в тг подарки»; затем «более
+       рандомно»): порядок перемешан, борт и вертикаль — рандомные
+       (слот + джиттер, без наложений), у каждой пилюли свой дрейф по
+       обеим осям, длительность и фаза */
+    function rr(a,b){return a+Math.random()*(b-a)}
+    rels=rels.slice().sort(function(){return Math.random()-0.5});
+    var nL=Math.ceil(rels.length/2),nR=rels.length-nL,kl=0,kr=0;
+    relBox.innerHTML='<div class="wv-cols2">'+rels.map(function(r,i){
+      var lft=(i%2===0),cnt=lft?nL:nR,k=lft?kl++:kr++;
+      var slot=78/Math.max(cnt,1),top=6+k*slot+rr(0,slot*0.5);
+      var st=(lft?'left:':'right:')+rr(8,40).toFixed(0)+'px;top:'+top.toFixed(1)+'%;'+
+        '--fx1:'+rr(-7,7).toFixed(1)+'px;--fy1:'+rr(-11,-4).toFixed(1)+'px;'+
+        '--fx2:'+rr(-7,7).toFixed(1)+'px;--fy2:'+rr(4,11).toFixed(1)+'px;'+
+        'animation-duration:'+rr(3.2,6.6).toFixed(2)+'s;'+
+        'animation-delay:-'+rr(0,6).toFixed(2)+'s;';
+      return '<button class="wv-rel" data-side="'+(lft?'l':'r')+'" style="'+st+'" data-id="'+escAttr(r.en.id)+'"><span class="wv-rel-d" style="background:'+wikiTypeColor(r.en.type)+'"></span>'+esc(r.en.name)+' <b>'+fmt(r.w)+'</b></button>';
+    }).join('')+'</div>';
     relBox.querySelectorAll('.wv-rel').forEach(function(btn){
       btn.addEventListener('click',function(){
         var nid=btn.getAttribute('data-id');

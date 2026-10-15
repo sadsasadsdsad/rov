@@ -17,6 +17,11 @@ function session_cookie_name(): string
 
 function session_cookie_secure(): bool
 {
+    /* nginx при SSL шлёт CHEROVIK_TLS — ему верим больше, чем заголовку от
+       клиента (X-Forwarded-Proto подделывается), см. setup-server.sh */
+    $tls = (string)($_SERVER['CHEROVIK_TLS'] ?? '');
+    if ($tls !== '') return $tls !== '0';
+
     return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
 }
@@ -57,6 +62,7 @@ function session_create(string $userId): string
     $token = bin2hex(random_bytes(32));
     $now = time();
     $expires = $now + (int)cfg()['session_days'] * 86400;
+    db_run('DELETE FROM sessions WHERE expires < ?', [$now]);   /* протухшие сессии не копятся */
     db_run('INSERT INTO sessions(token,user_id,created,expires) VALUES(?,?,?,?)', [$token, $userId, $now, $expires]);
     setcookie(session_cookie_name(), $token, [
         'expires'  => $expires,

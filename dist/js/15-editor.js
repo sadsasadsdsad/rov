@@ -383,7 +383,11 @@ document.addEventListener('click',function(e){
   if(menuOpen&&!e.target.closest('#blockmenu'))closeMenu();
 });
 
-function updateStats(){
+var statsTid=0;
+/* дебаунс: вызывается на каждый ввод (innerText + layout) — хватает 120 мс,
+   рендер статуса запаздывает незаметно, а лишние reflow на keystroke уходят */
+function updateStats(){clearTimeout(statsTid);statsTid=setTimeout(updateStatsNow,120)}
+function updateStatsNow(){
   var t=editor.innerText||'';
   var w=countWords(t),c=t.replace(/\s/g,'').length;
   var m=Math.ceil(w/180);
@@ -392,7 +396,6 @@ function updateStats(){
     var ch=currentCh(),idx=ch?b.chapters.indexOf(ch):-1;
     if(idx>=0)pos='гл. '+(idx+1)+'/'+b.chapters.length+' · ';
   }
-  $('#wcTop').textContent=fmt(w)+' '+plural(w,'слово','слова','слов');
   var narrow=innerWidth<=560;
   var right=pos;
   if(w)right+=narrow?('≈'+m+' мин · '):('≈ '+m+' мин чтения · ');
@@ -401,6 +404,7 @@ function updateStats(){
 }
 function rememberPos(){var b=book();if(!b)return;var ch=currentCh();if(ch)ch.pos=scroller.scrollTop}
 function commitNow(){
+  if(typeof state==='undefined'||!state)return;   /* до инициализации состояния писать нечего */
   if(isReadOnly())return;
   var b=book();
   if(b&&workspace.hidden===false&&editorOwned){
@@ -412,6 +416,7 @@ function commitNow(){
   }
 }
 function scheduleSave(){
+  if(typeof state==='undefined'||!state)return;   /* до инициализации состояния — не рисуем статус */
   if(isReadOnly()){saveTxt.textContent='Только чтение';return}
   saveTxt.textContent='Сохранение…';
   clearTimeout(saveTimer);
@@ -438,6 +443,9 @@ function scheduleSave(){
   },600);
 }
 addEventListener('beforeunload',commitNow);
+/* вкладка ушла в фон — дописываем сразу, а не через 600 мс автосейва:
+   вкладку могут выгрузить, пока «Сохранение…» ещё в очереди */
+document.addEventListener('visibilitychange',function(){if(document.hidden)commitNow()});
 
 $('#btnBackup').addEventListener('click',function(){
   commitNow();
@@ -464,7 +472,7 @@ function restoreBackup(file){
     if(st&&typeof sanitizeChapterHtml==='function'){
       st.books.forEach(function(bk){(bk.chapters||[]).forEach(function(c){c.html=sanitizeChapterHtml(c.html)})});
     }
-    if(!st){alert('Это не похоже на резервную копию «Черновика» — файл не читается.');return}
+    if(!st){toast('Это не похоже на резервную копию «Черновика» — файл не читается.');return}
     uiConfirm('Загрузить резервную копию?','Текущие книги будут полностью заменены.',false).then(function(ok){
       if(!ok)return;
       state=st;state.spell=false;
@@ -504,15 +512,7 @@ function clearDropMarks(){
   list.querySelectorAll('.drop-before,.drop-after').forEach(function(n){n.classList.remove('drop-before','drop-after')});
   list.classList.remove('drop-end');
 }
-function moveChapter(id,dir){
-  var b=book();if(!b||isReadOnly())return;
-  var arr=b.chapters;
-  var i=arr.findIndex(function(x){return x.id===id});
-  var j=i+dir;if(i<0||j<0||j>=arr.length)return;
-  var t=arr[i];arr[i]=arr[j];arr[j]=t;
-  b.updated=Date.now();                    /* H5 */
-  persist();renderList(false);updateStats();
-}
+/* moveChapter определён ниже — рядом с клавиатурной перестановкой Alt+↑/↓ */
 function dropAtEnd(){
   var b=book();if(!b||!dragChId||isReadOnly())return;
   var arr=b.chapters;
@@ -529,35 +529,6 @@ list.addEventListener('dragover',function(e){
 });
 list.addEventListener('dragleave',function(e){if(e.target===list)list.classList.remove('drop-end')});
 list.addEventListener('drop',function(e){if(dragChId&&list.classList.contains('drop-end')){e.preventDefault();dropAtEnd()}});
-
-(function(){
-  var chlist=$('#chlist');if(!chlist)return;
-  var RADIUS=110,BOOST=22;
-  var raf=null;
-  function isRail(){return document.body.classList.contains('side-hidden')&&!mqMobile.matches}
-  function setBars(clientY){
-    if(!isRail())return;
-    chlist.querySelectorAll('.ch').forEach(function(ch){
-      var num=ch.querySelector('.num');if(!num)return;
-      var r=num.getBoundingClientRect();
-      var cy=r.top+r.height/2;
-      var d=Math.abs(clientY-cy);
-      var t=Math.max(0,1-d/RADIUS);t=t*t;
-      var base=ch.classList.contains('active')?12:8;
-      num.style.setProperty('--bw',(base+t*BOOST)+'px');
-    });
-  }
-  function reset(){chlist.querySelectorAll('.ch .num').forEach(function(n){n.style.removeProperty('--bw')})}
-  chlist.addEventListener('pointermove',function(e){
-    if(!isRail())return;
-    var y=e.clientY;
-    if(raf)cancelAnimationFrame(raf);
-    raf=requestAnimationFrame(function(){setBars(y)});
-  },{passive:true});
-  chlist.addEventListener('pointerleave',reset);
-  var ob=new MutationObserver(function(){if(!isRail())reset()});
-  ob.observe(document.body,{attributes:true,class:'class'});
-})();
 
 /* перестановка глав с клавиатуры (Alt+↑/↓) — альтернатива drag&drop */
 function moveChapter(id,dir){
@@ -579,16 +550,21 @@ function moveChapter(id,dir){
 
 function renderList(animate){
   var b=book();if(!b)return;
+  var keepScroll=list.scrollTop;        /* пересборка строк сбрасывает скролл —
+     позицию сохраняем: клик по главе не дёргает список, а центрирование
+     ниже доводит его плавно */
   list.innerHTML='';
   var total=0;
   b.chapters.forEach(function(ch,i){
     var isNotes=isNotesCh(ch);
-    var w=isNotes?0:chapterWords(ch);total+=w;
+    var w=(isNotes||isPamatka(ch))?0:chapterWords(ch);total+=w;
     var el=mk('div');
     el.className='ch'+(ch.id===b.current?' active':'')+(animate?' boot':'')+(isNotes?' notes-ch':'');
+    el.setAttribute('data-ch',ch.id);         /* адрес для копий-колец и поиска */
     if(animate)el.style.animationDelay=(i*35)+'ms';
     el.draggable=!isReadOnly();
-    el.innerHTML='<button type="button" class="ch-open"><span class="num">'+(isNotes?'✎':String(i+1).padStart(2,'0'))+'</span><span class="ttl"></span><span class="wc"></span></button>'+
+    var nbIc='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:11px;height:11px"><path d="M4 20l1-4L16.5 4.5a1.8 1.8 0 0 1 2.6 0l.4.4a1.8 1.8 0 0 1 0 2.6L8 19l-4 1Z"/><path d="M14.5 6.5l3 3"/></svg>';
+    el.innerHTML='<button type="button" class="ch-open"><span class="num">'+(isNotes?nbIc:String(i+1).padStart(2,'0'))+'</span><span class="ttl"></span><span class="wc"></span></button>'+
       (isNotes||isReadOnly()?'':'<button type="button" class="del" title="Удалить главу" aria-label="Удалить главу">×</button>');
     el.querySelector('.ttl').textContent=chapterTitle(ch);
     el.querySelector('.wc').textContent=isNotes?'—':fmt(w);
@@ -662,12 +638,298 @@ function renderList(animate){
       list.appendChild(marksWrap);
     }
   });
+  /* кольцо бесконечной рейки: второй ряд копий строк — прокрутка замикается
+     бесшовно (в момент стыка видимые строки не меняются); в раскрытом
+     списке и на мобиле копии скрыты (CSS .dupe). Метки в копиях не
+     дублируются: в рейке .ch-marks и так скрыт, в раскрытом списке копий     не видно */
+  var ringSrc=[];
+  for(var q=0;q<list.children.length;q++){
+    var oc=list.children[q];
+    if(oc.classList&&oc.classList.contains('ch')&&!oc.classList.contains('dupe'))ringSrc.push(oc);
+  }
+  for(var q2=0;q2<ringSrc.length;q2++){
+    var cl=ringSrc[q2].cloneNode(true);
+    cl.classList.remove('boot');
+    cl.classList.add('dupe');
+    cl.setAttribute('aria-hidden','true');
+    list.appendChild(cl);
+  }
+  /* копии без своих слушателей: клик и перетаскивание — делегированием */
+  if(!list.__dupeBound){
+    list.__dupeBound=true;
+    list.addEventListener('click',function(e){
+      var row=e.target&&e.target.closest?e.target.closest('.ch.dupe'):null;
+      if(!row)return;
+      e.stopPropagation();
+      openChapter(row.getAttribute('data-ch'));
+    });
+    list.addEventListener('dragstart',function(e){
+      var row=e.target&&e.target.closest?e.target.closest('.ch.dupe'):null;
+      if(!row)return;
+      dragChId=row.getAttribute('data-ch');
+      e.dataTransfer.effectAllowed='move';
+      try{e.dataTransfer.setData('text/plain',dragChId)}catch(err){}
+    });
+    list.addEventListener('dragend',function(e){
+      if(e.target&&e.target.closest&&e.target.closest('.ch.dupe')){dragChId=null;clearDropMarks()}
+    });
+  }
+  /* копии скрываем, если список с ними помещается — иначе дубли по центру */
+  loopFit();
+  list.scrollTop=keepScroll;            /* позиция восстановлена после пересборки */
   $('#chCount').textContent=b.chapters.length+' шт.';
   $('#totalWords').textContent=fmt(total)+' '+plural(total,'слово','слова','слов');
   $('#totalRead').textContent=total?('≈ '+Math.ceil(total/180)+' мин'):'';
   renderMarksRail();
+  railCenterActive();
+  if(chWheelUpdate)chWheelUpdate();          /* новый ряд — сразу в барабан */
   if(typeof a11yPass==='function')a11yPass(list);
 }
+
+/* кольцо копий скрывается, если блок оригиналов помещается в экран (с тем
+   же запасом, что и цикл в «колесе») — иначе в узкой рейке с центрированием
+   были бы видны дубли */
+function loopFit(){
+  var l=$('#chlist');if(!l)return;
+  var chs=l.querySelectorAll('.ch:not(.dupe)');
+  var fit=true;
+  if(chs.length){
+    var f=chs[0],last=chs[chs.length-1];
+    fit=(last.offsetTop+last.offsetHeight-f.offsetTop)<=l.clientHeight+150;
+  }
+  l.classList.toggle('no-loop',fit);
+}
+
+var chWheelGoto=null;     /* плавный довод прокрутки рейки — см. «колесо» ниже */
+
+/* при большом числе глав в рейке (body.side-hidden) активная глава
+   держится в центре экрана — остальные уходят за края под маской */
+function railCenterActive(){
+  var chlist=$('#chlist');if(!chlist)return;
+  if(!document.body.classList.contains('side-hidden')||mqMobile.matches)return;
+  var act=chlist.querySelector('.ch.active');if(!act)return;
+  if(chlist.scrollHeight<=chlist.clientHeight+4)return;
+  var top=act.offsetTop-(chlist.clientHeight/2)+(act.offsetHeight/2);
+  /* главы у верхнего края ленты (первая и соседние): цель уходит за 0 и
+     глава осталась бы вверху — центрируемся по её копии в кольце (та же
+     строка на период ниже, видимый ряд не меняется); кольца нет
+     (.no-loop) — обрезаем по краю, как раньше */
+  if(top<0&&!chlist.classList.contains('no-loop')){
+    var o0=chlist.querySelector('.ch:not(.dupe)');
+    var d0=chlist.querySelector('.ch.dupe');
+    if(o0&&d0){
+      var per=d0.offsetTop-o0.offsetTop;
+      var max=chlist.scrollHeight-chlist.clientHeight;
+      if(per>0&&top+per<=max)top+=per;
+    }
+  }
+  if(top<0)top=0;
+  /* клик по любой главе: барабан доводит её в центр плавно — той же
+     инерцией, что у колеса (16% остатка за кадр, мягкий стоп); вне рейки
+     или пока «колесо» не готово — как раньше, мгновенно */
+  if(chWheelGoto)chWheelGoto(top);
+  else chlist.scrollTop=top;
+}
+
+/* эффект палок: в рейке выноска главы растёт, когда курсор проходит
+   рядом по вертикали (квадратичный спад в радиусе RADIUS) */
+(function(){
+  var chlist=$('#chlist');if(!chlist)return;
+  var RADIUS=110,BOOST=22;
+  var raf=null;
+  function isRail(){return document.body.classList.contains('side-hidden')&&!mqMobile.matches}
+  function setBars(clientY){
+    if(!isRail())return;
+    chlist.querySelectorAll('.ch').forEach(function(ch){
+      var num=ch.querySelector('.num');if(!num)return;
+      var r=num.getBoundingClientRect();
+      var cy=r.top+r.height/2;
+      var d=Math.abs(clientY-cy);
+      var t=Math.max(0,1-d/RADIUS);t=t*t;
+      var base=ch.classList.contains('active')?12:8;
+      num.style.setProperty('--bw',(base+t*BOOST)+'px');
+    });
+  }
+  function reset(){chlist.querySelectorAll('.ch .num').forEach(function(n){n.style.removeProperty('--bw')})}
+  chlist.addEventListener('pointermove',function(e){
+    if(!isRail())return;
+    var y=e.clientY;
+    if(raf)cancelAnimationFrame(raf);
+    raf=requestAnimationFrame(function(){setBars(y)});
+  },{passive:true});
+  chlist.addEventListener('pointerleave',reset);
+  var ob=new MutationObserver(function(){if(!isRail())reset()});
+  ob.observe(document.body,{attributes:true,class:'class'});
+})();
+
+/* «колесо»: в рейке прокрутка списка глав — инерционная: шаг по deltaY
+   превращается в цель, а список догоняет её по кадрам с затуханием (каждый
+   кадр — 16% остатка): барабан крутится мягко, без щелчка на каждый «зуб»
+   колеса. Кольцо бесконечное и бесшовное: за границей цель и позиция
+   прыгают на период копий строк — видимые строки в момент стыка не
+   меняются, поэтому за последней главой идёт первая и наоборот, без
+   видимой перемотки; если копий меньше экрана — упираемся в границу. В
+   раскрытом списке — обычная прокрутка, без перехвата */
+(function(){
+  var list=$('#chlist');if(!list)return;
+  var target=0,cur=0,applied=0,raf=null,anim=false;
+  function active(){return !mqMobile.matches&&document.body.classList.contains('side-hidden')}
+  /* период кольца — высота блока оригиналов (первая копия стартует через
+     неё); меньше экрана с запасом — цикл не включаем */
+  function ringPeriod(){
+    var o=list.querySelector('.ch:not(.dupe)'),d=list.querySelector('.ch.dupe');
+    if(!o||!d)return 0;
+    var p=d.offsetTop-o.offsetTop;
+    return p>=list.clientHeight+150?p:0;
+  }
+  function sync(){ /* жить от реального скролла */
+    if(raf){cancelAnimationFrame(raf);raf=null}
+    anim=false;
+    cur=target=applied=list.scrollTop;
+  }
+  function tick(){
+    raf=null;
+    if(!active()){sync();return}              /* список раскрыли/мобиле — хватит */
+    var d=target-cur;
+    if(Math.abs(d)<0.5){                      /* цель догнана — мягкая остановка */
+      cur=target;
+      anim=false;
+      applied=list.scrollTop=target;
+      return;
+    }
+    anim=true;
+    cur+=d*0.16;
+    applied=list.scrollTop=cur;
+    raf=requestAnimationFrame(tick);
+  }
+  /* плавный довод извне (клик по главе в рейке): цель меняется, список
+     догоняет её той же инерцией; вне рейки — просто ставим позицию */
+  chWheelGoto=function(pos){
+    if(!active()){list.scrollTop=pos;return}
+    if(!anim)sync();
+    var max=list.scrollHeight-list.clientHeight;
+    if(pos<0)pos=0;
+    if(pos>max)pos=max;
+    target=pos;
+    anim=true;
+    if(!raf)raf=requestAnimationFrame(tick);
+  };
+  list.addEventListener('wheel',function(e){
+    if(mqMobile.matches)return;               /* на мобиле список — своя шторка */
+    if(!document.body.classList.contains('side-hidden'))return;
+    var max=list.scrollHeight-list.clientHeight;
+    if(max<=4)return;                         /* весь список виден — крутить нечего */
+    e.preventDefault();
+    if(!anim)sync();                          /* первый шаг — от текущего места */
+    target+=e.deltaY;
+    var jumped=false,per=ringPeriod();
+    if(per){
+      /* бесшовное кольцо: прыжок на период — видимые строки не меняются */
+      if(target>max){target-=per;cur-=per;jumped=true}
+      else if(target<0){target+=per;cur+=per;jumped=true}
+    }else{
+      if(target>max)target=max;               /* упёрлись в последнюю главу — стоп */
+      if(target<0)target=0;                   /* упёрлись в первую — стоп */
+    }
+    if(target>max)target=max;                 /* страховка после цикла */
+    if(target<0)target=0;
+    if(cur>max)cur=max;
+    if(cur<0)cur=0;
+    if(jumped)applied=list.scrollTop=cur;     /* прыжок на том же тике */
+    anim=true;
+    if(!raf)raf=requestAnimationFrame(tick);
+  },{passive:false});
+  /* внешняя прокрутка (скроллбар, программный центринг) — принимаем её как
+     свою цель; свою догоняющую анимацию в этот момент останавливаем */
+  list.addEventListener('scroll',function(){
+    if(!anim){cur=target=applied=list.scrollTop;return}
+    if(Math.abs(list.scrollTop-applied)>2)sync();
+  },{passive:true});
+  window.addEventListener('resize',function(){
+    if(anim){
+      var max=list.scrollHeight-list.clientHeight;
+      if(target>max)target=max;
+      if(target<0)target=0;
+    }else sync();
+  });
+})();
+
+/* визуальное «колесо» — только в свёрнутой рейке (body.side-hidden): ряды едут
+   по горизонтали волной — сверху выезжают из-за левого края (гаснут, пока
+   цифры не внутри), к середине встают ровно на своё место (не торчат вправо
+   от стены: максимум --wx = 0 = позиция без колеса), снизу снова уезжают
+   влево за край и гаснут (ступень |t|^3). Половинок номеров на краю не
+   остаётся. Никакого rotateX/сжатия: высота строк, символы и палки не
+   меняются — двигается только translateX (--wx). В раскрытом списке глав
+   барабана нет — обычный список; на мобиле/в zen переменные снимаются */
+var chWheelUpdate=null;
+(function(){
+  var list=$('#chlist');if(!list)return;
+  var raf=null;
+  var reduce=matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function clear(){
+    var rows=list.children;
+    for(var i=0;i<rows.length;i++){
+      rows[i].style.removeProperty('--wx');
+      rows[i].style.removeProperty('--wo');
+      rows[i].style.removeProperty('--wco');
+    }
+  }
+  function paint(){
+    raf=null;
+    loopFit();                               /* держать no-loop в актуальном виде */
+    /* эффект — только в рейке: раскрытый список, мобиле, zen, reduce — чисто */
+    if(reduce||mqMobile.matches||workspace.hidden
+       ||document.body.classList.contains('zen')
+       ||!document.body.classList.contains('side-hidden')){clear();return}
+    var h=list.clientHeight;
+    if(h<40){clear();return}
+    var box=list.getBoundingClientRect();
+    var half=box.height/2,ctr=box.top+half;
+    var Aneg=24,K=3;
+    var rows=list.children,i;
+    var els=[],ts=[],nls=[];
+    /* сперва все замеры (один reflow), затем запись */
+    for(i=0;i<rows.length;i++){
+      var el=rows[i];
+      var r=el.getBoundingClientRect();
+      if(!r.height){els.push(null);ts.push(0);nls.push(0);continue}
+      var d=((r.top+r.height/2)-ctr)/half;
+      if(d>1)d=1;else if(d<-1)d=-1;
+      var prev=parseFloat(el.style.getPropertyValue('--wx'))||0;
+      var num=el.querySelector('.num');
+      /* база без текущего сдвига: левый край номера (или блока меток) */
+      var nl=(num?num.getBoundingClientRect().left:r.left)-prev;
+      els.push(el);ts.push(d);nls.push(nl);
+    }
+    for(i=0;i<els.length;i++){
+      if(!els[i])continue;
+      var t=ts[i];
+      /* т=0 (середина) -> 0: на своём месте, без выступа вправо от стены;
+         |т|=1 (края) -> -Aneg: уходят влево за край и гаснут */
+      var w=-Aneg*Math.pow(Math.abs(t),K);
+      var e=els[i];
+      e.style.setProperty('--wx',w.toFixed(1)+'px');
+      /* слева: ряд тускнеет, приближаясь к краю, и гаснет к −13px — выезжает
+         из-за левого края и уезжает за него без полуглифов; полная яркость —
+         с позиции покоя (relL>=1) */
+      var relL=nls[i]+w-box.left;
+      var opL=Math.min(1,Math.max(0,(relL+13)/14));
+      if(opL<0.995)e.style.setProperty('--wo',opL.toFixed(3));
+      else e.style.removeProperty('--wo');
+      e.style.removeProperty('--wco');
+    }
+  }
+  function schedule(){if(raf==null)raf=requestAnimationFrame(paint)}
+  chWheelUpdate=schedule;
+  list.addEventListener('scroll',schedule,{passive:true});
+  window.addEventListener('resize',schedule);
+  /* при перетаскивании метки drop-позиции меряются по rect — барабан мешает */
+  list.addEventListener('dragstart',function(){clear()});
+  list.addEventListener('dragend',schedule);
+  var ob=new MutationObserver(schedule);
+  ob.observe(document.body,{attributes:true,class:'class'});
+})();
 
 function renderMarksRail(){
   var rail=$('#marksRail');
@@ -693,13 +955,12 @@ function renderMarksRail(){
   all.forEach(function(it){
     var dot=mk('button');
     dot.type='button';
-    dot.className='mr-dot'+(it.ch.id===b.current?'':' other');
-    dot.title=it.m.label+(it.ch.id===b.current?'':' · гл. '+(it.idx+1));
-    dot.addEventListener('mouseenter',function(){showMarkTip(dot,it.m.label,it.idx+1,true)});
-    dot.addEventListener('mouseleave',hideMarkTip);
-    dot.addEventListener('focus',function(){showMarkTip(dot,it.m.label,it.idx+1,true)});
-    dot.addEventListener('blur',hideMarkTip);
-    dot.addEventListener('click',function(e){e.stopPropagation();hideMarkTip();jumpToMark(it.ch.id,it.m.id)});
+    var cur=it.ch.id===b.current;
+    dot.className='mr-dot'+(cur?' act':' other');
+    dot.title=it.m.label+(cur?'':' · гл. '+(it.idx+1));
+    var d=mk('span');d.className='d';d.setAttribute('aria-hidden','true');dot.appendChild(d);
+    var t=mk('span');t.className='t';t.textContent=it.m.label;dot.appendChild(t);
+    dot.addEventListener('click',function(e){e.stopPropagation();jumpToMark(it.ch.id,it.m.id)});
     rail.appendChild(dot);
   });
   rail.classList.add('on');
@@ -716,9 +977,24 @@ function updateCrumb(){
 function loadChapter(c){
   zenAnchor=null;
   if(!c||typeof c!=='object')c={id:null,html:'<p></p>',pos:0,marks:[]};   /* L7 */
-  editor.innerHTML=c.html||'<p></p>';
+  /* F15: html из хранилища/сервера вставляем в живой DOM; если в нём видна
+     исполняемая разметка (обработчик события, svg onload, ссылка-скрипт) —
+     прогоняем через санитайзер. Обычный текст и комментарии Памятки
+     (<!--pamatka-v32-->) не трогаем, чтобы не сбрасывать их на шаблон. */
+  var html=c.html||'<p></p>';
+  if(typeof hardenChapterHtml==='function'){
+    var hardened=hardenChapterHtml(html);
+    if(hardened!==html&&c.id){
+      /* санированную копию пишем в хранилище сразу: иначе печать/чталка
+         и следующие loadChapter будут читать исходную грязь из ch.html */
+      c.html=hardened;html=hardened;
+      try{persist()}catch(e){}
+    }
+  }
+  editor.innerHTML=html;
   if(!editor.firstElementChild)editor.innerHTML='<p></p>';
   editorOwned=!foreignDoc&&!isReadOnly();   /* F14: DOM = своя глава? */
+  lastCaretOffset=null;                     /* позиция каретки старой главы не нужна */
   ensureNoteIds();
   applyMarks(false);
   scroller.scrollTop=(typeof c.pos==='number')?c.pos:0;
@@ -1025,9 +1301,19 @@ function buildPrintBook(){
   if(workspace.hidden)return;
   var b=book();if(!b)return;
   var cur=currentCh();
+  /* печать служебной главы (Памятка/Заметки): она вне состава книги —
+     печатаем только её, иначе Ctrl+P отдаёт всю рукопись без неё */
+  if(cur&&(isPamatka(cur)||isNotesCh(cur))){
+    var svc=mk('div');svc.className='pb-ch';svc.innerHTML=hardenChapterHtml(cleanHtml());
+    pb.appendChild(svc);
+    return;
+  }
   var t=mk('div');t.className='pb-title';t.textContent=b.title||'Без названия';pb.appendChild(t);
   visibleChapters(b).forEach(function(ch){
     var html=(cur&&ch.id===cur.id)?cleanHtml():ch.html;
+    /* F15: печать минует гейт loadChapter — прогоняем через детектор,
+       иначе <img onerror> из хранилища выполнится и в #printBook */
+    if(typeof hardenChapterHtml==='function')html=hardenChapterHtml(html);
     var d=mk('div');d.className='pb-ch';d.innerHTML=html;pb.appendChild(d);
   });
 }
@@ -1041,16 +1327,34 @@ $('#btnSide').addEventListener('click',function(){
   }
   hideMarkTip();
   renderMarksRail();
+  setTimeout(railCenterActive,420);
   setTimeout(positionEdRz,500);
 });
 $('#veil').addEventListener('click',function(){document.body.classList.remove('side-open')});
 $('#btnZen').addEventListener('click',toggleZen);
 $('#zenpill').addEventListener('click',toggleZen);
+/* пилюля «РЕЖИМ ФОКУСА» гаснет через ~3.5с — в фокусе не должно быть мусора;
+   всплывает снова при движении курсора/тапе и по ESC */
+var zenPillTid=0;
+function zenPillShow(reset){
+  var p=$('#zenpill');if(!p)return;
+  clearTimeout(zenPillTid);
+  if(!document.body.classList.contains('zen')){p.classList.remove('hide');return}
+  if(reset!==false)p.classList.remove('hide');
+  zenPillTid=setTimeout(function(){p.classList.add('hide')},3500);
+}
+document.addEventListener('mousemove',function(){
+  if(document.body.classList.contains('zen'))zenPillShow();
+},{passive:true});
+document.addEventListener('touchstart',function(){
+  if(document.body.classList.contains('zen'))zenPillShow();
+},{passive:true});
 function toggleZen(){
   var on=document.body.classList.toggle('zen');
   $('#btnZen').classList.toggle('on',on);
   state.zen=on;persist();
   if(on)document.body.classList.remove('side-open');
+  zenPillShow(on);
   if(!on){
     zenAnchor=null;
     Array.prototype.forEach.call(editor.children,function(el){el.style.opacity='';el.classList.remove('lit')});
@@ -1130,7 +1434,7 @@ function buildHtmlDoc(b){
     : '';
   var css =
     '@import url("https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,300..700;1,7..72,300..700&family=JetBrains+Mono:wght@400;500&display=swap");'+
-    ':root{--ink:#1a1814;--ink2:#5a564d;--ink3:#8a8574;--accent:#c93a2b;--bg:#f6f4ee;--line:rgba(26,24,20,.14);--line2:rgba(26,24,20,.08)}'+
+    ':root{--ink:#1a1814;--ink2:#5a564d;--ink3:#8a8574;--accent:#b7301f;--bg:#f6f4ee;--line:rgba(26,24,20,.14);--line2:rgba(26,24,20,.08)}'+
     '@media (prefers-color-scheme:dark){:root{--ink:#ece7d8;--ink2:#b8b1a1;--ink3:#8d8778;--accent:#ff6a52;--bg:#161411;--line:rgba(233,228,214,.2);--line2:rgba(233,228,214,.1)}}'+
     '*{box-sizing:border-box}html{background:var(--bg)}'+
     'body{margin:0;background:var(--bg);color:var(--ink);font-family:"Literata",Georgia,"Times New Roman",serif;font-size:18px;line-height:1.78;-webkit-font-smoothing:antialiased}'+
@@ -1202,7 +1506,7 @@ function doExport(kind){
   else if(kind==='html'){downloadBlob(buildHtmlDoc(b),'text/html;charset=utf-8',base+'.html');toast('Сохранено '+base+'.html · '+fmt(w)+' слов')}
   else{downloadBlob(buildTxt(b),'text/plain;charset=utf-8',base+'.txt');toast('Сохранено '+base+'.txt · '+fmt(w)+' слов')}
 }
-function closeExportMenu(){$('#exportMenu').classList.remove('on')}
+function closeExportMenu(){$('#exportMenu').classList.remove('on');var eb=$('#btnExport');if(eb)eb.setAttribute('aria-expanded','false')}
 function openExportMenu(){
   var m=$('#exportMenu'),b=book();if(!b)return;
   var w=bookWords(b),n=visibleChapters(b).length,notes=collectNotes().length;
@@ -1217,6 +1521,7 @@ function openExportMenu(){
   m.style.top=(r.bottom+8)+'px';
   m.style.left=Math.max(10,Math.min(r.left-180,innerWidth-260))+'px';
   m.classList.add('on');
+  $('#btnExport').setAttribute('aria-expanded','true');
   m.querySelectorAll('.bm-item').forEach(function(btn){
     btn.addEventListener('click',function(){
       var k=btn.dataset.k;closeExportMenu();
@@ -1254,7 +1559,9 @@ document.addEventListener('keydown',function(e){
     if(inp.value.trim().length>=2)showSearchResults();
     return;
   }
-  if(e.key==='Escape'){
+  /* defaultPrevented: поиск в #spInput уже сработал (14-search.js) —
+     не закрываем вдобавок панель/чужую книгу */
+  if(e.key==='Escape'&&!e.defaultPrevented){
     if($('#exportMenu')&&$('#exportMenu').classList.contains('on')){closeExportMenu();return}
     if($('#accMenu')&&$('#accMenu').classList.contains('on')){closeAccMenu();return}
     if($('#wikiViewModal').classList.contains('on')){closeWikiView();return}

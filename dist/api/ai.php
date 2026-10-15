@@ -21,6 +21,8 @@ declare(strict_types=1);
 
 const AI_UPSTREAM_DEFAULT = 'http://127.0.0.1:8080';
 const AI_MAX_BODY        = 256 * 1024; /* предел тела запроса от браузера */
+const AI_MAX_TOKENS      = 16384;      /* потолок max_tokens: браузер не должен
+                                          просить больше (PHP 8 undefined-const) */
 const AI_CONNECT_TIMEOUT = 8;          /* сек: соединение с прокси */
 const AI_STREAM_WAIT     = 180;        /* сек: ожидание ответа/следующего фрагмента */
 
@@ -44,7 +46,12 @@ function ai_fail(int $code, string $kind, string $detail): void
     ]);
 }
 
-/** Только свои запросы: POST принимаем лишь с этого же origin. */
+/** Только свои запросы: сравниваем origin c HTTP_HOST, включая порт.
+ *  Порт сверяем строго: обе стороны без порта (дефолтные 80/443) либо оба
+ *  совпадающих явных — «origin с портом, Host без» не считаем совпадением.
+ *  Раньше host брался целиком из HTTP_HOST (с портом), а parse_url даёт host
+ *  без порта — на любом нестандартном порту (php -S localhost:8088) всё
+ *  падало в 403. */
 function ai_same_origin_ok(): bool
 {
     $sfs = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
@@ -55,9 +62,20 @@ function ai_same_origin_ok(): bool
     if ($origin === '') {
         return true; // curl/скрипты без Origin — но у них и тела нет ключей
     }
-    $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-    $p    = parse_url($origin);
-    return is_array($p) && isset($p['host']) && strtolower((string)$p['host']) === $host;
+    $p = parse_url($origin);
+    if (!is_array($p) || !isset($p['host'])) {
+        return false;
+    }
+    $oh = strtolower((string)$p['host']);
+    $op = isset($p['port']) ? (int)$p['port'] : null;
+    $h  = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+    $hh = $h;
+    $hp = null;
+    if (preg_match('/^(.+):(\d+)$/', $h, $m)) {
+        $hh = $m[1];
+        $hp = (int)$m[2];
+    }
+    return $oh === $hh && ($op === $hp || ($op === null && $hp === null));
 }
 
 function ai_key(): string
@@ -122,8 +140,18 @@ if (!in_array($method, ['GET', 'HEAD', 'POST'], true)) {
 if ($method === 'POST' && $action !== 'chat') {
     ai_fail(405, 'bad_request', 'POST доступен только для chat');
 }
-if ($method === 'POST' && !ai_same_origin_ok()) {
+/* Квота DeepSeek открыта любому посетителю (так задумано), но только для
+   браузерных запросов с сайта: чужие страницы (`<img src=…>`) несут
+   Sec-Fetch-Site: cross-site и отсекаются функцией, а скриптовые curl-POST
+   без единого браузерного сигнала — здесь. GET без заголовков разрешён:
+   им проверяют живость релея (curl '?action=models'). */
+if (!ai_same_origin_ok()) {
     ai_fail(403, 'bad_request', 'запрос с чужого origin');
+}
+if ($method === 'POST'
+    && (($_SERVER['HTTP_SEC_FETCH_SITE'] ?? '') === '')
+    && (($_SERVER['HTTP_ORIGIN'] ?? '') === '')) {
+    ai_fail(403, 'bad_request', 'POST без браузерных сигналов origin');
 }
 
 $body   = '';
@@ -143,7 +171,13 @@ if ($method === 'POST') {
     if (!is_array($j)) {
         ai_fail(400, 'bad_request', 'некорректный JSON');
     }
+    /* клиент не управляет бюджетом генерации: свой max_tokens обрезаем
+       до потолка (8k-книги влезают, шесть цифр — нет) */
+    if (isset($j['max_tokens'])) {
+        $j['max_tokens'] = max(1, min((int)$j['max_tokens'], AI_MAX_TOKENS));
+    }
     $stream = !empty($j['stream']);
+    $body   = (string)json_encode($j, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 
 /* ── Запрос к прокси на этом же хосте ─────────────────────────────────── */
@@ -159,7 +193,7 @@ if ($key !== '') {
 
 $ctx = stream_context_create([
     'http' => [
-        'method'          => $method === 'GET' ? 'GET' : 'POST',
+        'method'          => $method === 'POST' ? 'POST' : 'GET', /* HEAD не должен уходить в прокси POST-ом */
         'header'          => $headers,
         'content'         => $method === 'POST' ? $body : '',
         'timeout'         => AI_CONNECT_TIMEOUT,

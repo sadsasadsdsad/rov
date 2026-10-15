@@ -8,8 +8,7 @@
  * Порядок: подключается ПОСЛЕДНИМ — перекрывает более ранние правила.
  * ========================================================================== */
 
-@media (max-width:1100px){#wcTop{display:none}}
-@media (max-width:1000px){#btnNote,#btnNotesPanel{display:none}}
+@media (max-width:1000px){#btnNote,#btnNotesPanel{display:none}.tb-grp{padding:0;background:none;border:0;margin-right:0;gap:0}}
 @media (max-width:880px){
   .tb-left{min-width:150px}
   aside{position:fixed;top:0;left:0;bottom:0;width:min(300px,84vw)!important;flex:none;margin:0;transform:translateX(-105%);transition:transform .4s cubic-bezier(.4,0,.2,1);box-shadow:0 0 48px rgba(0,0,0,.3);background:var(--panel);z-index:60}
@@ -18,7 +17,7 @@
   body.side-hidden aside .brand,body.side-hidden aside .bookbox,body.side-hidden aside .chapters-label,body.side-hidden aside #addCh,body.side-hidden aside .side-foot{display:flex}
   body.side-hidden .ch .ttl,body.side-hidden .ch .wc,body.side-hidden .ch .del{display:block}
   body.side-hidden .ch{justify-content:flex-start;gap:10px;padding:8px 10px;width:auto;align-items:center}
-  body.side-hidden .ch .num{display:grid;place-items:center;width:25px;height:18px;font-size:9px;letter-spacing:0;border:1px solid var(--line2);background:transparent;border-radius:5px;padding:0;color:var(--ink3);overflow:visible;line-height:1;transition:color .18s,border-color .18s;gap:0}
+  body.side-hidden .ch .num{display:grid;place-items:center;width:25px;height:18px;font-size:9px;letter-spacing:0;border:1px solid var(--line2);background:transparent;border-radius:10px;padding:0;color:var(--ink3);overflow:visible;line-height:1;transition:color .18s,border-color .18s;gap:0}
   body.side-hidden .ch .num::after{display:none}
   body.side-hidden .ch.active .num{border-color:var(--accent);color:var(--accent);font-weight:500}
   body.side-hidden .ch-marks{display:none}
@@ -73,10 +72,7 @@
   .gp-name{flex:0 0 42%}
   .wp-tab{min-width:0;padding:7px 10px;font-size:9px}
   .gp-slider{min-width:100px;font-size:8px}
-  .gp-hint{right:64px;font-size:8px}
 }
-.empty-hero{text-align:center;padding:28px 18px;border:1.5px dashed var(--line);border-radius:var(--r-lg);color:var(--ink3);font-size:13px;line-height:1.7}
-.empty-hero b{color:var(--ink2)}
 #exportMenu{position:fixed;z-index:95;width:250px;background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);padding:6px;opacity:0;visibility:hidden;transform:translateY(6px) scale(.98);pointer-events:none;transition:opacity .16s,visibility .16s,transform .16s}
 #exportMenu.on{opacity:1;visibility:visible;transform:none;pointer-events:auto}
 #exportMenu .bm-item{text-align:left;width:100%}
@@ -140,7 +136,7 @@
 .auth-user:hover{border-color:var(--accent);background:var(--hover)}
 .auth-user:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .auth-ava{width:38px;height:38px;flex:0 0 auto;display:grid;place-items:center;border-radius:11px;background:var(--ink);color:var(--bg);font-family:var(--f-disp);font-size:13px;font-weight:500;letter-spacing:.02em;transition:background .18s,color .18s}
-.auth-user:hover .auth-ava{background:var(--accent);color:#fff}
+.auth-user:hover .auth-ava{background:var(--accent);color:var(--bg)}
 .auth-user .au-meta{display:flex;flex-direction:column;flex:1;min-width:0;gap:2px}
 .auth-user .au-n{font-size:14px;font-weight:500;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
 .auth-user .au-d{font-family:var(--f-ui);font-size:9px;color:var(--ink3);letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -152,7 +148,8 @@
 .auth-optional{font-family:var(--f-ui);font-size:8px;letter-spacing:.06em;color:var(--ink3);text-transform:none;letter-spacing:0}
 .auth-pass-wrap{position:relative}
 .auth-pass-wrap input{padding-right:40px}
-.auth-pass-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:var(--ink3);background:transparent;border:0;cursor:pointer;font-size:14px;line-height:1;transition:color .15s,background .15s}
+.auth-pass-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:var(--ink3);background:transparent;border:0;cursor:pointer;transition:color .15s,background .15s}
+.auth-pass-toggle svg{width:16px;height:16px;display:block}
 .auth-pass-toggle:hover{color:var(--ink);background:var(--hover)}
 .auth-strength{display:flex;gap:4px;margin-top:6px}
 .auth-strength i{flex:1;height:3px;border-radius:2px;background:var(--line2);transition:background .2s}

@@ -22,6 +22,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 AIKEY_FILE="$SCRIPT_DIR/.aikey"
 SRC_ARCHIVE="${1:-/root/web2api.tar.gz}"
+DOMAIN="${2:-rov.smartliba.ru}"
 DEST="/opt/web2api"
 UNIT="/etc/systemd/system/web2api.service"
 UPSTREAM="http://127.0.0.1:8080"
@@ -61,6 +62,13 @@ chgrp www-data "$AIKEY_FILE" 2>/dev/null || true
 chmod 640 "$AIKEY_FILE"
 
 echo "==> 3/5 Раскладка кода в $DEST"
+# runtime-состояние прокси (.env с настройками, data/ с авторизованными
+# аккаунтами и их токенами) обязано пережить переустановку: без этого
+# повторный «идемпотентный» запуск убивал обновлённые токены и ронял ИИ
+KEEP="$(mktemp -d)"
+for f in .env data; do
+  [[ -e "$DEST/$f" ]] && cp -a "$DEST/$f" "$KEEP/" 2>/dev/null || true
+done
 rm -rf "$DEST"
 mkdir -p "$DEST"
 tar -xzf "$SRC_ARCHIVE" -C "$DEST"
@@ -72,6 +80,14 @@ if [[ ! -f "$DEST/server.py" ]]; then
   mv "$sub"/* "$DEST"/
   shopt -u dotglob
 fi
+# сохранённое состояние важнее архива (архив может быть старым)
+for f in .env data; do
+  if [[ -e "$KEEP/$f" ]]; then
+    rm -rf "$DEST/$f"
+    mv "$KEEP/$f" "$DEST/"
+  fi
+done
+rm -rf "$KEEP"
 chmod 600 "$DEST/.env" 2>/dev/null || true
 chmod 600 "$DEST/data/accounts.json" 2>/dev/null || true
 # ключ прокси = ключ релея (.aikey) — единственный источник правды
@@ -127,7 +143,13 @@ if [[ $ok -ne 1 ]]; then
 fi
 echo "    health:      $(curl -s "$UPSTREAM/health")"
 echo "    models(ключ): HTTP $(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $AIKEY" "$UPSTREAM/v1/models")"
-RELAY_CODE="$(curl -s -o /dev/null -w '%{http_code}' --resolve rov.smartliba.ru:443:127.0.0.1 https://rov.smartliba.ru/api/ai.php?action=models || true)"
+# проверка релея — по домену вторым аргументом; без SSL-сертификата
+# ходим по http через nginx
+if [[ -d "/etc/letsencrypt/live/$DOMAIN" ]]; then
+  RELAY_CODE="$(curl -s -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/ai.php?action=models" || true)"
+else
+  RELAY_CODE="$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $DOMAIN" "http://127.0.0.1/api/ai.php?action=models" || true)"
+fi
 echo "    релей сайта:  HTTP $RELAY_CODE  (200 — всё работает; 503 — DeepSeek лёг, сайт покажет «повторить»)"
 echo
 echo "ГОТОВО. Проверь сам: открой сайт, кнопка ИИ внизу справа — «DeepSeek на связи»."

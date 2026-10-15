@@ -8,15 +8,15 @@
  * Порядок: после 05; разметка тулбара — 12-graph.js.
  * ========================================================================== */
 /* ====== ГРАФ — улучшенная версия ====== */
-.gp-bar{display:flex;gap:4px;align-items:center;padding:8px 12px;flex:0 0 auto;flex-wrap:wrap;border-bottom:1px dashed var(--line2);background:var(--card-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;z-index:2}
+.gp-bar{display:flex;gap:6px;align-items:center;padding:10px 14px;flex:0 0 auto;flex-wrap:wrap;border-bottom:1px dashed var(--line2);background:var(--card-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;z-index:2}
 .gp-mode{font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);border-radius:99px;padding:4px 9px;color:var(--ink3);transition:color .16s,border-color .16s,background .16s;background:transparent;white-space:nowrap}
 .gp-mode:hover{color:var(--ink);border-color:var(--line)}
-.gp-mode.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.gp-mode.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
 .gp-sp{flex:1;min-width:2px}
 .gp-toggle{font-family:var(--f-ui);font-size:9px;letter-spacing:.08em;text-transform:uppercase;border:1px dashed var(--line2);border-radius:99px;padding:4px 9px;color:var(--ink3);transition:color .16s,border-color .16s,background .16s;background:transparent;white-space:nowrap}
 .gp-toggle:hover{border-color:var(--accent);color:var(--accent)}
 .gp-toggle.on{border-style:solid;border-color:var(--accent);color:var(--accent);background:var(--sel)}
-.gp-sliders{display:flex;gap:14px;align-items:center;padding:6px 14px 8px;flex:0 0 auto;border-bottom:1px dashed var(--line2);flex-wrap:wrap}
+.gp-sliders{display:flex;gap:14px;align-items:center;padding:8px 14px 10px;flex:0 0 auto;border-bottom:1px dashed var(--line2);flex-wrap:wrap}
 .gp-slider{display:flex;align-items:center;gap:8px;font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);flex:1;min-width:150px}
 .gp-slider input[type=range]{flex:1;accent-color:var(--accent);height:3px;min-width:60px;cursor:pointer}
 .gp-slider .gp-val{color:var(--accent);min-width:26px;text-align:right;font-weight:500;letter-spacing:.02em}
@@ -81,7 +81,7 @@
   position:absolute;
   bottom:8px;left:12px;right:76px;
   font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--ink3);opacity:.65;
+  text-transform:uppercase;color:var(--ink3);
   pointer-events:none;line-height:1.55;
 }
 .gp-tip{position:absolute;top:8px;left:12px;background:var(--card-glass);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-family:var(--f-ui);font-size:10px;color:var(--ink2);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s;pointer-events:none;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
@@ -106,7 +106,7 @@
 .gp-legend i{width:8px;height:8px;display:inline-block;transform:rotate(45deg);margin-right:6px;vertical-align:middle}
 .gp-legend .gp-legend-hint{
   text-transform:none;letter-spacing:.02em;font-style:italic;
-  color:var(--ink3);opacity:.75;margin-left:auto;
+  color:var(--ink3);margin-left:auto;
 }
 .gp-rank{flex:0 0 auto;overflow-y:auto;max-height:38%;margin-top:0;padding-right:2px}
 .gp-h{margin-bottom:8px}
@@ -131,5 +131,13 @@
   .gp-mode,.gp-toggle,.gp-tchip{padding-top:7px;padding-bottom:7px}
   .gp-zoom button{width:36px;height:36px}
   .gp-row{padding-top:6px;padding-bottom:6px}
+}
+/* узкий экран: легенда дублирует чипы типов (.gp-typebar), а подсказка
+   налезает на узлы и кнопки зума — обе скрываем */
+@media (max-width:720px){
+  .gp-legend,.gp-hint{display:none}
+  .gp-bar{padding:8px 12px}
+  .gp-sliders{padding:8px 12px 10px;gap:10px}
+  .gp-typebar{padding:0 12px 10px}
 }
 

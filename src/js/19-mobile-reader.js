@@ -95,9 +95,6 @@ function hideReaderUi(){
   if(document.body.classList.contains('rd-sheet'))return;
   document.body.classList.remove('rd-ui');
 }
-function toggleReaderUi(){
-  if(document.body.classList.contains('rd-ui'))hideReaderUi();else showReaderUi();
-}
 function openReaderSheet(){
   if(!isReader())return;
   document.body.classList.add('rd-sheet');

@@ -4,15 +4,20 @@
  * Что делает: кнопки «Спросить ИИ» (.ai-open — #aiFab в #topbar редактора
  *   на месте «Все заметки» и #aiFabLib в шапке библиотеки; обычные
  *   ibtn-иконки-искры без подложки и точки связи) открывают панель
- *   чата (#aiPanel)
- *   с контекстом текущей книги/главы и живого выделения; кнопки .sb-ai в
+ *   чата (#aiPanel — раздел «Чат» Энциклопедии) с селектором
+ *   контекста .ai-scope (текущая глава / глава и соседние / только
+ *   выделение / вся книга — см. aiBuildCtx); кнопки .sb-ai в
  *   #selbar («Испр.»/«Улуч.») прогоняют выделение через модель и показывают
  *   результат в #aiResModal («Применить» подменяет выделение с сохранением
- *   абзацев, заголовков и инлайн-форматирования). Модель умеет создавать
- *   книги и главы: попросите словами или чипом «＋ Новая книга» — она
- *   ответит JSON-действием (create_book / create_chapter / replace_chapter),
- *   лента покажет карточку с планом, а по кнопке действие исполнится
- *   (см. aiTryAction/aiRunAction).
+ *   абзацев, заголовков и инлайн-форматирования).
+ *   Ссылки на места в тексте: модель оборачивает точную цитату в [[…]]
+ *   (правило в промпте), чат рисует её чипом .ai-cite, клик находит цитату
+ *   в главе и подсвечивает фрагмент в #editor оверлеем .ai-flash — DOM
+ *   редактора не мутируется, сохранение не задевается (см. aiCiteGo).
+ *   Размышление (reasoning_content) показывается карточкой details.ai-think:
+ *   в стриме — живой индикатор с таймером, после — свёрнуто с длительностью.
+ *   Функций создания книги/глав (create_book / create_chapter /
+ *   replace_chapter) больше нет: ИИ только анализирует текст и отвечает.
  * Ключевое: по умолчанию ходит через свой сервер — /api/ai.php (релей в
  *   src/api/ai.php), который сам идёт в прокси deepseek-web2api на сервере
  *   (127.0.0.1:8080) с ключом, лежащим там же. Работает с любого устройства
@@ -32,8 +37,8 @@
 /* ── Конфигурация ──────────────────────────────────────────────────────── */
 var AI_LS='chernovik.ai.v1';
 var AI_TH_LS='chernovik.ai.threads.v1'; /* история диалогов (localStorage) */
-var aiCfg={base:'',key:'',model:'deepseek-chat'}; /* base='' → релей /api/ai.php */
-var aiThreads=[];               /* [{id,title,ctx,hist,ts}] — диалоги (страница) */
+var aiCfg={base:'',key:'',model:'deepseek-chat',scope:'ch'}; /* base='' → релей /api/ai.php; scope — селектор контекста */
+var aiThreads=[];               /* [{id,title,ctx,hist,ts}] — диалоги (история в LS) */
 var aiCur=null;                 /* активный диалог */
 var aiHist=[];                  /* hist активного диалога (алиас — код ниже не менялся) */
 var aiSeq=0;                    /* номер запроса: старый колбэк не гасит busy нового */
@@ -50,6 +55,7 @@ var aiPingTimer=0;             /* автоперепроверка связи, �
 var aiLastKind='';             /* последний режим правки (fix|improve) */
 var aiLastBtn=null;            /* кнопка, запустившая правку (для busy) */
 var aiThinkOpen=-1;            /* индекс сообщения с раскрытым «Рассуждением» */
+var aiThinkTimer=0;            /* тикер секунд для живого «Размышления» */
 
 /* Версия разметки, под которую написан этот файл (см. ?v=.. в index.html) и
    адрес, с которого файл загрузился. Нужно, чтобы заметить устаревший
@@ -57,10 +63,13 @@ var aiThinkOpen=-1;            /* индекс сообщения с раскр�
    эвристике): ассеты подгружаются свежие, а разметка — прошлая, и панель ИИ
    в ней просто отсутствует. document.currentScript живёт только во время
    выполнения скрипта, поэтому значение фиксируем здесь, сразу. */
-var AI_HTML_V='10';
+var AI_HTML_V='27'; /* = ?v= в index.html: при каждом бампе версии менять вместе с ним */
 var AI_SRC=(typeof document!=='undefined'&&document.currentScript&&document.currentScript.src)||'';
 
 function aiEl(id){return document.getElementById(id)}
+/* Привязка с проверкой: устаревшая разметка в кэше может не содержать
+   элемента — без guard один отсутствующий id обрывал бы весь aiInit */
+function aiOn(id,ev,fn){var el=aiEl(id);if(el)el.addEventListener(ev,fn)}
 /* Искра — единая иконка ИИ: кнопки в шапках, шапка панели, пустое
    состояние, карточка действия. Минималистичная 4-лучевая звезда
    с вогнутыми гранями (quadri-кривые), заливка currentColor */
@@ -98,6 +107,7 @@ function aiLoadCfg(){
     if(typeof j.base==='string'&&j.base)aiCfg.base=j.base;
     if(typeof j.key==='string')aiCfg.key=j.key;
     if(typeof j.model==='string'&&j.model)aiCfg.model=j.model;
+    if(typeof j.scope==='string'&&/^(ch|around|sel|book)$/.test(j.scope))aiCfg.scope=j.scope;
   }catch(e){}
 }
 function aiSaveCfg(){try{localStorage.setItem(AI_LS,JSON.stringify(aiCfg))}catch(e){}}
@@ -147,30 +157,169 @@ function aiSelectionRaw(){
   }catch(e){return ''}
 }
 
-/* ── Диалоги: история в localStorage (страница #aiPage + панель) ───────── */
-/* Активный диалог один на обе ленты (data-aimsgs): aiHist — алиас его hist.
-   ctx снимается при создании диалога (книга/глава/текст), чтобы вопросы
-   с страницы шли с тем же контекстом, с каким диалог начат. */
+/* ── Охват контекста: селектор .ai-scope ──────────────────────────────── */
+var AI_SCOPE_OPTS=[['ch','Текущая глава'],['around','Глава и соседние'],['sel','Только выделение'],['book','Вся книга']];
+function aiScope(){
+  return /^(ch|around|sel|book)$/.test(aiCfg.scope)?aiCfg.scope:'ch';
+}
+function aiScopeLabel(v){
+  for(var i=0;i<AI_SCOPE_OPTS.length;i++)if(AI_SCOPE_OPTS[i][0]===v)return AI_SCOPE_OPTS[i][1];
+  return 'Текущая глава';
+}
+function aiScopePaint(){
+  var el=aiEl('aiScope');if(!el)return;
+  var sp=el.querySelector('.ai-scope-t'),t=aiScopeLabel(aiScope());
+  if(sp&&sp.textContent!==t)sp.textContent=t;
+}
+function aiScopeSet(v){
+  if(!/^(ch|around|sel|book)$/.test(v))v='ch';
+  if(aiCfg.scope!==v){aiCfg.scope=v;aiSaveCfg()}
+  aiScopePaint();
+  aiRenderCtx();
+}
+function aiCloseScopeMenu(){
+  var m=aiEl('aiScopeMenu');if(m)m.classList.remove('on');
+  document.querySelectorAll('.ai-scope').forEach(function(b){b.setAttribute('aria-expanded','false')});
+}
+function aiScopeMenuOpen(btn){
+  var m=aiEl('aiScopeMenu');if(!m||!btn)return;
+  var cur=aiScope();
+  m.innerHTML='';
+  AI_SCOPE_OPTS.forEach(function(o){
+    var b=document.createElement('button');
+    b.type='button';b.className='bm-item'+(o[0]===cur?' act':'');
+    b.setAttribute('role','menuitemradio');
+    b.setAttribute('aria-checked',o[0]===cur?'true':'false');
+    b.innerHTML='<span class="t"></span>'+(o[0]===cur?'<span class="h">✓</span>':'');
+    b.querySelector('.t').textContent=o[1];
+    b.addEventListener('click',function(){aiScopeSet(o[0]);aiCloseScopeMenu()});
+    m.appendChild(b);
+  });
+  var r=btn.getBoundingClientRect();
+  m.style.top=(r.bottom+6)+'px';
+  m.style.left=Math.max(8,Math.min(r.left,innerWidth-260))+'px';
+  m.classList.add('on');
+  btn.setAttribute('aria-expanded','true');
+}
+/* Блоки текущей главы: живой DOM (для подсветки цитат нужны узлы), либо
+   сохранённый HTML, когда редактор не открыт (el:null — подсветим после
+   открытия главы, поиск цитат тогда идёт заново по живому DOM) */
+function aiChBlocks(){
+  var out=[];
+  try{
+    var live=(typeof editorOwned!=='undefined')&&editorOwned&&editor&&editor.children&&editor.children.length&&
+             typeof workspace!=='undefined'&&!workspace.hidden;
+    if(live){
+      Array.prototype.forEach.call(editor.children,function(el){
+        out.push({el:el,text:String(el.textContent||'')});
+      });
+    }else{
+      var c=currentCh();
+      if(c&&typeof c.html==='string'){
+        Array.prototype.forEach.call(tmp(c.html).children,function(el){
+          out.push({el:null,text:String(el.textContent||'')});
+        });
+      }
+    }
+  }catch(e){}
+  return out;
+}
+function aiChapterText(c){
+  var t='';
+  try{if(c&&typeof c.html==='string')t=tmp(c.html).textContent||''}catch(e){}
+  return String(t).replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ').replace(/^\s+|\s+$/g,'');
+}
+/* Пронумерованные абзацы: модель отвечает «[7] …» и цитирует вслепую —
+   номера дают ей ориентир, а нам — быструю проверку */
+function aiNumbered(blocks){
+  var out=[];
+  for(var i=0;i<blocks.length;i++){
+    var t=blocks[i].text.replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ').replace(/^\s+|\s+$/g,'');
+    out.push('['+(i+1)+'] '+t);
+  }
+  return out.join('\n\n');
+}
+/* Оглавление книги без служебных глав (заметки/памятка) */
+function aiBookChapters(){
+  var out=[];
+  try{
+    var b=book();
+    if(b)visibleChapters(b).forEach(function(c){
+      out.push({id:c.id,ch:c,title:chapterTitle(c)});
+    });
+  }catch(e){}
+  return out;
+}
+/* Текст главы в охвате — для «соседних» глав и «вся книга» */
+function aiCtxScopeText(sc){
+  var parts=[],i,chs;
+  if(sc==='sel'){
+    var sel=aiSelectionRaw();
+    if(sel)return 'Выделенный фрагмент:\n'+sel;
+    sc='ch';                            /* выделения нет — берём главу, а не пустоту */
+  }
+  if(sc==='book'){
+    chs=aiBookChapters();
+    for(i=0;i<chs.length;i++)parts.push('«'+chs[i].title+'»:\n'+aiCut(aiChapterText(chs[i].ch),3500));
+    return aiCut(parts.join('\n\n'),30000);
+  }
+  var blocks=aiChBlocks();
+  if(sc==='around'){
+    chs=aiBookChapters();
+    var curId='';
+    try{var cc=currentCh();curId=cc?cc.id:''}catch(e){}
+    var idx=-1;
+    for(i=0;i<chs.length;i++)if(chs[i].id===curId)idx=i;
+    if(idx>0)parts.push('Предыдущая глава «'+chs[idx-1].title+'» (выдержка):\n'+aiCut(aiChapterText(chs[idx-1].ch),1500));
+    if(blocks.length)parts.push(aiNumbered(blocks));
+    if(idx>=0&&idx<chs.length-1)parts.push('Следующая глава «'+chs[idx+1].title+'» (выдержка):\n'+aiCut(aiChapterText(chs[idx+1].ch),1500));
+    return parts.join('\n\n');
+  }
+  return blocks.length?aiNumbered(blocks):'';
+}
+/* Нормализация с картой позиций: цитата из ответа и текст главы сравниваются
+   одинаково (регистр, ё/е, тире, кавычки-пробелы), а map[i] хранит индекс
+   исходного символа — дальше строим Range без вмешательства в DOM */
+function aiNormMap(s){
+  var t='',map=[],raw=String(s==null?'':s),i,c,prevSp=true;
+  for(i=0;i<raw.length;i++){
+    c=raw.charAt(i).toLowerCase();
+    if(c==='ё')c='е';
+    else if(c==='—'||c==='–'||c==='−')c='-';
+    if(/\s/.test(c)){
+      if(prevSp)continue;
+      c=' ';prevSp=true;
+    }else prevSp=false;
+    t+=c;map.push(i);
+  }
+  if(t.charAt(0)===' '){t=t.slice(1);map.shift()}
+  if(t.charAt(t.length-1)===' '){t=t.slice(0,-1);map.pop()}
+  return {t:t,map:map};
+}
+
+/* ── Диалоги: история в localStorage (активный диалог панели) ──────────── */
+/* Активный диалог один: aiHist — алиас его hist. ctx снимается при
+   создании диалога (книга/глава/текст), чтобы вопросы шли с тем же
+   контекстом, с каким диалог начат. */
 function aiCtxSnap(){
   var b=null;try{b=book()}catch(e){}
-  var t=aiBookTitle(),ch=aiChTitle(),txt=aiChText();
+  var t=aiBookTitle(),ch=aiChTitle(),txt=aiChText(),chId='';
+  try{var c=currentCh();chId=c&&c.id?c.id:''}catch(e){}
   /* книга не открыта (страница без редактора) — берём контекст активного
      диалога, если он есть (быстрый чат продолжается) */
-  if(!t&&aiCur&&aiCur.ctx){t=aiCur.ctx.book;ch=aiCur.ctx.ch;txt=aiCur.ctx.chText}
-  return {bookId:b&&b.id?b.id:'',book:t,ch:ch,chText:aiCut(txt||'',9000)};
+  if(!t&&aiCur&&aiCur.ctx){t=aiCur.ctx.book;ch=aiCur.ctx.ch;txt=aiCur.ctx.chText;chId=aiCur.ctx.chId||''}
+  return {bookId:b&&b.id?b.id:'',book:t,ch:ch,chId:chId,chText:aiCut(txt||'',9000)};
 }
-/* Контекст для промпта: живой текст — если открыта та же книга, о которой
-   диалог; иначе снимок из диалога (не подмешиваем чужую книгу) */
+/* Контекст для промпта: живая книга — собираем текст по выбранному охвату
+   (.ai-scope: глава / соседние / выделение / вся книга); чужая книга —
+   снимок из диалога (не подмешиваем) */
 function aiCtxNow(){
   var c=(aiCur&&aiCur.ctx)||{};
   var live=aiCtxSnap();
-  if(c.bookId&&live.bookId&&c.bookId!==live.bookId)
-    return {title:c.book,ch:c.ch,text:c.chText};
-  if(c.bookId)
-    return {title:live.bookId===c.bookId?live.book:c.book,
-            ch:live.bookId===c.bookId?live.ch:c.ch,
-            text:live.bookId===c.bookId?(live.chText||c.chText):c.chText};
-  return {title:live.book,ch:live.ch,text:live.chText};
+  var sameBook=!c.bookId?true:(!!live.bookId&&c.bookId===live.bookId);
+  if(!sameBook)return {title:c.book,ch:c.ch,chId:c.chId||'',text:c.chText||''};
+  return {title:live.book||c.book,ch:live.ch||c.ch,chId:live.chId||c.chId||'',
+          text:aiCtxScopeText(aiScope())};
 }
 /* Массив истории, которому принадлежит сообщение m (на время потока
    активный диалог может смениться — работаем с найденным массивом) */
@@ -188,57 +337,31 @@ function aiThreadTouch(q){
   var i=aiThreads.indexOf(aiCur);
   if(i>0){aiThreads.splice(i,1);aiThreads.unshift(aiCur)} /* активный — наверх */
   aiSaveThreads();
+  aiRenderCtx();
 }
 function aiNewThread(){
   var th={id:uid()+'-'+Date.now().toString(36),title:'',ctx:aiCtxSnap(),hist:[],ts:Date.now()};
   aiThreads.unshift(th);
   aiCur=th;aiHist=th.hist;aiThinkOpen=-1;
   aiTrimThreads();aiSaveThreads();
-  aiRenderThreads();aiRenderCtx();aiRender();
+  aiRenderCtx();aiRender();
   return th;
-}
-function aiSwitchThread(id){
-  var th=null;
-  for(var i=0;i<aiThreads.length;i++)if(aiThreads[i].id===id)th=aiThreads[i];
-  if(!th||th===aiCur)return;
-  aiStop();aiBusy=false;aiErrMsg='';aiRetryPending=false;
-  if(aiRetryTimer){clearTimeout(aiRetryTimer);aiRetryTimer=0}
-  aiCur=th;aiHist=th.hist;aiThinkOpen=-1;
-  aiSetBusy(false);aiSaveThreads();
-  aiRenderThreads();aiRenderCtx();aiRender();
-}
-function aiDelThread(id){
-  var i,th=null;
-  for(i=0;i<aiThreads.length;i++)if(aiThreads[i].id===id){th=aiThreads[i];break}
-  if(!th)return;
-  if(th===aiCur){aiStop();aiBusy=false;aiSetBusy(false)}
-  aiThreads.splice(i,1);
-  if(th===aiCur){
-    if(aiThreads.length)aiSwitchThread(aiThreads[0].id);
-    else aiNewThread();
-    return;
-  }
-  aiSaveThreads();aiRenderThreads();
 }
 function aiTrimThreads(){while(aiThreads.length>20)aiThreads.pop()}
 /* Сериализация: режем поля по размеру — история живёт в localStorage.
-   Форма action — такая же, как в памяти: {plan:{…}, done} (раньше здесь
-   была плоская форма, и загрузчик отбрасывал карточку — баг) */
+   ctx сообщения {b,c} — книга/глава, к которым относится ответ: по ним
+   чип цитаты .ai-cite находит нужную главу (см. aiCiteGo) */
 function aiThreadSave(t){
   return {id:t.id,title:t.title,ts:t.ts,ctx:t.ctx,
     hist:t.hist.slice(-40).map(function(m){
-      var a=null;
-      if(m.action&&m.action.plan){
-        var p=m.action.plan;
-        a={done:m.action.done||'',
-           plan:{action:p.action,title:p.title,
-                 content:p.content?aiCut(p.content,2000):''}};
-        if(p.chapters)a.plan.chapters=p.chapters.slice(0,10).map(function(c){
-          return {title:c.title,content:aiCut(c.content,1500)};
-        });
-      }
-      return {role:m.role,content:aiCut(String(m.content==null?'':m.content),4000),
-              think:m.think?aiCut(m.think,1200):'',action:a,noFmt:m.noFmt?1:0};
+      /* во время уточнения (repairing) m.content занят стримом — в сохранение
+         уходит исходный ответ m.orig, иначе перезагрузка посреди уточнения
+         оставила бы «(пустой ответ)» */
+      var c=(m.repairing&&m.orig!=null)?m.orig:m.content;
+      var o={role:m.role,content:aiCut(String(c==null?'':c),4000),
+             think:m.think?aiCut(m.think,1200):'',noFmt:m.noFmt?1:0};
+      if(m.ctx&&(m.ctx.b||m.ctx.c))o.ctx={b:String(m.ctx.b||''),c:String(m.ctx.c||'')};
+      return o;
     })};
 }
 function aiSaveThreads(){
@@ -253,11 +376,23 @@ function aiSaveThreads(){
         aiThreads=aiThreads.slice(0,6);
         localStorage.setItem(AI_TH_LS,JSON.stringify(aiThreads.map(aiThreadSave)));
         if(aiThreads.indexOf(aiCur)<0){aiCur=aiThreads[0];aiHist=aiCur.hist}
-        aiRenderThreads();
       }catch(e2){}
     }
   },400);
 }
+/* Немедленная запись при уходе со страницы: отложенный save (400 мс) иначе
+   теряется — закрытие вкладки/перезагрузка в первые 400 мс после действия
+   стирали бы последнее изменение истории диалогов */
+function aiFlushThreads(){
+  if(!aiSaveTimer)return;
+  clearTimeout(aiSaveTimer);aiSaveTimer=0;
+  try{
+    if(aiThreads.length)localStorage.setItem(AI_TH_LS,JSON.stringify(aiThreads.map(aiThreadSave)));
+  }catch(e){}
+}
+addEventListener('beforeunload',aiFlushThreads);
+addEventListener('pagehide',aiFlushThreads);
+document.addEventListener('visibilitychange',function(){if(document.hidden)aiFlushThreads()});
 function aiLoadThreads(){
   aiThreads=[];
   try{
@@ -268,64 +403,52 @@ function aiLoadThreads(){
       aiThreads.push({
         id:String(t.id||uid()),title:String(t.title||''),ts:+t.ts||Date.now(),
         ctx:{bookId:String(t.ctx&&t.ctx.bookId||''),book:String(t.ctx&&t.ctx.book||''),
-             ch:String(t.ctx&&t.ctx.ch||''),chText:String(t.ctx&&t.ctx.chText||'')},
+             ch:String(t.ctx&&t.ctx.ch||''),chId:String(t.ctx&&t.ctx.chId||''),
+             chText:String(t.ctx&&t.ctx.chText||'')},
         hist:t.hist.filter(function(m){return m&&(m.role==='user'||m.role==='assistant')})
           .map(function(m){
-            /* принимаем обе формы: {plan:{…},done} и плоскую (старые записи) */
-            var a=(m.action&&(m.action.plan||m.action.action))?m.action:null;
-            var plan=a?(a.plan||a):null;
-            return {role:m.role,content:String(m.content||''),think:String(m.think||''),
-                    noFmt:!!m.noFmt,
-                    action:(plan&&(plan.action||plan.title))?
-                      {plan:plan,done:String(a.done||plan.done||'')}:null};
+            /* старые записи с action (создание книг/глав) читаем без него:
+               их content — обычный текст, он и отображается */
+            var o={role:m.role,content:String(m.content||''),think:String(m.think||''),
+                   noFmt:!!m.noFmt,ctx:null};
+            if(m.ctx&&(m.ctx.b||m.ctx.c))
+              o.ctx={b:String(m.ctx.b||''),c:String(m.ctx.c||'')};
+            return o;
           })
       });
     });
   }catch(e){}
   aiThreads.sort(function(a,b){return b.ts-a.ts});
   aiTrimThreads();
+  /* пусто — диалог НЕ создаём: пустой ключ не должен появляться в
+     localStorage, пока ИИ не пользовались (создаст первый вопрос —
+     см. aiNewThread) */
   if(aiThreads.length){aiCur=aiThreads[0];aiHist=aiCur.hist}
-  else aiNewThread();
+  else{aiCur=null;aiHist=[]}
 }
-function aiFmtTs(ts){
-  var d=new Date(ts),n=new Date();
-  function p2(x){return('0'+x).slice(-2)}
-  if(d.toDateString()===n.toDateString())return p2(d.getHours())+':'+p2(d.getMinutes());
-  var y=new Date(n.getTime()-86400000);
-  if(d.toDateString()===y.toDateString())return 'вчера';
-  return p2(d.getDate())+'.'+p2(d.getMonth()+1);
-}
-function aiRenderThreads(){
-  var box=aiEl('aiThreads');
-  if(!box)return;
-  var h='';
-  aiThreads.forEach(function(t){
-    var meta=(t.ctx&&t.ctx.book?'«'+aiCut(t.ctx.book,18)+'» · ':'')+aiFmtTs(t.ts);
-    h+='<div class="ai-thread'+(t===aiCur?' on':'')+'" role="listitem" data-aith="'+esc(t.id)+'" title="'+esc(t.title||'Новый чат')+'">'+
-       '<span class="t">'+esc(t.title||'Новый чат')+'</span>'+
-       '<span class="m">'+esc(meta)+'</span>'+
-       '<button class="del" type="button" data-aithdel="'+esc(t.id)+'" title="Удалить диалог" aria-label="Удалить диалог">×</button></div>';
-  });
-  box.innerHTML=h;
-}
-
-/* Системный промпт: книга + глава + её текст + опциональное выделение */
+/* Системный промпт: оглавление книги + контекст по охвату .ai-scope
+   (пронумерованные абзацы главы / выдержки соседних / вся книга) +
+   опциональное выделение + правила ссылок на места [[цитата]] */
 function aiSystemPrompt(extra){
-  var s='Ты — ассистент в приложении «Черновик» (чтение и правка рукописей).';
-  var cx=aiCtxNow(), title=cx.title, ch=cx.ch;
-  if(title)s+='\nКнига: «'+title+'».'+(ch?'\nТекущая глава: «'+ch+'».':'');
-  if(cx.text)s+='\n\nТекущий текст главы (может быть обрезан):\n"""\n'+aiCut(cx.text,9000)+'\n"""';
+  var s='Ты — ассистент в приложении «Черновик» (чтение и правка рукописей). Помогаешь автору разобрать текст: отвечаешь по книге, находишь ошибки и слабые места и объясняешь, ГДЕ именно в тексте что не так.';
+  var cx=aiCtxNow(),title=cx.title,ch=cx.ch;
+  if(title)s+='\nКнига: «'+title+'».'+(ch?'\nТекущая глава: «'+ch+'» (её абзацы пронумерованы [n] — так модель ориентируется в тексте).':'');
+  /* оглавление: модель должна понимать устройство рукописи целиком */
+  var list=aiBookChapters(),i,names=[],cur=-1;
+  if(list.length>1){
+    for(i=0;i<list.length;i++){
+      if(cx.chId&&list[i].id===cx.chId)cur=i;
+      names.push((i+1)+'. '+aiCut(list[i].title,40));
+    }
+    s+='\nГлавы: '+names.join('; ')+'.'+(cur>=0?' Работаешь с главой '+(cur+1)+'.':'');
+  }
+  if(cx.text)s+='\n\nКонтекст (текущая глава — с номерами абзацев, соседние главы — выдержки; может быть обрезан):\n"""\n'+aiCut(cx.text,12000)+'\n"""';
   if(extra)s+='\n\n'+extra;
-  /* Действия: модель сама создаёт книги/главы — отвечает JSON, лента
-     рисует карточку с планом, исполняет пользователь по кнопке.
-     Формулировка жёсткая: модель часто отвечала текстом «нажмите
-     "Создать книгу"» — а кнопка появляется только из JSON (см. aiTryAction) */
-  s+='\n\nДействия. Если тебя прямо просят создать книгу, написать новую главу или переписать текущую — ответь ТОЛЬКО одним JSON-объектом: первый символ {, последний }, вокруг ровно ничего. Без ``` , без пояснений, без списков и без фразы «нажмите кнопку» — кнопку пользователь увидит сам после твоего ответа:'+
-     '\n{"action":"create_book","title":"Название книги","chapters":[{"title":"Заголовок главы","content":"текст главы"}]} — 3–8 глав. Пиши связную книгу, а не конспект: продумай сюжетную дугу от завязки до финала, главы продолжают друг друга и не повторяют экспозицию; каждая глава — цельный эпизод, 3–7 абзацев через пустую строку (600–2000 знаков): живая проза с событиями, деталями и репликами героев вместо пересказа «как будто»; не подводи главу моралью и не заканчивай выводом; держи единый стиль и голос, заданные запросом;'+
-     '\n{"action":"create_chapter","title":"Заголовок","content":"текст главы до 8000 знаков, абзацы через пустую строку"};'+
-     '\n{"action":"replace_chapter","title":"Заголовок","content":"новый текст главы до 8000 знаков"}.'+
-     '\ncontent — простой текст без HTML и markdown; заголовок в content не включай. Если не просят создать или переписать — отвечай обычным текстом.';
-  s+='\n\nОтвечай по-русски, по существу, без воды. Если вопрос о конкретном месте — процитируй его.';
+  /* Ссылки на места: цитата в [[…]] — чип в чате, по клику подсветит
+     фрагмент в редакторе (см. aiCiteGo) */
+  s+='\n\nСсылки на места в тексте. Когда говоришь о конкретном месте (ошибка, спорный момент, повтор, сильная или слабая строчка) — после пояснения ставь точную цитату из этого места в двойных квадратных скобках: [[…]]. Требования: 3–15 слов подряд ДОСЛОВНО из контекста, без сокращений и пропусков внутри, цитата встречается в контексте один-в-один — по ней приложение найдёт и подсветит место в редакторе. Таких ссылок может быть несколько.';
+  s+='\n\nЧего не делать: не создавай книги и главы и не переписывай текст за автора — только анализ и ответы на вопросы. Не выдумывай фактов, которых нет в контексте: если данных не хватает — прямо скажи и уточни, что нужно.';
+  s+='\n\nОтвечай по-русски, по существу, без воды; без markdown-заголовков и жирного выделения.';
   return s;
 }
 
@@ -358,9 +481,12 @@ function aiReadSSE(body,emit){
       var c=o.choices&&o.choices[0];
       if(!c)return;
       var d=c.delta||c.message||{};
-      if(typeof d.reasoning_content==='string'&&d.reasoning_content){
-        emit(d.reasoning_content,true);return;
-      }
+      /* размышление: DeepSeek шлёт reasoning_content, часть релеев —
+         reasoning / thinking; ловим все три, иначе «размышление не видно» */
+      var rc=(typeof d.reasoning_content==='string')?d.reasoning_content:
+             ((typeof d.reasoning==='string')?d.reasoning:
+             ((typeof d.thinking==='string')?d.thinking:''));
+      if(rc){emit(rc,true);return}
       if(typeof d.content==='string'&&d.content)emit(d.content,false);
     }catch(e){}
   }
@@ -384,7 +510,16 @@ function aiReadSSE(body,emit){
 function aiRequest(messages,onDelta,onDone,onErr){
   var ctrl=new AbortController();
   aiAbort=ctrl;
-  var full='';
+  var full='',stalled=false;
+  /* Простой: сервер молчит дольше 60 с (обрыв связи без FIN) — рвём запрос,
+     иначе busy зависнет до ручного «Стоп». beat() сбрасывается каждым куском
+     потока и при ожидании заголовков; stall уходит как ретраебельная ошибка */
+  var idle=0;
+  function beat(){
+    if(idle)clearTimeout(idle);
+    idle=setTimeout(function(){stalled=true;try{ctrl.abort()}catch(e){}},60000);
+  }
+  beat();
   aiFetch(aiUrl('chat'),{
     method:'POST',headers:aiHeaders(),
     body:JSON.stringify({model:aiCfg.model,messages:messages,stream:true})
@@ -398,15 +533,22 @@ function aiRequest(messages,onDelta,onDone,onErr){
     }
     if(!res.body)throw new Error('Браузер не поддерживает потоковый ответ');
     return aiReadSSE(res.body,function(t,isThink){
+      beat();
       full+=t;
       onDelta(t,isThink);
     });
   }).then(function(){
+    if(idle)clearTimeout(idle);
     if(aiAbort===ctrl)aiAbort=null;
     onDone(full);
   }).catch(function(e){
+    if(idle)clearTimeout(idle);
     if(aiAbort===ctrl)aiAbort=null;
-    onErr(e);                                /* AbortError обрабатывает вызывающий */
+    if(stalled&&e&&e.name==='AbortError'){
+      var er=new Error('модель не отдавала данные 60 секунд');
+      er.status=0;                         /* 0 → ретраебельно → автоповтор */
+      onErr(er);
+    }else onErr(e);                        /* AbortError обрабатывает вызывающий */
   });
 }
 
@@ -458,6 +600,10 @@ function aiPing(){
       Array.prototype.forEach.call(document.querySelectorAll('[data-aidot]'),function(d){
         d.classList.toggle('ok',!!s.ok);
         d.classList.toggle('err',!s.ok);
+        /* статус не только цветом: у точки есть текст для скринридера */
+        var lbl=s.ok?'Связь с ИИ есть':'ИИ временно недоступен';
+        d.setAttribute('aria-label',lbl);
+        d.setAttribute('title',lbl);
       });
       if(s.ok){
         if(aiPingTimer){clearTimeout(aiPingTimer);aiPingTimer=0}
@@ -468,23 +614,33 @@ function aiPing(){
     });
 }
 
-/* Строка контекста: книга/глава диалога + живое выделение (selectionchange) */
+/* Строка контекста: книга/глава + охват (.ai-scope) + размер. Выделение
+   показываем всегда, когда оно есть — в запрос оно попадает отдельным
+   блоком независимо от охвата (см. aiAsk). Сознательно не дёргаем
+   aiCtxNow(): он собирает текст для промпта целиком, а label пересчитывается
+   на каждый selectionchange (см. debounce в aiInit) */
 function aiCtxLabel(){
   var c=(aiCur&&aiCur.ctx)||{}, parts=[];
-  var cx=aiCtxNow();
-  var bt=cx.title||c.book;
+  var live=aiCtxSnap();
+  var sameBook=!c.bookId?true:(!!live.bookId&&c.bookId===live.bookId);
+  var bt=sameBook?(live.book||c.book):c.book;
+  var ch=sameBook?(live.ch||c.ch):c.ch;
   if(bt)parts.push('«'+aiCut(bt,22)+'»');
-  if(cx.ch||c.ch)parts.push('глава «'+aiCut(cx.ch||c.ch,18)+'»');
+  var sc=aiScope();
+  if(sc==='book')parts.push('вся книга');
+  else if(ch)parts.push('глава «'+aiCut(ch,18)+'»');
+  if(sc==='around')parts.push('и соседние');
   var sel=aiSelection();
-  if(sel)parts.push('выделено '+sel.length+' зн.');
+  if(sel)parts.push('выделено '+fmt(sel.length)+' зн.');
+  else if(sc==='sel')parts.push('выделение пусто');
+  else if(sc==='ch'||sc==='around'){
+    var n=aiChText().length;                     /* дешёвая оценка размера */
+    if(n)parts.push('→ '+fmt(n)+' зн.');
+  }
   return parts.length?parts.join(' · '):'без контекста книги';
 }
 function aiRenderCtx(){
-  var t=aiCtxLabel();
-  var a=aiEl('aiPanelCtx');if(a)a.textContent=t;
-  var b=aiEl('aiPgCtx');if(b)b.textContent=t;
-  var ti=aiEl('aiPgTitle');
-  if(ti)ti.textContent=(aiCur&&aiCur.title)?aiCur.title:'Новый чат';
+  var a=aiEl('aiPanelCtx');if(a)a.textContent=aiCtxLabel();
 }
 
 /* ── Панель чата ───────────────────────────────────────────────────────── */
@@ -492,6 +648,8 @@ function aiOpenPanel(){
   var p=aiEl('aiPanel');
   if(!p)return;
   p.classList.add('on');
+  /* чат — раздел Энциклопедии: открываем панель вики на вкладке «Чат» */
+  if(typeof toggleWikiPanel==='function')toggleWikiPanel(true,'ai');
   aiFabs().forEach(function(f){f.setAttribute('aria-expanded','true')});
   aiRender();aiRenderCtx();aiSyncLink();aiPing();
   setTimeout(function(){var i=aiEl('aiInput');if(i&&!aiBusy)i.focus()},60);
@@ -500,6 +658,10 @@ function aiClosePanel(){
   var p=aiEl('aiPanel');
   if(p)p.classList.remove('on');
   aiFabs().forEach(function(f){f.setAttribute('aria-expanded','false')});
+  /* раздел закрыли — закрывается и панель Энциклопедии */
+  var w=document.getElementById('wikiPanel');
+  if(typeof toggleWikiPanel==='function'&&w&&w.classList.contains('on')
+     &&typeof panelTab!=='undefined'&&panelTab==='ai')toggleWikiPanel(false);
 }
 /* ссылка «Панель прокси ↗» есть только у своего прокси (на сервере её нет) */
 function aiSyncLink(){
@@ -513,30 +675,6 @@ function aiTogglePanel(){
   var p=aiEl('aiPanel');
   if(!p)return;
   if(p.classList.contains('on'))aiClosePanel();else aiOpenPanel();
-}
-
-/* ── Полностраничный чат (#aiPage): поверх всех видов, «Назад» = закрыть ─ */
-var aiPgFromPanel=false;         /* открыта из панели — по «Назад» вернуть её */
-function aiShowPage(){
-  var pg=aiEl('aiPage');
-  if(!pg)return;
-  if(!aiCur)aiNewThread();
-  var panel=aiEl('aiPanel');
-  aiPgFromPanel=!!(panel&&panel.classList.contains('on'));
-  pg.hidden=false;
-  viewIn(pg);
-  aiClosePanel();
-  aiRenderThreads();aiRenderCtx();aiRender();
-  aiPing();
-  var side=aiEl('aiSide');if(side)side.classList.remove('open');
-  setTimeout(function(){var i=aiEl('aiPgInput');if(i&&!aiBusy)i.focus()},60);
-}
-function aiHidePage(){
-  var pg=aiEl('aiPage');
-  if(!pg||pg.hidden)return;
-  pg.hidden=true;
-  var side=aiEl('aiSide');if(side)side.classList.remove('open');
-  if(aiPgFromPanel){aiPgFromPanel=false;aiOpenPanel()}
 }
 
 function aiToggleSettings(){
@@ -597,49 +735,104 @@ function aiChatFmt(s){
   t=t.replace(/[ \t]{2,}/g,' ').replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n');
   return t;
 }
+/* Цитаты [[…]] из ответа модели — по ним чип ведёт к месту в тексте */
+var AI_CITE_RE='\\[\\[([\\s\\S]{6,240}?)\\]\\]';
+function aiCites(t){
+  var out=[],m,re=new RegExp(AI_CITE_RE,'g');
+  while((m=re.exec(String(t==null?'':t)))){
+    out.push(m[1].replace(/\s+/g,' ').replace(/^\s+|\s+$/g,''));
+  }
+  return out;
+}
+/* HTML ответа: текст вокруг цитат форматируем (aiChatFmt), сами цитаты —
+   чипами .ai-cite дословно: форматирование меняет тире/кавычки, и цитата
+   перестала бы находиться в тексте главы */
+function aiBotHtml(m){
+  var txt=String(m.content==null?'':m.content);
+  if(m.noFmt)return esc(txt);
+  /* недописанная [[цитата — при стриме прячем хвост, не мусорим маркером */
+  var open=txt.lastIndexOf('[[');
+  if(open>=0&&txt.indexOf(']]',open)<0)txt=txt.slice(0,open);
+  var out='',last=0,n=0,mm,re=new RegExp(AI_CITE_RE,'g');
+  while((mm=re.exec(txt))){
+    var quote=mm[1].replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'');
+    out+=esc(aiChatFmt(txt.slice(last,mm.index)));
+    out+='<button class="ai-cite" type="button" data-aicit="'+n+'" title="Показать это место в тексте">«'+esc(quote)+'»</button>';
+    last=mm.index+mm[0].length;n++;
+  }
+  out+=esc(aiChatFmt(txt.slice(last)));
+  return out;
+}
 /* Рендер ленты (innerHTML + esc — как в остальных модулях).
-   Ленты две (панель + страница, data-aimsgs) — собираем html один раз */
+   Ленты две (панель + страница, data-aimsgs) — собираем html один раз.
+   rAF-троттлинг: при стриминге на каждый чанк не пересобираем DOM
+   (иначе ~70 rebuild/сек); кеш строки — рендер без изменений не трогает
+   DOM вовсе, фокус/каретка внутри ленты живут дольше */
+var aiRenderRaf=0;
 function aiRender(){
-  var boxes=document.querySelectorAll('[data-aimsgs]');
-  if(!boxes.length)return;
-  var h=aiRenderHtml();
-  Array.prototype.forEach.call(boxes,function(box){
-    var pinned=(box.scrollHeight-box.scrollTop-box.clientHeight)<48;
-    box.innerHTML=h;
-    if(pinned)box.scrollTop=box.scrollHeight;
+  if(aiRenderRaf)return;
+  aiRenderRaf=requestAnimationFrame(function(){
+    aiRenderRaf=0;
+    var boxes=document.querySelectorAll('[data-aimsgs]');
+    if(!boxes.length)return;
+    var h=aiRenderHtml();
+    Array.prototype.forEach.call(boxes,function(box){
+      if(box._aih===h)return;                 /* без изменений — DOM не трогаем */
+      var pinned=(box.scrollHeight-box.scrollTop-box.clientHeight)<48;
+      box.innerHTML=h;
+      box._aih=h;
+      if(pinned)box.scrollTop=box.scrollHeight;
+      aiJumpSync(box);
+    });
   });
+}
+/* Кнопка «к последнему сообщению»: видна, когда ушли вверх от конца */
+function aiJumpSync(box){
+  var feed=box&&box.parentNode;
+  if(!feed||!feed.querySelector)return;
+  var jb=feed.querySelector('.ai-jump');
+  if(!jb)return;
+  var far=box.scrollHeight-box.scrollTop-box.clientHeight>60;
+  jb.classList.toggle('on',!!far);
 }
 function aiRenderHtml(){
   var h='',prevRole='';
   if(!aiHist.length){
     h+='<div class="ai-empty"><span class="ai-spark">'+AI_SPARK+'</span><b>ИИ-ассистент</b>'+
-       'Спросите что угодно по текущей книге — контекст главы подхватится сам. '+
-       'Выделенный фрагмент тоже попадёт в запрос.</div>';
+       'Спросите что угодно по книге — контекст подхватится сам (охват выбирается в шапке). '+
+       'Где ИИ находит ошибку, он цитирует место — по цитате перейдёте прямо в текст.</div>';
   }else{
     aiHist.forEach(function(m,i){
       if(m.think){
-        h+='<details class="ai-think"'+(i===aiThinkOpen?' open':'')+' data-i="'+i+'">'+
-           '<summary>Рассуждение</summary>'+
-           '<span class="ai-think-b">'+esc(aiChatFmt(aiCut(m.think,1200)))+'</span></details>';
+        /* живое «Размышляет…» — пока модель не начала писать ответ;
+           после — свёрнутая карточка с длительностью */
+        var live=aiBusy&&i===aiHist.length-1&&!m.content&&!m.repairing;
+        var dur=(m.thinkMs>0)?Math.max(1,Math.round(m.thinkMs/1000)):0;
+        var el=(live&&m.thinkT0)?Math.max(0,Math.round((Date.now()-m.thinkT0)/1000)):0;
+        h+='<details class="ai-think'+(live?' live':'')+'"'+
+           (((live&&aiThinkOpen!==-2)||i===aiThinkOpen)?' open':'')+' data-i="'+i+'">'+
+           '<summary>'+
+           (live?'<span class="ai-th-dot" aria-hidden="true"></span>Размышляет':'Рассуждение')+
+           '<span class="ai-th-t">'+(live?(el+' с'):(dur?(dur+' с'):''))+'</span>'+
+           '</summary>'+
+           '<span class="ai-think-b">'+esc(aiChatFmt(aiCut(m.think,1600)))+'</span></details>';
       }
       if(m.role==='user'){
         h+='<div class="ai-msg user'+(prevRole==='user'?' tight':'')+'">'+esc(m.content)+'</div>';
         prevRole='user';
       }else{
-        /* модель в потоке пишет JSON-действие — прячем его за статусом */
-        var pend=!m.action&&aiBusy&&aiLooksAction(m.content);
-        if(!m.content&&m.think&&!aiBusy&&!m.repairing){
+        if(!m.content&&m.think&&!aiBusy){
           prevRole='';                   /* остановили во время рассуждения —
                                             текста нет, think показан выше */
         }else{
-          var txt=m.content?aiChatFmt(m.content):(aiBusy?'…':'(пустой ответ)');
-          if(m.noFmt)txt=m.content;
-          if(m.repairing)txt='Уточняю структуру…';
-          if(pend)txt='ИИ готовит структуру…';
-          var empty=!m.content||pend||m.repairing;
-          h+='<div class="ai-msg bot'+(empty?' empty':'')+(prevRole==='bot'&&!empty?' tight':'')+'">'+esc(txt)+'</div>';
-          if(m.action)h+=aiActCard(m.action,i);
-          prevRole=m.action?'':'bot';
+          var body;
+          if(m.repairing)body=esc('Уточняю структуру…');
+          else if(m.content)body=aiBotHtml(m);
+          else if(aiBusy)body='<span class="ai-typing" role="img" aria-label="ИИ печатает ответ"><i></i><i></i><i></i></span>';
+          else body=esc('(пустой ответ)');
+          var empty=!m.content||m.repairing;
+          h+='<div class="ai-msg bot'+(empty?' empty':'')+(prevRole==='bot'&&!empty?' tight':'')+'" data-i="'+i+'">'+body+'</div>';
+          prevRole='bot';
         }
       }
     });
@@ -654,11 +847,99 @@ function aiShowErr(e){
   aiRender();
 }
 
+/* ── Переход к месту: цитата [[…]] → подсветка фрагмента в #editor ────── */
+/* Range внутри блока по смещениям в его textContent: текстовые узлы
+   блока складываем в порядке обхода (aiChBlocks отдаёт те же блоки,
+   что ушли модели в промпт — смещения совпадают с её видом текста) */
+function aiRangeInBlock(el,from,to){
+  var w,r=document.createRange(),acc=0,started=false,n;
+  try{w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null)}catch(e){return null}
+  while((n=w.nextNode())){
+    var len=n.data.length;
+    if(!started&&acc+len>from){r.setStart(n,from-acc);started=true}
+    if(started&&acc+len>=to){r.setEnd(n,to-acc);return r}
+    acc+=len;
+  }
+  return null;
+}
+/* Подсветка — оверлей поверх редактора: DOM #editor НЕ мутируется,
+   иначе scheduleSave мог бы записать временный <span> в главу */
+function aiFlash(range){
+  var rects=range.getClientRects(),host=document.createElement('div'),any=null,i;
+  host.className='ai-flash-host';
+  for(i=0;i<rects.length;i++){
+    var r=rects[i];
+    if(r.width<1||r.height<1)continue;
+    var d=document.createElement('i');
+    d.className='ai-flash';
+    d.style.left=Math.round(r.left)+'px';
+    d.style.top=Math.round(r.top)+'px';
+    d.style.width=Math.round(r.width)+'px';
+    d.style.height=Math.round(r.height)+'px';
+    host.appendChild(d);
+    if(!any)any=r;
+  }
+  document.body.appendChild(host);
+  setTimeout(function(){if(host.parentNode)host.parentNode.removeChild(host)},2500);
+  return any;
+}
+function aiScrollToRect(rect){
+  var sc=aiEl('scroller');
+  if(!rect||!sc)return;
+  var box=sc.getBoundingClientRect();
+  var top=sc.scrollTop+(rect.top-box.top)-(sc.clientHeight/2)+(rect.height/2);
+  try{sc.scrollTo({top:top,behavior:'smooth'})}catch(e){sc.scrollTop=top}
+}
+/* Поиск цитаты в блоках главы: дословно, затем по первым четырём словам
+   (цитата могла «склеиться» при форматировании ответа) */
+function aiCiteFind(quote){
+  var blocks=aiChBlocks();
+  if(!blocks.length){toast('Откройте главу — по ней цитата не найдётся');return}
+  var full=aiNormMap(quote).t;
+  var heads=full.split(' ').slice(0,4).join(' ');
+  var needles=heads&&heads!==full?[full,heads]:[full];
+  for(var k=0;k<needles.length;k++){
+    var needle=needles[k];
+    if(!needle)continue;
+    for(var i=0;i<blocks.length;i++){
+      var nm=aiNormMap(blocks[i].text);
+      var at=nm.t.indexOf(needle);
+      if(at<0)continue;
+      var last=Math.min(at+needle.length,nm.map.length)-1;
+      if(last<at||!blocks[i].el)continue;
+      var r=aiRangeInBlock(blocks[i].el,nm.map[at],nm.map[last]+1);
+      if(!r)continue;
+      aiScrollToRect(aiFlash(r));
+      return;
+    }
+  }
+  toast('Фрагмент не найден — текст главы изменился');
+}
+/* Клик по чипу цитаты: сверяем книгу/главу сообщения с открытой — чужая
+   книга просит открыть её, чужая глава открывается сама (с задержкой,
+   пока enterEditor перечитает DOM), потом подсвечиваем */
+function aiCiteGo(msgIdx,citeIdx){
+  var m=aiHist[msgIdx];
+  if(!m)return;
+  var cites=aiCites(m.content||'');
+  var quote=cites[citeIdx];
+  if(!quote){toast('Цитата не найдена');return}
+  var ctx=m.ctx||{},live=aiCtxSnap();
+  if(ctx.b&&live.bookId&&ctx.b!==live.bookId){
+    toast('Цитата из другой книги — откройте её из библиотеки');return;
+  }
+  if(!live.bookId&&!ctx.c){aiCiteFind(quote);return}
+  if(ctx.c&&live.chId!==ctx.c){
+    if(typeof enterEditor!=='function'){toast('Откройте главу с этим фрагментом');return}
+    try{enterEditor(ctx.c)}catch(e){toast('Глава недоступна');return}
+    setTimeout(function(){aiCiteFind(quote)},260);
+    return;
+  }
+  aiCiteFind(quote);
+}
+
 /* ── Отправка сообщения ────────────────────────────────────────────────── */
-/* Активное поле ввода: страница открыта — её поле, иначе панельное */
 function aiField(){
-  var pg=aiEl('aiPage');
-  if(pg&&!pg.hidden)return aiEl('aiPgInput');
   return aiEl('aiInput');
 }
 function aiAutosize(el){
@@ -707,6 +988,7 @@ function aiAsk(q,isRetry){
     aiShowErr(new Error('укажите API-ключ прокси (⚙ настройки)'));
     return;
   }
+  if(!aiCur)aiNewThread();               /* первый вопрос — создаём диалог */
   aiErrMsg='';aiRetryPending=false;
   if(!isRetry){
     aiRetried=false;
@@ -715,7 +997,9 @@ function aiAsk(q,isRetry){
     if(aiCur&&!aiCur.ctx.bookId)aiCur.ctx=aiCtxSnap(); /* пустой контекст — подхватываем книгу */
   }
   var sel=isRetry?'':aiSelection();   /* выделение к моменту повтора могло сняться */
-  var sys=aiSystemPrompt(sel?('\nВыделенный фрагмент (учти в ответе):\n«'+aiCut(sel,4000)+'»'):'' );
+  /* при охвате «только выделение» фрагмент уже ушёл главным блоком контекста
+     (aiCtxScopeText) — дублировать его отдельным куском не нужно */
+  var sys=aiSystemPrompt(sel&&aiScope()!=='sel'?('\nВыделенный фрагмент (учти в ответе; при ссылках на него цитируй его через [[…]]):\n«'+aiCut(sel,4000)+'»'):'');
 
   var feed=aiHist;                /* история ЭТОГО диалога: во время потока её можно
                                      сменить — колбэки работают с feed, не с aiHist */
@@ -727,12 +1011,15 @@ function aiAsk(q,isRetry){
 
   var apiMsgs=[{role:'system',content:sys}];
   hist.slice(-12).forEach(function(m){     /* think в API не отправляем */
-    apiMsgs.push({role:m.role,content:aiActionMsg(m)});
+    apiMsgs.push({role:m.role,content:String(m.content==null?'':m.content)});
   });
   apiMsgs.push({role:'user',content:q});
 
   if(!inHist)feed.push({role:'user',content:q});
-  var ass={role:'assistant',content:'',think:''};
+  /* к какой книге/главе относится ответ — по этим id чип цитаты откроет
+     нужную главу, даже если пользователь уже переключился (см. aiCiteGo) */
+  var snap=aiCtxSnap();
+  var ass={role:'assistant',content:'',think:'',ctx:{b:snap.bookId||'',c:snap.chId||''}};
   feed.push(ass);
   aiBusy=true;
   Array.prototype.forEach.call(document.querySelectorAll('.ai-foot textarea'),function(t){
@@ -743,13 +1030,19 @@ function aiAsk(q,isRetry){
 
   aiRequest(apiMsgs,
     function(t,isThink){
-      if(isThink)ass.think+=t;else ass.content+=t;
+      if(isThink){
+        if(!ass.thinkT0)ass.thinkT0=Date.now();  /* таймер живого «Размышляет…» */
+        ass.think+=t;
+      }else{
+        if(ass.thinkT0&&!ass.thinkMs)ass.thinkMs=Date.now()-ass.thinkT0;
+        ass.content+=t;
+      }
       aiRender();
     },
     function(){
       if(my===aiSeq){aiBusy=false;aiSetBusy(false)}
+      if(ass.thinkT0&&!ass.thinkMs)ass.thinkMs=Date.now()-ass.thinkT0;
       if(!ass.content)ass.content=ass.think?'(без текста — см. рассуждение выше)':'(пустой ответ)';
-      aiTryAction(ass,q);                   /* вдруг модель прислала действие */
       if(my===aiSeq){aiRetried=false;aiRetryPending=false}
       aiSaveThreads();
       aiRender();
@@ -768,9 +1061,16 @@ function aiAsk(q,isRetry){
     });
 }
 function aiSetBusy(b){
+  /* живой таймер «Размышляет…»: пока модель думает, секунды тикают сами
+     (aiRender кеширует html — раз в секунду пересборка только при changes) */
+  if(b&&!aiThinkTimer)aiThinkTimer=setInterval(function(){if(aiBusy)aiRender()},1000);
+  if(!b&&aiThinkTimer){clearInterval(aiThinkTimer);aiThinkTimer=0}
   Array.prototype.forEach.call(document.querySelectorAll('.ai-send'),function(btn){
     btn.classList.toggle('busy',!!b);
     btn.title=b?'Остановить генерацию':'Отправить (Enter)';
+    /* состояние — не только цветом: скринридер узнаёт «Стоп» и busy */
+    btn.setAttribute('aria-label',b?'Стоп генерацию':'Отправить запрос');
+    btn.setAttribute('aria-busy',b?'true':'false');
     /* во время генерации кнопка — «Стоп» (квадрат), а не стрелка:
        иначе клик «остановить» выглядит как повторная отправка */
     btn.innerHTML=b?AI_STOP_SVG:AI_SEND_SVG;
@@ -786,7 +1086,7 @@ function aiClearHist(){
   aiBusy=false;aiErrMsg='';aiSetBusy(false);
   aiRetryPending=false;aiRetried=false;aiThinkOpen=-1;
   if(aiRetryTimer){clearTimeout(aiRetryTimer);aiRetryTimer=0}
-  aiRenderThreads();aiRenderCtx();
+  aiRenderCtx();
   aiRender();
 }
 
@@ -818,243 +1118,6 @@ function aiRetryNow(){
   if(last&&last.role==='user')aiAsk(last.content,true);
 }
 
-/* ── Действия ИИ: модель создаёт книги и главы по JSON-плану ───────────── */
-/* Модель отвечает JSON-объектом (см. блок «Действия» в aiSystemPrompt);
-   в ленте рисуется карточка с планом, а книга/глава создаётся по кнопке —
-   пользователь всегда видит, что именно будет создано. */
-
-function aiLooksAction(s){
-  s=String(s==null?'':s);
-  /* достаточно «{"action":… где угодно в ответе» — так во время потока
-     уже видно, что модель пишет JSON, даже если начала с пары слов */
-  if(s.indexOf('{')<0)return false;
-  return /"action"\s*:/.test(s);
-}
-/* Поиск парной скобки с учётом строк — JSON может быть длинным и содержать } */
-function aiMatchBrace(s,i){
-  var depth=0,inStr=false,escd=false;
-  for(var k=i;k<s.length;k++){
-    var c=s.charAt(k);
-    if(inStr){
-      if(escd)escd=false;
-      else if(c==='\\')escd=true;
-      else if(c==='"')inStr=false;
-      continue;
-    }
-    if(c==='"')inStr=true;
-    else if(c==='{')depth++;
-    else if(c==='}'){depth--;if(depth===0)return k}
-  }
-  return -1;
-}
-function aiStr(v,n){
-  var s=String(v==null?'':v).replace(/^\s+/,'').replace(/\s+$/,'');
-  return s.length>n?s.slice(0,n):s;
-}
-function aiValidateAction(o){
-  if(!o||typeof o!=='object')return null;
-  var act=(typeof o.action==='string'&&o.action)||
-          (typeof o.type==='string'&&o.type)||(typeof o.name==='string'&&o.name);
-  if(!act)return null;
-  if(act==='create_book'){
-    var title=aiStr(o.title,200);
-    if(!title||!Array.isArray(o.chapters))return null;
-    var chs=[];
-    for(var i=0;i<o.chapters.length&&chs.length<40;i++){
-      var c=o.chapters[i];
-      var ct='';
-      if(typeof c==='string')ct=aiStr(c,200);   /* модель отдавала список строк */
-      else if(c&&typeof c==='object')ct=aiStr(c.title,200);
-      if(!ct)continue;
-      chs.push({title:ct,content:(c&&typeof c==='object')?aiStr(c.content,40000):''});
-    }
-    if(!chs.length)return null;
-    return {action:'create_book',title:title,chapters:chs};
-  }
-  if(act==='create_chapter'||act==='replace_chapter'){
-    var raw=(o.content!=null?o.content:(o.text!=null?o.text:o.body));
-    var content=aiStr(raw,40000);
-    if(!content)return null;
-    return {action:act,title:aiStr(o.title,200),content:content};
-  }
-  return null;
-}
-/* JSON из ответа: ```json-фенсы и текст вокруг — не помеха */
-function aiExtractAction(text){
-  var t=String(text==null?'':text);
-  var fence=t.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if(fence)t=fence[1];
-  else{
-    var i=t.indexOf('{');
-    if(i<0)return null;
-    var j=aiMatchBrace(t,i);
-    if(j<0)return null;
-    t=t.slice(i,j+1);
-  }
-  t=t.replace(/^\s+|\s+$/g,'');
-  var o;
-  try{o=JSON.parse(t)}
-  catch(e){
-    /* модели бывают ленивы и вставляют «сырой» перевод строки внутрь
-       JSON-строки — чиним управляющие символы только внутри кавычек */
-    try{o=JSON.parse(aiJsonFix(t))}catch(e2){return null}
-  }
-  return aiValidateAction(o);
-}
-function aiJsonFix(t){
-  var out='',inStr=false,escd=false;
-  for(var i=0;i<t.length;i++){
-    var c=t.charAt(i);
-    if(inStr){
-      if(escd)escd=false;
-      else if(c==='\\')escd=true;
-      else if(c==='"')inStr=false;
-      else if(c==='\n'){out+='\\n';continue}
-      else if(c==='\r'){out+='\\r';continue}
-      else if(c==='\t'){out+='\\t';continue}
-    }else if(c==='"')inStr=true;
-    out+=c;
-  }
-  return out;
-}
-function aiActionSummary(p){
-  if(p.action==='create_book'){
-    /* названия глав уходят в историю API — иначе в следующем вопросе
-       модель придумывает их заново */
-    var names=p.chapters.slice(0,10).map(function(c){
-      return '«'+aiCut(c.title,40)+'»';
-    }).join(', ');
-    if(p.chapters.length>10)names+='…';
-    return 'Структура книги «'+aiCut(p.title,70)+'» готова — '+
-      p.chapters.length+' '+plural(p.chapters.length,'глава','главы','глав')+
-      ': '+names+'. Нажмите «Создать книгу», чтобы добавить её в библиотеку.';
-  }
-  if(p.action==='create_chapter'){
-    return 'Новая глава «'+aiCut(p.title||'Без названия',70)+'» готова — '+
-      fmt(countWords(p.content))+' слов. Нажмите «Добавить главу».';
-  }
-  return 'Новый вариант главы «'+aiCut(p.title||'Без названия',70)+'» готов — '+
-    fmt(countWords(p.content))+' слов. Нажмите «Заменить главу», чтобы применить.';
-}
-function aiActCard(a,i){
-  if(!a||!a.plan)return '';
-  if(a.done)return '<div class="ai-act done">✓ '+esc(a.done)+'</div>';
-  var p=a.plan;
-  var head=p.action==='create_book'?'Новая книга'
-    :p.action==='create_chapter'?'Новая глава':'Переписанная глава';
-  var h='<div class="ai-act"><div class="ai-act-h"><span class="ai-spark">'+AI_SPARK+'</span>'+esc(head)+'</div>';
-  var note='';
-  if(p.action==='create_book'){
-    h+='<ol class="ai-act-list">';
-    p.chapters.forEach(function(c){h+='<li>'+esc(c.title)+'</li>'});
-    h+='</ol>';
-    note=p.chapters.length+' · '+
-      fmt(countWords(p.chapters.map(function(c){return c.content}).join(' ')))+' слов';
-  }else{
-    h+='<div class="ai-act-prev">'+esc(aiCut(p.content,500))+'</div>';
-    note=fmt(countWords(p.content))+' слов';
-  }
-  var go=p.action==='create_book'?'Создать книгу'
-    :p.action==='create_chapter'?'Добавить главу':'Заменить главу';
-  h+='<div class="ai-act-foot"><span class="note">'+esc(note)+'</span>'+
-     '<button class="go" type="button" data-aiact="'+i+'">'+esc(go)+'</button></div></div>';
-  return h;
-}
-/* Текст обещает кнопку («Нажмите "Создать книгу"»), но JSON не пришёл:
-   чаще всего модель подхватила наше саммити из истории и повторила его */
-function aiPromisedAction(s){
-  s=String(s==null?'':s);
-  if(!/(Создать книгу|Добавить главу|Заменить главу)/.test(s))return false;
-  return /(Нажмите|нажмите|нажми|по кнопке|кнопку|кнопка)/.test(s);
-}
-/* Честная замена: вместо вводящего в заблуждение «нажмите кнопку»
-   (кнопки-то не из чего построить) — прямой ответ. Вызывается, когда
-   и исходный ответ, и автопочинка закончились без JSON */
-function aiActionFailed(m){
-  var s=String(m.content==null?'':m.content);
-  if(!aiPromisedAction(s))return;         /* обычный текст — не трогаем */
-  m.content='Модель не прислала данные для создания — кнопка не появилась. '+
-            'Попробуйте спросить ещё раз.';
-}
-/* Для истории API: у сообщений с действием отдаём компактный JSON —
-   модель видит свой «формат ответа», а не саммити «нажмите кнопку»
-   (иначе она начинает повторять саммити текстом без JSON) */
-function aiActionMsg(m){
-  var p=m&&m.action&&m.action.plan;
-  if(!p)return m?m.content:'';
-  try{
-    if(p.action==='create_book'){
-      return JSON.stringify({action:'create_book',title:p.title,
-        chapters:p.chapters.slice(0,10).map(function(c){
-          return {title:c.title,content:aiCut(c.content,240)};
-        })});
-    }
-    return JSON.stringify({action:p.action,title:p.title,content:aiCut(p.content,700)});
-  }catch(e){return m.content}
-}
-/* Одна автопопытка: модель ответила текстом вместо JSON-действия —
-   уточняем прямо в этом же диалоге (без записи в историю) */
-function aiFixAction(m,q){
-  m.actFix=true;m.repairing=true;
-  var saved=m.content;
-  m.content='';
-  var msgs=[{role:'system',content:aiSystemPrompt('')+
-    '\n\nВАЖНО: твой предыдущий ответ был обычным текстом, а нужен ответ-действие — РОВНО один JSON-объект из инструкции выше: первый символ {, последний }. Без пояснений, без списков и без фразы «нажмите кнопку».'}];
-  var feed=aiFeedOf(m);               /* m может жить не в активном диалоге */
-  var idx=feed.indexOf(m);
-  feed.slice(0,idx<0?feed.length:idx).slice(-10).forEach(function(x){
-    msgs.push({role:x.role,content:aiActionMsg(x)});
-  });
-  aiBusy=true;aiSetBusy(true);aiRender();
-  aiRequest(msgs,
-    function(t,isThink){if(!isThink)m.content+=t;aiRender()},
-    function(){
-      aiBusy=false;aiSetBusy(false);m.repairing=false;
-      var plan=aiExtractAction(m.content);
-      if(plan){
-        m.action={plan:plan,done:''};
-        m.content=aiActionSummary(plan);
-      }else{
-        m.content=saved;               /* не вышло — оставляем исходный ответ */
-        aiActionFailed(m);             /* …но честно, если там «нажмите кнопку» */
-      }
-      aiSaveThreads();aiRender();
-    },
-    function(){
-      aiBusy=false;aiSetBusy(false);m.repairing=false;
-      m.content=saved;aiActionFailed(m);
-      aiSaveThreads();aiRender(); /* сбой уточнения — не трогаем ответ */
-    });
-}
-/* Завершённый ответ: распознаём действие и подменяем текст резюме */
-function aiTryAction(m,q){
-  if(!m||m.role!=='assistant'||!m.content||m.action)return;
-  var looks=aiLooksAction(m.content);
-  if(!looks&&m.content.indexOf('{')<0&&!aiPromisedAction(m.content))return;
-  var plan=aiExtractAction(m.content);
-  if(plan){
-    m.action={plan:plan,done:''};
-    m.content=aiActionSummary(plan);
-  }else if(aiPromisedAction(m.content)&&q!=null&&!m.actFix){
-    aiFixAction(m,q);                  /* пообещала кнопку без JSON — уточняем */
-  }else if(aiPromisedAction(m.content)){
-    /* уточнение уже было и не помогло — говорим честно (без «нажмите кнопку») */
-    aiActionFailed(m);
-  }else if(looks){
-    m.content=aiCut(m.content,600)+'\n\n(структура не разобралась — попросите ещё раз)';
-    m.noFmt=true;                     /* это остаток JSON — не трогаем кавычки */
-  }
-}
-
-/* Markdown-обвязка — на случай если модель всё же её прислала */
-function aiStripMd(s){
-  return String(s==null?'':s)
-    .replace(/^\s{0,3}#{1,6}[ \t]+/,'')
-    .replace(/\*\*([^*]+)\*\*/g,'$1')
-    .replace(/__([^_]+)__/g,'$1')
-    .replace(/^\s*[-*][ \t]+/,'')
-    .replace(/^\s+/,'').replace(/\s+$/,'');
-}
 /* Разбивка текста на абзацы: пустая строка, иначе перевод строки */
 function aiSplitParas(t,sep){
   return String(t==null?'':t).replace(/\r/g,'').split(sep)
@@ -1077,89 +1140,10 @@ function aiParasFor(out,n){
   if(n===1)return [String(out==null?'':out).replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'')];
   return null;
 }
-/* Глава в формате приложения: <h1>заголовок</h1> + <p>абзацы</p> */
-function aiChapterHtml(title,content){
-  var ps=aiParasAny(content);
-  var h='<h1>'+esc(aiStripMd(title||'Без названия'))+'</h1>';
-  if(!ps.length)h+='<p></p>';
-  ps.forEach(function(p){h+='<p>'+esc(aiStripMd(p))+'</p>'});
-  return h;
-}
-
-function aiCreateBook(p){
-  if(typeof state==='undefined'||!state)throw new Error('сначала войдите в профиль');
-  if(isReadOnly())throw new Error('сейчас открыт чужой файл — действие недоступно');
-  var chapters=p.chapters.map(function(c){
-    return {id:uid(),html:aiChapterHtml(c.title,c.content),pos:0,marks:[]};
-  });
-  if(!chapters.length)chapters.push({id:uid(),html:aiChapterHtml(p.title,''),pos:0,marks:[]});
-  var first=chapters[0];
-  /* служебные главы — как в обычной книге (createBook в 15-editor) */
-  chapters.push({id:uid(),html:pamatkaHtml(),pos:0,marks:[]});
-  chapters.push({id:uid(),kind:'notes',html:notesChapterHtml(),pos:0,marks:[]});
-  var b={
-    id:uid(),title:p.title,
-    color:COLORS[state.books.length%COLORS.length],
-    updated:Date.now(),
-    chapters:chapters,current:first.id,customTypes:[],wiki:[]
-  };
-  state.books.push(b);state.activeBookId=b.id;persist();invalidateCo();
-  enterEditor(first.id);
-  return 'Книга «'+aiCut(p.title,60)+'» создана — '+
-    p.chapters.length+' '+plural(p.chapters.length,'глава','главы','глав');
-}
-function aiCreateChapter(p){
-  if(typeof state==='undefined'||!state)throw new Error('сначала войдите в профиль');
-  if(isReadOnly())throw new Error('нельзя менять чужую книгу');
-  var b=book();if(!b)throw new Error('сначала откройте книгу');
-  var title=p.title||'Без названия';
-  var n={id:uid(),html:aiChapterHtml(title,p.content),pos:0,marks:[]};
-  b.chapters.push(n);
-  b.updated=Date.now();                 /* структурная правка должна уехать на сервер */
-  persist();
-  enterEditor(n.id);
-  return 'Глава «'+aiCut(title,60)+'» добавлена в книгу «'+aiCut(b.title||'Без названия',40)+'»';
-}
-function aiReplaceChapter(p){
-  if(typeof state==='undefined'||!state)throw new Error('сначала войдите в профиль');
-  if(isReadOnly())throw new Error('нельзя менять чужую книгу');
-  var b=book();if(!b)throw new Error('сначала откройте книгу');
-  var ch=currentCh();if(!ch)throw new Error('нет текущей главы');
-  if(isNotesCh(ch))throw new Error('глава «Заметки» — служебная, заменять нельзя');
-  if(typeof isPamatka==='function'&&isPamatka(ch))throw new Error('глава «Памятка» — заменять нельзя');
-  var title=p.title||chapterTitle(ch);
-  ch.html=aiChapterHtml(title,p.content);
-  ch.pos=0;
-  b.updated=Date.now();
-  /* та же глава: DOM просто перечитывается из ch.html (без save поверх) */
-  loadChapter(ch);
-  renderList(false);updateCrumb();updateStats();
-  if(typeof selbar!=='undefined'&&selbar)selbar.classList.remove('on');
-  if(typeof hideSynbar==='function')hideSynbar();
-  persist();
-  return 'Глава «'+aiCut(title,60)+'» заменена';
-}
-function aiRunAction(idx){
-  var m=aiHist[idx];
-  if(!m||!m.action||m.action.done)return;
-  if(aiBusy){toast('Дождитесь ответа ИИ');return}
-  var p=m.action.plan,done='',err='';
-  try{
-    if(p.action==='create_book')done=aiCreateBook(p);
-    else if(p.action==='create_chapter')done=aiCreateChapter(p);
-    else if(p.action==='replace_chapter')done=aiReplaceChapter(p);
-    else err='неизвестное действие';
-  }catch(ex){err=String(ex&&ex.message?ex.message:ex)}
-  if(err){toast(err);return}
-  m.action.done=done;
-  aiSaveThreads();                       /* «выполнено» переживёт перезагрузку */
-  aiRender();
-  toast(done);
-}
 
 /* ── Исправить / улучшить выделение ────────────────────────────────────── */
 function aiTransform(kind,btn){
-  if(aiBusy)return;
+  if(aiBusy){toast('Дождитесь ответа ИИ');return}
   /* с абзацами — иначе модель не видит разбивку и не может её сохранить */
   var src=aiSelectionRaw()||aiSelection();
   if(!src){toast('Сначала выделите текст');return}
@@ -1236,6 +1220,8 @@ function aiShowRes(kind){
   aiEl('aiResRetry').hidden=true;
   aiEl('aiResSrc').textContent=aiResult.src;
   m.classList.add('on');
+  /* фокус внутрь диалога: Tab не уходит в затемнённый фон */
+  setTimeout(function(){var c=aiEl('aiResClose');if(c)c.focus()},0);
 }
 function aiFillRes(){
   var out=aiEl('aiResOut');
@@ -1475,23 +1461,23 @@ function aiCheckHtmlVer(){
     bar.id='aiStaleBar';
     bar.setAttribute('role','status');
     bar.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99999;'+
-      'display:flex;gap:12px;align-items:center;background:#22242c;color:#f5f5f7;'+
-      'border:1px solid #3c3f4b;border-radius:12px;padding:10px 14px;'+
-      'font:14px/1.4 -apple-system,system-ui,sans-serif;box-shadow:0 10px 34px rgba(0,0,0,.4)';
+      'display:flex;gap:12px;align-items:center;background:var(--panel,#22242c);color:var(--ink,#f5f5f7);'+
+      'border:1px solid var(--line,#3c3f4b);border-radius:var(--r-md,12px);padding:10px 14px;'+
+      'font:14px/1.4 var(--f-ui,-apple-system,system-ui,sans-serif);box-shadow:var(--shadow,0 10px 34px rgba(0,0,0,.4))';
     var txt=document.createElement('span');
     txt.textContent='Сайт обновился, а страница в кэше устарела'+
       (v?' (v'+v+' → v'+AI_HTML_V+')':'')+' — обновите её, пожалуйста.';
     var btn=document.createElement('button');
     btn.type='button';
     btn.textContent='Обновить';
-    btn.style.cssText='background:#6c8cff;color:#fff;border:0;border-radius:8px;'+
-      'padding:7px 14px;font:600 13px -apple-system,system-ui,sans-serif;cursor:pointer';
+    btn.style.cssText='background:var(--accent,#6c8cff);color:var(--bg,#161411);border:0;border-radius:var(--r-sm,8px);'+
+      'padding:7px 14px;font:600 13px/1 var(--f-ui,-apple-system,system-ui,sans-serif);letter-spacing:.04em;cursor:pointer';
     btn.addEventListener('click',function(){location.reload()});
     var x=document.createElement('button');
     x.type='button';
     x.textContent='×';
     x.setAttribute('aria-label','Закрыть');
-    x.style.cssText='background:none;border:0;color:#9a9daa;font:20px/1 system-ui,sans-serif;'+
+    x.style.cssText='background:none;border:0;color:var(--ink3,#9a9daa);font:20px/1 var(--f-ui,-apple-system,system-ui,sans-serif);'+
       'cursor:pointer;padding:0 2px';
     x.addEventListener('click',function(){if(bar.parentNode)bar.parentNode.removeChild(bar)});
     bar.appendChild(txt);bar.appendChild(btn);bar.appendChild(x);
@@ -1512,46 +1498,16 @@ function aiInit(){
     f.classList.add('ai-open');
     f.addEventListener('click',aiTogglePanel);
   });
-  aiEl('aiClose').addEventListener('click',aiClosePanel);
-  aiEl('aiGear').addEventListener('click',aiToggleSettings);
-  aiEl('aiClear').addEventListener('click',aiClearHist);
-  aiEl('aiSend').addEventListener('click',aiSendMsg);
-  aiEl('aiSave').addEventListener('click',aiSaveSettings);
+  aiOn('aiGear','click',aiToggleSettings);
+  aiOn('aiClear','click',aiClearHist);
+  aiOn('aiSend','click',aiSendMsg);
+  aiOn('aiSave','click',aiSaveSettings);
 
-  /* ── Полностраничный чат: страница #aiPage (история диалогов слева) ── */
+  /* история диалогов: активный диалог восстанавливаем из localStorage —
+     список-сайдбар ушёл вместе со старым режимом (#aiPage) */
   aiLoadThreads();
-  aiRenderThreads();
-  var expand=aiEl('aiExpand');
-  if(expand)expand.addEventListener('click',aiShowPage);   /* панель → полный чат */
-  var back=aiEl('aiPgBack');
-  if(back)back.addEventListener('click',aiHidePage);
-  var pgSend=aiEl('aiPgSend');
-  if(pgSend)pgSend.addEventListener('click',aiSendMsg);
-  var pgGear=aiEl('aiPgGear');
-  if(pgGear)pgGear.addEventListener('click',aiToggleSettings);
-  var sideBtn=aiEl('aiPgSide'),side=aiEl('aiSide'),sideX=aiEl('aiSideClose');
-  if(sideBtn&&side)sideBtn.addEventListener('click',function(){side.classList.toggle('open')});
-  if(sideX&&side)sideX.addEventListener('click',function(){side.classList.remove('open')});
-  var newChat=aiEl('aiNewChat');
-  if(newChat)newChat.addEventListener('click',function(){
-    aiNewThread();
-    var i=aiEl('aiPgInput');if(i)i.focus();
-  });
-  var thBox=aiEl('aiThreads');                       /* переключение/удаление диалогов */
-  if(thBox)thBox.addEventListener('click',function(e){
-    if(!e.target||!e.target.closest)return;
-    var del=e.target.closest('[data-aithdel]');
-    if(del){
-      var id=del.getAttribute('data-aithdel'),t=null;
-      aiThreads.forEach(function(x){if(x.id===id)t=x});
-      if(t&&(t.title||t.hist.length)&&!confirm('Удалить диалог «'+(t.title||'Без названия')+'»?'))return;
-      aiDelThread(id);return;
-    }
-    var row=e.target.closest('[data-aith]');
-    if(row)aiSwitchThread(row.getAttribute('data-aith'));
-  });
 
-  /* настройки — общая модалка (⚙ панели и страницы);
+  /* настройки — общая модалка (⚙ панели);
      guard: старая разметка в кэше может не содержать #aiSetModal */
   var setClose=aiEl('aiSetClose');
   if(setClose)setClose.addEventListener('click',aiCloseSettings);
@@ -1560,27 +1516,51 @@ function aiInit(){
     if(e.target===this)aiCloseSettings();
   });
 
-  /* «Повторить» и кнопки действий (карточки) — делегирование, их рисует aiRender;
-     ленты обе (панель + страница) */
+  /* «Повторить» и чипы цитат (.ai-cite) — делегирование, их рисует aiRender */
   Array.prototype.forEach.call(document.querySelectorAll('[data-aimsgs]'),function(box){
     box.addEventListener('click',function(e){
       if(!e.target||!e.target.closest)return;
-      var a=e.target.closest('[data-aiact]');
-      if(a){aiRunAction(+a.getAttribute('data-aiact')||0);return}
+      var ct=e.target.closest('[data-aicit]');
+      if(ct){
+        /* чип лежит внутри .ai-msg.bot[data-i] — индекс сообщения берём оттуда */
+        var msg=e.target.closest('[data-i]');
+        aiCiteGo(msg?+msg.getAttribute('data-i'):0,+ct.getAttribute('data-aicit')||0);
+        return;
+      }
       if(e.target.closest('[data-airetry]'))aiRetryNow();
     });
     /* раскрытая «Рассуждением» деталь не должна схлопываться при каждом
        рендере (стриминг пересобирает ленту целиком): запоминаем её индекс,
-       aiRender возвращает open по data-i. toggle не всплывает — фаза capture */
+       aiRender возвращает open по data-i. toggle не всплывает — фаза capture.
+       -2 — пользователь сам закрыл (во время стрима это значит «не
+       раскрывать автоматически», см. условие live в aiRenderHtml) */
     box.addEventListener('toggle',function(e){
       var d=e.target;
       if(!d||!d.classList||!d.classList.contains('ai-think'))return;
-      aiThinkOpen=d.open?(+d.getAttribute('data-i')||0):-1;
+      aiThinkOpen=d.open?(+d.getAttribute('data-i')||0):-2;
     },true);
+    /* «к последнему сообщению»: кнопка лежит в обёртке .ai-feed */
+    box.addEventListener('scroll',function(){aiJumpSync(box)});
+    var feed=box.parentNode,jb=feed&&feed.querySelector?feed.querySelector('.ai-jump'):null;
+    if(jb)jb.addEventListener('click',function(){
+      box.scrollTop=box.scrollHeight;
+      aiJumpSync(box);
+    });
   });
 
   aiBindInput(aiEl('aiInput'));
-  aiBindInput(aiEl('aiPgInput'));
+
+  /* селектор контекста (.ai-scope) */
+  var scopeBtn=aiEl('aiScope');
+  if(scopeBtn)scopeBtn.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(scopeBtn.getAttribute('aria-expanded')==='true')aiCloseScopeMenu();
+    else aiScopeMenuOpen(scopeBtn);
+  });
+  document.addEventListener('click',function(e){
+    if(!e.target.closest||(!e.target.closest('#aiScopeMenu')&&!e.target.closest('.ai-scope')))aiCloseScopeMenu();
+  });
+  aiScopePaint();
 
   /* быстрые вопросы под лентой — в активное поле ввода */
   Array.prototype.forEach.call(document.querySelectorAll('[data-aiq]'),function(b){
@@ -1600,16 +1580,16 @@ function aiInit(){
   });
 
   /* модальный результат */
-  aiEl('aiResClose').addEventListener('click',aiCloseRes);
-  aiEl('aiResCancel').addEventListener('click',aiCloseRes);
-  aiEl('aiResCopy').addEventListener('click',aiCopyRes);
-  aiEl('aiResApply').addEventListener('click',aiApplyRes);
-  aiEl('aiResRetry').addEventListener('click',function(){   /* после сбоя ИИ */
+  aiOn('aiResClose','click',aiCloseRes);
+  aiOn('aiResCancel','click',aiCloseRes);
+  aiOn('aiResCopy','click',aiCopyRes);
+  aiOn('aiResApply','click',aiApplyRes);
+  aiOn('aiResRetry','click',function(){   /* после сбоя ИИ */
     if(!aiLastKind)return;
     aiShowRes(aiLastKind);
     aiTransformRun(aiLastKind);
   });
-  aiEl('aiResModal').addEventListener('click',function(e){
+  aiOn('aiResModal','click',function(e){
     if(e.target===this)aiCloseRes();
   });
 
@@ -1617,6 +1597,8 @@ function aiInit(){
      обработчиков 15-editor/14-search (они всплывают по document) */
   document.addEventListener('keydown',function(e){
     if(e.key!=='Escape')return;
+    var sm=aiEl('aiScopeMenu');
+    if(sm&&sm.classList.contains('on')){aiCloseScopeMenu();return}
     var res=aiEl('aiResModal');
     if(res&&res.classList.contains('on')){
       e.preventDefault();e.stopPropagation();aiCloseRes();return;
@@ -1632,19 +1614,15 @@ function aiInit(){
       else aiClosePanel();
       return;
     }
-    var pg=aiEl('aiPage');
-    if(pg&&!pg.hidden){
-      e.preventDefault();e.stopPropagation();aiHidePage();
-    }
   },true);
 
-  /* живой контекст в шапках (панель и страница) */
+  /* живой контекст в шапке панели */
   document.addEventListener('selectionchange',function(){
     if(aiCtxTimer)return;
     aiCtxTimer=setTimeout(function(){
       aiCtxTimer=0;
-      var p=aiEl('aiPanel'),pg=aiEl('aiPage');
-      if((p&&p.classList.contains('on'))||(pg&&!pg.hidden))aiRenderCtx();
+      var p=aiEl('aiPanel');
+      if(p&&p.classList.contains('on'))aiRenderCtx();
     },250);
   });
 }

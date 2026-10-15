@@ -14,7 +14,58 @@ if (!in_array($method, ['GET', 'HEAD'], true)) json_err(405, 'method not allowed
 
 $id = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_GET['id'] ?? ''));
 $tok = preg_replace('/[^a-f0-9]/', '', strtolower((string)($_GET['t'] ?? '')));
-if ($id === '' && $tok === '') json_err(400, 'bad id');
+if (($id === '' && $tok === '') || strlen($id) > 40 || strlen($tok) > 64) json_err(400, 'bad id');
+
+/**
+ * Убирает врезки автора (div.nb) — читателю они не показываются.
+ * Разбираем теги, а не подстроку: кавычки любого типа (в т.ч. `>` внутри
+ * значения атрибута), `class` не первым (не захватываем `data-class`),
+ * вложенные div (считаем глубину) — иначе остаётся лишний </div>
+ * и текст читателя ломается. Потолка «64 врезки на главу» больше нет:
+ * цикл безопасно ограничивается только проверкой прогресса (строка после
+ * каждого удаления строго короче).
+ */
+function strip_nb(string $html): string
+{
+    $openRe = '/<div\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*>/i';   /* учитывает кавычки в атрибутах */
+    $anyRe  = '/<(\/?)div\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*>/i';
+    $clsQ   = '/(?<![\w-])class\s*=\s*(["\'])(.*?)\1/is';    /* не матчит data-class */
+    $clsB   = '/(?<![\w-])class\s*=\s*([^\s"\'>]+)/i';
+    $pos = 0;   /* курсор поиска: после удаления блока продолжаем с места выреза —
+                   текст до него не менялся, полный перескан документа не нужен
+                   (иначе K nb-блоков × D div-ов = квадратичная сложность) */
+    while (true) {
+        $victim = null;
+        $victimLen = 0;
+        while (preg_match($openRe, $html, $m, PREG_OFFSET_CAPTURE, $pos)) {
+            $tag = $m[0][0];
+            $off = (int)$m[0][1];
+            $cls = '';
+            if (preg_match($clsQ, $tag, $c)) $cls = $c[2];
+            elseif (preg_match($clsB, $tag, $c)) $cls = $c[1];
+            if (preg_match('/(^|\s)nb(\s|$)/', $cls)) {   /* ровно токен класса */
+                $victim = $off;
+                $victimLen = strlen($tag);
+                break;
+            }
+            $pos = $off + strlen($tag);
+        }
+        if ($victim === null) break;
+
+        $p = $victim + $victimLen;
+        $d = 1;
+        while ($d > 0 && preg_match($anyRe, $html, $mm, PREG_OFFSET_CAPTURE, $p)) {
+            $d += ($mm[1][0] === '/' ? -1 : 1);
+            $p = (int)$mm[0][1] + strlen($mm[0][0]);
+        }
+        if ($d > 0) break;   /* незакрытый тег — не режем, чтобы не потерять текст */
+        $next = substr($html, 0, $victim) . substr($html, $p);
+        if (strlen($next) >= strlen($html)) break;   /* страховка от зацикливания */
+        $html = $next;
+        $pos = $victim;   /* вырезали начиная с $victim — курсор на это место */
+    }
+    return $html;
+}
 
 $row = null;
 if ($tok !== '') {
@@ -38,24 +89,31 @@ if (!$row) json_err(404, 'book not found');
 $b = json_decode((string)$row['content'], true);
 if (!is_array($b)) json_err(500, 'corrupt book');
 
-/* вычищаем всё, что не для читателя */
-unset($b['wiki'], $b['customTypes'], $b['share_token'], $b['visibility'], $b['author'], $b['id']);
+/* белый список: читателю отдаём только нужное. Раньше стоял unset() по
+   7 полям — любое НОВОЕ приватное поле книги автоматически утекало бы. */
 $chs = [];
 foreach (($b['chapters'] ?? []) as $ch) {
     if (!is_array($ch)) continue;
     if (($ch['kind'] ?? '') === 'notes') continue;          /* глава «Заметки» — не показывается */
-    $ch['marks'] = [];
-    $ch['pos'] = 0;
-    if (isset($ch['html']) && is_string($ch['html'])) {
-        /* врезки автора (div.nb) не попадают читателю */
-        $ch['html'] = preg_replace('/<div\b[^>]*class="[^"]*\bnb\b[^"]*"[^>]*>.*?<\/div>/su', '', $ch['html']);
-    }
-    $chs[] = $ch;
+    $chs[] = [
+        'id'    => (string)($ch['id'] ?? ''),
+        'kind'  => (string)($ch['kind'] ?? ''),
+        'html'  => isset($ch['html']) && is_string($ch['html']) ? strip_nb($ch['html']) : '',
+        'marks' => [],
+        'pos'   => 0,
+    ];
 }
-$b['chapters'] = $chs;
+$out = [
+    'v'        => (int)($b['v'] ?? 0),
+    'title'    => (string)($b['title'] ?? 'Без названия'),
+    'color'    => (string)($b['color'] ?? ''),
+    'current'  => (string)($b['current'] ?? ''),
+    'updated'  => (int)($b['updated'] ?? 0),
+    'chapters' => $chs,
+];
 
 json_out([
-    'book' => $b,
+    'book' => $out,
     'meta' => [
         'id'      => (string)$row['id'],
         'title'   => (string)$row['title'],

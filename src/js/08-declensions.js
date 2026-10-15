@@ -50,6 +50,9 @@ function buildNameRegex(name){return buildNameRegexAll(name,null)}
 function nameStats(enOrName,aliases){
   var b=book(),re=buildNameRegexAll(enOrName,aliases),appear=[],totalMatches=0;
   if(b&&re){
+    /* ЕДИНАЯ нумерация — абсолютная (по b.chapters): findContexts, поиск
+       «гл. N» и цитаты уже считают по ней; по visible-индексам таймлайн и
+       «главы» в карточке расходились с цитатами на ≥2 (Памятка/Заметки) */
     visibleChapters(b).forEach(function(ch){
       var m=tmp(ch.html).textContent.match(re);
       var c=m?m.length:0;
@@ -57,7 +60,7 @@ function nameStats(enOrName,aliases){
     });
   }
   var names=namesOf(enOrName,aliases);
-  return {forms:names.reduce(function(acc,n){return acc.concat(declForms(n))},[]).filter(function(v,i,a){return a.indexOf(v)===i}),appear:appear,total:b?visibleChapters(b).length:0,totalMatches:totalMatches};
+  return {forms:names.reduce(function(acc,n){return acc.concat(declForms(n))},[]).filter(function(v,i,a){return a.indexOf(v)===i}),appear:appear,total:b?b.chapters.length:0,totalMatches:totalMatches};
 }
 function findContexts(enOrName,aliases){
   var b=book(),out=[];if(!b)return out;

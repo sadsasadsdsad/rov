@@ -10,7 +10,7 @@ require __DIR__ . '/bootstrap.php';
 $u = require_user();
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $id = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_GET['id'] ?? ''));
-if ($id === '') json_err(400, 'bad id');
+if ($id === '' || strlen($id) > 40) json_err(400, 'bad id');   /* колонка id — VARCHAR(40) */
 
 if ($method === 'GET' || $method === 'HEAD') {
     $row = db_one('SELECT content FROM books WHERE id = ? AND user_id = ?', [$id, $u['id']]);
@@ -76,14 +76,24 @@ if ($method === 'PUT' || $method === 'POST') {
 
     $content = json_encode($b, JSON_UNESCAPED_UNICODE);
     if ($content === false) json_err(422, 'bad book json');
-    if (strlen($content) > (int)cfg()['max_book_bytes']) json_err(413, 'book too big');
+    /* MEDIUMTEXT держит максимум 16777215 байт — лимит строго меньше
+       max_book_bytes (16 МБ), иначе MySQL обрежет/упадёт на последнем байте */
+    if (strlen($content) >= (int)cfg()['max_book_bytes']) json_err(413, 'book too big');
 
     $tokBind = $token !== '' ? $token : null;   /* без токена — NULL, а не '' */
     if ($row) {
-        db_run(
-            'UPDATE books SET title = ?, author = ?, updated = ?, visibility = ?, share_token = ?, content = ?, version = version + 1 WHERE id = ?',
-            [$b['title'], $b['author'], $b['updated'], $b['visibility'], $tokBind, $content, $id]
+        /* F12: запись условная (AND updated <= ?): параллельный более свежий
+           PUT, прошедший проверку выше, больше не затирается вслепую */
+        $n = db_run(
+            'UPDATE books SET title = ?, author = ?, updated = ?, visibility = ?, share_token = ?, content = ?, version = version + 1 WHERE id = ? AND updated <= ?',
+            [$b['title'], $b['author'], $b['updated'], $b['visibility'], $tokBind, $content, $id, $b['updated']]
         );
+        if ($n === 0) {
+            $again = db_one('SELECT updated FROM books WHERE id = ?', [$id]);
+            if ($again && (int)$again['updated'] > $b['updated']) {
+                json_out(['ok' => false, 'stale' => true, 'updated' => (int)$again['updated']]);
+            }
+        }
     } else {
         try {
             db_run(

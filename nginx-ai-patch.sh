@@ -17,7 +17,10 @@ set -euo pipefail
 
 CONF=/etc/nginx/sites-enabled/rov.smartliba.ru.conf
 BACKUP_DIR=/root/nginx-backup
-PHP_SOCK=/run/php/php8.3-fpm.sock
+# версию PHP не хардкодим: на сервере может быть 8.1/8.2/8.4 — хардкод
+# проходил бы nginx -t, но ронял бы все php в 502
+PHP_SOCK="$(ls -1t /run/php/php*-fpm.sock 2>/dev/null | head -n1)"
+[[ -n "$PHP_SOCK" ]] || { echo "сокет php-fpm не найден в /run/php"; exit 1; }
 ANCHOR='  location ~ \.php$ {'
 
 [[ -f "$CONF" ]] || { echo "нет $CONF"; exit 1; }
@@ -69,14 +72,33 @@ if need_ai and 'location = /api/ai.php' not in s:
 
 ''')
 if need_cache and 'no-cache, must-revalidate' not in s:
+    # add_header в location заменяет серверные «вместо» наследования —
+    # безопасность продублирована внутри каждого вставляемого блока
     blocks.append('''  # Кэш: html перепроверяется каждый раз (иначе после обновления браузер
   # держит старый index.html по эвристике — вёрстка отстаёт от JS),
   # статика — на сутки: её адреса версионированы (?v=..) в index.html.
   location ~* \\.html$ {
     add_header Cache-Control "no-cache, must-revalidate";
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
   }
-  location ~* \\.(css|js|jpg|jpeg|png|gif|svg|ico|woff|woff2|ttf|map)$ {
+  # js/css версионируются (?v=.. в index.html), но история помнит правки без
+  # бампа версии — сутки кеша отдавали бы пользователям смесь старых и новых
+  # модулей (порядок подключения строгий, расхождение версий = сломанный старт).
+  # Перепроверка каждый раз — как в setup-server.sh; кэшируем только картинки
+  # и шрифты, которые не версионируются.
+  location ~* \\.(css|js|map)$ {
+    add_header Cache-Control "no-cache, must-revalidate";
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+  }
+  location ~* \\.(jpg|jpeg|png|gif|svg|ico|woff|woff2|ttf)$ {
     add_header Cache-Control "public, max-age=86400";
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
   }
 
 ''')
@@ -88,6 +110,13 @@ if blocks:
     print('блоки location вставлены')
 PY
 
-nginx -t
+# сначала проверяем: сломанный conf на диске упадёт при СЛЕДУЮЩЕМ любом
+# reload (certbot, setup-server) — откатываем к бэкапу сразу
+if ! nginx -t; then
+  cp -a "$(ls -t "$BACKUP_DIR"/* | head -n1)" "$CONF"
+  echo "ОШИБКА конфига! Откат к бэкапу, nginx не перезагружен."
+  nginx -t || true
+  exit 1
+fi
 systemctl reload nginx
 echo 'nginx пропатчен и перезагружен'

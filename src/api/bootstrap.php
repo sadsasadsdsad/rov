@@ -15,7 +15,14 @@ header('Cache-Control: no-store');
 function json_out(array $data, int $code = 200): void
 {
     http_response_code($code);
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    $out = json_encode($data, JSON_UNESCAPED_UNICODE);
+    /* json_encode вернёт false на битых байтах — раньше клиент получал
+       пустой ответ 200 и честно показывал «офлайн» без причины */
+    if ($out === false) {
+        http_response_code(500);
+        $out = '{"error":"encode error"}';
+    }
+    echo $out;
     exit;
 }
 
@@ -50,7 +57,10 @@ function same_origin_ok(): bool
     if ($sfs !== '' && !in_array($sfs, ['same-origin', 'none'], true)) return false;
 
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if ($origin === '' || $origin === 'null') return true; // curl / серверные вызовы
+    /* Origin отсутствует → не-браузерный клиент (curl, серверный вызов):
+       полагаемся на Sec-Fetch-Site выше. А вот Origin: null присылает
+       sandboxed iframe — это чужой контекст, такой запрос отклоняем. */
+    if ($origin === '') return true;
 
     /* HTTP_HOST может быть без порта (стандартные 443/80) — подставляем схему,
        иначе origin_parts вернёт порт null и сравнение всегда провалится */
@@ -97,3 +107,16 @@ function new_id(): string
 {
     return bin2hex(random_bytes(12));
 }
+
+/* Непойманное исключение (например, PDO) уходило браузеру как HTML-500 —
+   клиент ждёт JSON и видит «офлайн». Отвечаем JSON и пишем в лог. */
+set_exception_handler(function (Throwable $e): void {
+    error_log('[chernovik] ' . get_class($e) . ': ' . $e->getMessage()
+        . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    http_response_code(500);
+    echo json_encode(['error' => 'internal error'], JSON_UNESCAPED_UNICODE);
+    exit;
+});

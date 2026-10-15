@@ -10,6 +10,9 @@
 "use strict";
 /* ===== график статистики ===== */
 var chartState={days:[],series:[],niceMax:10};
+/* скрытые книги-линии переживают перерисовку (легенда пересобирается
+   при каждой отрисовке статистики) */
+var chartHidden={};
 function niceMaxFor(v){
   if(v<=10)return 10;
   if(v<=50)return Math.ceil(v/10)*10;
@@ -64,7 +67,7 @@ function renderStats(){
       rawDeltas.push(d);deltas.push(Math.max(0,d));
     }
     var total=rawDeltas.reduce(function(a,b){return a+b},0);
-    return {book:bk,deltas:deltas,rawDeltas:rawDeltas,total:total,hidden:false};
+    return {book:bk,deltas:deltas,rawDeltas:rawDeltas,total:total,hidden:!!chartHidden[bk.id]};
   });
   var activeSeries=allSeries.filter(function(s){return s.total!==0 || s.book.id===state.activeBookId});
   activeSeries.sort(function(a,b){return Math.abs(b.total)-Math.abs(a.total)});
@@ -94,7 +97,7 @@ function renderStats(){
   }
   svgLines.innerHTML='';
   activeSeries.forEach(function(ser){
-    var color=ser.book.color||COLORS[0];
+    var color=safeColor(ser.book.color,COLORS[0]);   /* цвет из данных — только литерал CSS */
     var pts=[];
     for(var i=0;i<N;i++){
       var x=(N>1)?(i/(N-1))*W:W/2;
@@ -109,6 +112,7 @@ function renderStats(){
     ser.lineEl=line;ser.color=color;
     ser.W=W;ser.H=H;ser.padTop=padTop;ser.plotH=plotH;
     svgLines.appendChild(line);
+    if(ser.hidden)line.style.display='none';
   });
   if(legend){
     legend.innerHTML='';
@@ -117,12 +121,13 @@ function renderStats(){
     }else{
       activeSeries.forEach(function(ser){
         var item=mk('button');item.type='button';
-        item.className='chart-legend-item'+(ser.book.id===state.activeBookId?' active':'');
+        item.className='chart-legend-item'+(ser.book.id===state.activeBookId?' active':'')+(ser.hidden?' off':'');
         var dot=mk('i');dot.style.background=ser.color;item.appendChild(dot);
         var label=mk('span');label.textContent=ser.book.title||'Без названия';item.appendChild(label);
         var num=mk('b');num.textContent=(ser.total>0?'+':'')+fmt(ser.total);item.appendChild(num);
         item.addEventListener('click',function(){
           ser.hidden=!ser.hidden;
+          chartHidden[ser.book.id]=ser.hidden;   /* помним выбор до следующей перерисовки */
           item.classList.toggle('off',ser.hidden);
           if(ser.lineEl)ser.lineEl.style.display=ser.hidden?'none':'';
         });

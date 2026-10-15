@@ -84,6 +84,37 @@ function sanitizeChapterHtml(html){
   return d.innerHTML;
 }
 
+/* --------------------------------------------------------------------------
+ * F15: глава из localStorage/сервера вставляется в живой DOM. Решаем «чисто /
+ * грязь» парсингом в ОТСОЕДИНЁННОМ DOM, а не regex'ом: regex требует пробел
+ * перед on…= (атрибут начинается сразу после кавычки: <img src="x"alt="y"
+ * onerror=…>), не видит сущности в ссылке (java&#10;script:) и пропускает
+ * style/id. Детектор: опасный тег (SAN_DROP) либо атрибут вне белого списка
+ * (onerror и пр.) либо невалидная ссылка (sanUrl) → полный санитайзер;
+ * иначе — исходная строка как есть (комментарии целы — в них маркер Памятки).
+ * Безобидные неизвестные теги (<aside>) сами по себе чистку не триггерят.
+ * Отсоединённый парсинг скрипты и обработчики не исполняет.
+ * ------------------------------------------------------------------------ */
+function hardenChapterHtml(html){
+  if(typeof html!=='string'||!html)return html;
+  var d=mk('div');d.innerHTML=html;
+  var bad=false;
+  (function walk(n){
+    for(var el=n.firstChild;el&&!bad;el=el.nextSibling){
+      if(el.nodeType!==1)continue;
+      var tag=el.tagName;
+      if(SAN_DROP[tag]){bad=true;return}
+      for(var i=0;i<el.attributes.length;i++){
+        var aname=el.attributes[i].name.toLowerCase();
+        if(!SAN_ATTRS[aname]){bad=true;return}                 /* onerror, style, id и пр. */
+        if((aname==='href'||aname==='src')&&sanUrl(el.attributes[i].value,tag)===null){bad=true;return}
+      }
+      walk(el);
+    }
+  })(d);
+  return bad?sanitizeChapterHtml(html):html;
+}
+
 function roNormalize(b){
   if(!b||typeof b!=='object')return b;
   b.wiki=Array.isArray(b.wiki)?b.wiki:[];

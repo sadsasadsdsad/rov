@@ -114,7 +114,19 @@ function load(){
   }catch(e){}
   return seed();
 }
-function persist(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(e){}if(typeof Sync!=='undefined'&&Sync.markDirty)Sync.markDirty()}
+var persistWarned=false;
+function persist(){
+  try{localStorage.setItem(LS,JSON.stringify(state))}
+  catch(e){
+    /* хранилище переполнено: раньше молчали — пользователь бы не узнал,
+       что его правки не сохраняются. Тост один раз за сессию, не на каждый автосейв */
+    if(!persistWarned&&e&&(e.name==='QuotaExceededError'||e.code===22||e.code===1014)){
+      persistWarned=true;
+      if(typeof toast==='function')toast('Локальное хранилище переполнено — правки могут не сохраняться');
+    }
+  }
+  if(typeof Sync!=='undefined'&&Sync.markDirty)Sync.markDirty()
+}
 
 function initState(){
   state=load();

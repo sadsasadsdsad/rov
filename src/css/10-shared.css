@@ -14,8 +14,8 @@
   font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
   font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
   padding:5px 9px;border-radius:6px;white-space:nowrap;
-  color:var(--accent);background:rgba(201,58,43,.1);
-  border:1px solid rgba(201,58,43,.3);
+  color:var(--accent);background:var(--sel);
+  border:1px solid var(--line);
 }
 .ro-badge::before{
   content:"";width:5px;height:5px;border-radius:50%;background:currentColor;

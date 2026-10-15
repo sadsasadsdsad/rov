@@ -194,6 +194,36 @@ Sync.logout = function () {
     .catch(function () { return false });   /* офлайн: вызывающий решает, что делать (M10) */
 };
 
+/* смена пароля серверного аккаунта (старый пароль обязателен) */
+Sync.changePass = function (oldPass, newPass) {
+  if (Sync.mode !== 'server') return Promise.resolve({ ok: false, reason: 'local' });
+  return syncFetch('api/auth.php?action=pass', { method: 'POST', body: { old: oldPass, 'new': newPass } })
+    .then(function () { return { ok: true } })
+    .catch(function (e) {
+      if (!e.status) return { ok: false, reason: 'offline' };
+      if (e.status === 401) return { ok: false, reason: 'wrong-password' };
+      if (e.status === 429) return { ok: false, reason: 'throttled' };
+      return { ok: false, reason: 'http' };
+    });
+};
+
+/* удаление аккаунта на сервере: книги, настройки, статистика, сессии, юзер */
+Sync.erase = function (pass) {
+  if (Sync.mode !== 'server') return Promise.resolve({ ok: false, reason: 'local' });
+  return syncFetch('api/auth.php?action=erase', { method: 'POST', body: { pass: pass || '' }, keepalive: true })
+    .then(function () {
+      Sync.mode = 'local'; Sync.user = null; Sync.pulled = false;
+      Sync.sentBooks = {}; Sync.sentProfile = null; Sync.sentStats = null;
+      return { ok: true };
+    })
+    .catch(function (e) {
+      if (!e.status) return { ok: false, reason: 'offline' };
+      if (e.status === 401) return { ok: false, reason: 'wrong-password' };
+      if (e.status === 429) return { ok: false, reason: 'throttled' };
+      return { ok: false, reason: 'http' };
+    });
+};
+
 /* ---------- сверка состояния ---------- */
 function applyProfile(pd) {
   state.theme = pd.theme || 'light';
@@ -211,6 +241,10 @@ function applyProfile(pd) {
 
 function reconcile(srv) {
   if (!state || !Array.isArray(state.books)) return;
+  /* Сначала дописываем то, что набрано в DOM: подмена книг/глав ниже могла
+     бы выбросить только что введённый текст, а без b.updated сервер «победил»
+     бы даже со старой версией (LWW сравнивает именно updated). */
+  try { if (typeof commitNow === 'function') commitNow(); } catch (e) {}
   var fresh = !!Sync.freshSeed;
   Sync.freshSeed = false;
   /* новое устройство (только что создан локальный профиль со сидом) и на сервере уже есть книги:
@@ -292,8 +326,21 @@ function reconcile(srv) {
   /* дедупликация глав (дубли id/служебных глав) — если что-то вычистили, книга уедет на сервер */
   if (typeof dedupeChapters === 'function') {
     var deduped = 0;
+    var curBefore = null;
+    try { var cB = currentCh(); curBefore = cB ? cB.id : null; } catch (e) {}
     state.books.forEach(function (b) { deduped += dedupeChapters(b) });
     if (deduped) Sync.markDirty();
+    /* глава в DOM была вычищена/заменена — перечитываем, иначе следующий
+       автосейв запишет текст показанной главы в другую главу */
+    if (deduped && curBefore) {
+      try {
+        var cA = currentCh();
+        if ((!cA || cA.id !== curBefore) && typeof workspace !== 'undefined' && workspace
+            && !workspace.hidden && typeof loadChapter === 'function') {
+          loadChapter(cA);
+        }
+      } catch (e) {}
+    }
   }
 
   /* профиль (тема/настройки/мир): при первом заходе (sentProfile=null) сервер авторитетен */
@@ -347,10 +394,14 @@ Sync.pull = function () {
 
 /* ---------- отправка ---------- */
 function syncPutBook(b, keepalive) {
+  /* снимок updated в момент сериализации тела: если правка придёт «в полёте»,
+     помечать «отправлено» нельзя — книга уедет ещё раз, иначе теряется */
+  var snap = b.updated;
   return syncFetch('api/book.php?id=' + encodeURIComponent(b.id), { method: 'PUT', body: b, keepalive: keepalive })
     .then(function (j) {
       if (j && j.ok === false && j.stale) return 'stale';
-      Sync.sentBooks[b.id] = b.updated;
+      if (b.updated === snap) Sync.sentBooks[b.id] = snap;
+      else delete Sync.sentBooks[b.id];
       return 'ok';
     });
 }
@@ -366,12 +417,19 @@ function syncPutState(prefs, stats, keepalive) {
     .then(function () { return 'ok' });
 }
 
+/* бэкофф ретраев: 2, 4, 8, 16, 32 с и дальше раз в минуту */
+function syncBackoff(fails) {
+  return Math.min(60000, 1000 * Math.pow(2, Math.min(fails, 6)));
+}
+
 Sync.flush = function (opt) {
   opt = opt || {};
   if (Sync.mode !== 'server' || Sync.flushing) return;
   if (!Sync.pulled) {
+    /* сверки ещё не было — сеть тут же, но с бэкоффом, а не каждые 2 с */
     clearTimeout(Sync.timer);
-    Sync.timer = setTimeout(function () { Sync.flush() }, 2000);
+    Sync.fails++;
+    Sync.timer = setTimeout(function () { Sync.flush() }, syncBackoff(Sync.fails));
     return;
   }
   if (!state) return;
@@ -395,6 +453,7 @@ Sync.flush = function (opt) {
   if (!opt.silent) syncStatus('sending');
 
   var i = 0;
+  var hadErr = false;   /* элемент не прошёл — остальные всё равно едут */
   function step() {
     if (i >= plan.length) {
       if (wantState) {
@@ -407,9 +466,9 @@ Sync.flush = function (opt) {
         ).then(function () {
           if (wasProf) Sync.sentProfile = pstr;
           if (wasStats) Sync.sentStats = sstr;
-          done(true);
+          done();
         }).catch(function (e) { fail(e) });
-      } else done(true);
+      } else done();
       return;
     }
     var op = plan[i++];
@@ -420,20 +479,41 @@ Sync.flush = function (opt) {
     req.then(function (r) {
       if (r === 'stale') { Sync.staleHit = true; return step(); }
       step();
-    }).catch(function (e) { fail(e) });
+    }).catch(function (e) {
+      /* ошибка элемента (413/422/403) — мимо, не роняем очередь; но 401 =
+         сессия кончилась: раньше он тоже шёл «мимо», ветка fail()→mode='local'
+         была недостижима и синк молотил 401 до перезагрузки («Офлайн» вечно) */
+      if (e && e.status && e.status !== 401) { hadErr = true; step(); return; }
+      fail(e);                                                 /* сеть/таймаут/401: обрываем и ждём */
+    });
   }
   function done() {
-    Sync.flushing = false; Sync.fails = 0;
+    Sync.flushing = false;
+    if (hadErr) { partial(); return; }
+    Sync.fails = 0;
     if (!opt.silent) syncStatus('synced');
     if (Sync.dirty) { clearTimeout(Sync.timer); Sync.timer = setTimeout(function () { Sync.flush() }, 400); }
     if (Sync.staleHit) { Sync.staleHit = false; setTimeout(function () { Sync.pull().then(function () { Sync.flush() }) }, 600); }
   }
-  function fail() {
-    Sync.flushing = false; Sync.fails++;
+  /* что-то из очереди не уехало (413 слишком большая книга, 422, 403):
+     не показываем «синхронизировано» и повторяем с бэкоффом */
+  function partial() {
+    Sync.fails++;
     syncStatus('offline');
     clearTimeout(Sync.timer);
-    var backoff = Math.min(30000, 3000 * Sync.fails);
-    Sync.timer = setTimeout(function () { Sync.flush() }, backoff);
+    Sync.timer = setTimeout(function () { Sync.flush() }, syncBackoff(Sync.fails));
+  }
+  function fail(e) {
+    Sync.flushing = false;
+    if (e && e.status === 401) {           /* сессия кончилась — уходим в локальный режим */
+      Sync.mode = 'local'; Sync.user = null; Sync.pulled = true;
+      syncStatus('local');
+      return;
+    }
+    Sync.fails++;
+    syncStatus('offline');
+    clearTimeout(Sync.timer);
+    Sync.timer = setTimeout(function () { Sync.flush() }, syncBackoff(Sync.fails));
   }
   step();
 };
@@ -462,5 +542,12 @@ addEventListener('online', function () {
 addEventListener('beforeunload', function () {
   if (Sync.mode === 'server' && (Sync.dirty || Sync.timer)) {
     try { Sync.flush({ silent: true, keepalive: true }) } catch (e) {}   /* L6 */
+  }
+});
+/* Safari/iOS не всегда шлёт beforeunload — текст дописываем и увозим на pagehide */
+addEventListener('pagehide', function () {
+  try { if (typeof commitNow === 'function') commitNow(); } catch (e) {}
+  if (Sync.mode === 'server') {
+    try { Sync.flush({ silent: true, keepalive: true }) } catch (e) {}
   }
 });

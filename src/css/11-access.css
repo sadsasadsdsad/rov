@@ -20,8 +20,8 @@
 }
 .lib-tabs button:hover{color:var(--ink);border-color:var(--line)}
 .lib-tabs button.on{
-  color:var(--accent);border-color:rgba(201,58,43,.35);
-  background:rgba(201,58,43,.08);
+  color:var(--accent);border-color:var(--accent);
+  background:var(--sel);
 }
 /* .shelf{display:grid} перебивает UA-[hidden] — прячем вручную */
 .shelf[hidden]{display:none!important}
@@ -36,7 +36,7 @@
   border-radius:var(--r-md);padding:11px 14px;outline:none;
   transition:border-color .2s,box-shadow .2s;
 }
-#sharedSearch:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
+#sharedSearch:focus{border-color:var(--accent)}
 #sharedSearch::placeholder{color:var(--ink3)}
 .shared-list{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
@@ -85,7 +85,7 @@ body.ro .bv-access{display:none!important}
 }
 .vis-seg button:last-child{border-right:0}
 .vis-seg button:hover{color:var(--ink);background:var(--hover)}
-.vis-seg button.on{color:var(--accent);background:rgba(201,58,43,.1)}
+.vis-seg button.on{color:var(--accent);background:var(--sel)}
 .share-row{display:flex;gap:8px;flex:1 1 320px;min-width:260px}
 .share-row[hidden]{display:none!important}
 #bvShareLink{
@@ -94,7 +94,7 @@ body.ro .bv-access{display:none!important}
   background:var(--card);border:1px solid var(--line2);
   border-radius:var(--r-sm);padding:8px 11px;outline:none;
 }
-#bvShareLink:focus-visible{border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
+#bvShareLink:focus-visible{border-color:var(--accent)}
 .share-row .m-btn{
   font-family:var(--f-ui);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
   padding:8px 13px;white-space:nowrap;
@@ -110,7 +110,7 @@ body.ro .bv-access{display:none!important}
   padding:3px 8px;background:var(--card-glass);white-space:nowrap;
 }
 .cv-vis[hidden]{display:none}
-.cv-vis[data-v="public"]{color:var(--accent);border-color:rgba(201,58,43,.4)}
+.cv-vis[data-v="public"]{color:var(--accent);border-color:var(--accent)}
 .cv-vis[data-v="unlisted"]{color:var(--ink2);border-color:var(--line)}
 
 /* ===== поле «Автор» в обзоре книги ===== */

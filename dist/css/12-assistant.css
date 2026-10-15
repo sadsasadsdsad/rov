@@ -4,22 +4,33 @@
  * Что делает: оформляет кнопки «Спросить ИИ» с классом .ai-open —
  *   #aiFab в #topbar редактора (на месте «Все заметки») и #aiFabLib в шапке
  *   библиотеки; обе — обычные .ibtn-иконки (искра AI_SPARK), без подложки
- *   и точки связи: статус виден только в шапке панели (.ai-status).
+ *   и точки связи: статус виден только в строке охвата панели (.ai-dot).
  *   Старая плавающая пилюля #aiFab осталась только для устаревшей
- *   разметки в кэше браузера, #aiPanel (чат с контекстом книги и чипами
- *   действий «новая книга/глава»), карточки действия .ai-act (модель
- *   прислала план — создаём по кнопке), #aiResModal (результат
- *   «исправить/улучшить») и кнопки ИИ внутри #selbar (.sb-ai).
- * Ключевое: только токены темы из 01-base.css (--card-glass, --line,
- *   --accent, --r-*, --f-*), поэтому светлая/тёмная/сепия темы работают
- *   без переопределений; z-index: панель 100 (над #wikiPanel), модальный
- *   результат 110 (как #dayModal), у старой плавающей пилюли — 96 (у #micPill).
+ *   разметки в кэше браузера, #aiPanel (чат с контекстом книги — раздел
+ *   «Чат» Энциклопедии: строка охвата .ai-scope-row (селектор контекста,
+ *   подпись книги/главы, точка связи, «очистить»/«настройки»), лента
+ *   в обёртке .ai-feed с кнопкой «к последнему сообщению» .ai-jump,
+ *   чипы быстрых вопросов .ai-chips в стиле .sb-chips), карточка
+ *   размышления .ai-think (что думала модель, с таймером и живым
+ *   индикатором в духе #micPill), чипы цитат .ai-cite (ссылка на
+ *   конкретное место в тексте — оформление .hit-flash: по клику
+ *   подсвечиваем фрагмент в #editor, не трогая DOM: оверлей .ai-flash),
+ *   #aiResModal (результат «исправить/улучшить») и кнопки ИИ внутри
+ *   #selbar (.sb-ai). Селектор контекста .ai-scope (глава / соседние /
+ *   выделение / вся книга).
+ * Ключевое: только токены и паттерны 01-base.css / 05-modals-notes.css —
+ *   .m-btn.primary (кнопка отправки), .sb-chips (чипы вопросов),
+ *   .hit-flash (цитаты), micPulse (живая точка), радиусы --r-*,
+ *   фокус везде = border-color:var(--accent) без колец; поэтому
+ *   светлая/тёмная/сепия темы работают без переопределений;
+ *   z-index: панель 100 (как #wikiPanel), модальный результат 110
+ *   (как #dayModal), у старой плавающей пилюли — 96 (у #micPill).
  * ========================================================================== */
 
 /* ── Кнопки ИИ (.ai-open): обычная иконка в шапках + запреты ─────────── */
 /* Иконка ИИ визуально не отличается от соседних .ibtn — без подложки-пилюли
    и точки связи (по желанию пользователя); статус связи показывает только
-   строка .ai-status внутри панели. Класс .ai-tb остался меткой «не
+   строка .ai-dot внутри панели. Класс .ai-tb остался меткой «не
    плавающая пилюля» для стилей устаревшей разметки; в ней (и в старых
    версиях кнопок) прячем надпись «ИИ» и точку */
 .ai-tb .t,.ai-tb .dot{display:none}
@@ -43,14 +54,14 @@ body.reader .ai-open,body.zen .ai-open{display:none}
 #aiFab:not(.ai-tb):hover svg{transform:rotate(14deg) scale(1.06)}
 #aiFab:not(.ai-tb) .t{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
 
-/* ── Панель чата ───────────────────────────────────────────────────── */
+/* ── Панель чата — та же конструкция, что у #wikiPanel ───────────────── */
 #aiPanel{
   position:fixed;right:16px;bottom:18px;z-index:100;
   width:min(400px,calc(100vw - 24px));height:min(74vh,640px);
   display:flex;flex-direction:column;
   background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-lg);
-  box-shadow:0 30px 70px -30px rgba(0,0,0,.6),0 4px 14px -6px rgba(0,0,0,.25);
-  backdrop-filter:blur(24px) saturate(1.3);-webkit-backdrop-filter:blur(24px) saturate(1.3);
+  box-shadow:0 24px 48px -24px rgba(0,0,0,.55),0 4px 12px -6px rgba(0,0,0,.2);
+  backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
   opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px) scale(.98);
   transform-origin:100% 100%;
   transition:opacity .18s,transform .18s,visibility .18s;
@@ -59,173 +70,222 @@ body.reader .ai-open,body.zen .ai-open{display:none}
 #aiPanel.on{opacity:1;visibility:visible;pointer-events:auto;transform:none}
 @media print{#aiPanel{display:none}}
 
-.ai-head{
-  display:flex;align-items:center;gap:8px;
-  padding:10px 10px 10px 14px;border-bottom:1px solid var(--line2);
+/* ── Чат как раздел Энциклопедии (#paneAi): без своего фикс-бокса ──────
+   карточку панели даёт сам #wikiPanel; чат растягивается на её место.
+   Видимость НЕ переопределяем: её даёт класс .on (его держит
+   updatePanelTabs) — иначе visibility:visible перебил бы скрытие
+   закрытой панели и чат ловил бы клики поверх всего экрана; заголовок
+   раздела — в шапке вики, статус связи и кнопки — в .ai-scope-row */
+#paneAi #aiPanel{
+  position:relative;right:auto;bottom:auto;z-index:auto;
+  width:auto;height:auto;
+  flex:1 1 auto;min-height:0;
+  background:none;border:0;border-radius:0;box-shadow:none;
+  backdrop-filter:none;-webkit-backdrop-filter:none;
 }
-.ai-head .ai-spark{display:grid;place-items:center;color:var(--accent);flex:0 0 auto}
-.ai-spark svg{width:16px;height:16px}          /* база — страховка от размера по умолчанию */
-.ai-head .ai-spark svg{width:15px;height:15px}
-.ai-head b{font-family:var(--f-disp);font-size:10px;letter-spacing:.18em;text-transform:uppercase;font-weight:600}
-.ai-head .sp{flex:1}
-.ai-head .sibtn{width:26px;height:26px}
-/* крошечная точка связи в шапках (панель и страница) — без надписей */
+/* колонка ленты, чипсов и поля — не шире ~860px, по центру широкой панели */
+#paneAi .ai-msgs,#paneAi .ai-chips,#paneAi .ai-foot{
+  width:100%;max-width:860px;margin-left:auto;margin-right:auto;
+}
+
+/* искра AI_SPARK: базовый размер (шапка результата, пустое состояние) */
+.ai-spark svg{width:16px;height:16px}
+/* крошечная точка связи — в строке охвата, без надписей */
 .ai-dot{width:6px;height:6px;border-radius:50%;background:var(--ink3);flex:0 0 auto}
 .ai-dot.ok{background:var(--neg)}
 .ai-dot.err{background:var(--accent)}
-/* контекст книги — компактный чип в шапке */
-.ai-head .ctx,.ai-pg-head .ctx{
+
+/* Строка охвата — один ряд под шапкой вики (как .wp-tabs у #wikiPanel):
+   селектор контекста + подпись книги/главы, справа — статус связи
+   и кнопки «очистить»/«настройки» */
+.ai-scope-row{display:flex;align-items:center;gap:8px;padding:7px 12px 8px;border-bottom:1px solid var(--line2)}
+.ai-scope-row .ctx{flex:1;min-width:0}
+/* контекст книги — компактная подпись */
+.ai-scope-row .ctx{
   font-family:var(--f-ui);font-size:9.5px;letter-spacing:.03em;color:var(--ink3);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
 }
+/* узкий экран: в ряду остаётся селектор контекста, подпись книги убираем */
+@media (max-width:560px){
+  .ai-scope-row .ctx{display:none}
+  .ai-scope{max-width:112px}
+}
+/* ── Селектор контекста запроса (.ai-scope): глава / соседние / выделение / книга ── */
+/* Кнопка в духе .wp-tab: ui-шрифт, капитель, тонкая рамка, шеврон;
+   меню #aiScopeMenu живёт в стиле #exportMenu (08-responsive-auth.css) */
+.ai-scope{
+  flex:0 1 auto;min-width:0;max-width:170px;
+  font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);
+  background:var(--card);border:1px solid var(--line2);border-radius:var(--r-sm);
+  padding:5px 9px 5px 8px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;
+  transition:border-color .15s,color .15s;
+}
+.ai-scope .ai-scope-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-scope::after{content:"";flex:0 0 auto;width:0;height:0;border-left:3.5px solid transparent;border-right:3.5px solid transparent;border-top:4px solid currentColor;opacity:.7}
+.ai-scope:hover{border-color:var(--accent);color:var(--ink)}
+.ai-scope:focus-visible{outline:none;border-color:var(--accent)}
+.ai-scope[aria-expanded="true"]{border-color:var(--accent);color:var(--accent)}
+#aiScopeMenu .bm-item .h{margin-left:auto;color:var(--accent)}
+#aiScopeMenu .bm-item.act{background:var(--sel);color:var(--accent)}
+/* меню охвата — та же физика, что #exportMenu (08-responsive-auth.css);
+   z-index выше панели (100), иначе уходит под неё */
+#aiScopeMenu{position:fixed;z-index:120;width:250px;background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);padding:6px;opacity:0;visibility:hidden;transform:translateY(6px) scale(.98);pointer-events:none;transition:opacity .16s,visibility .16s,transform .16s}
+#aiScopeMenu.on{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+#aiScopeMenu .bm-item{text-align:left;width:100%;font-family:var(--f-ui);font-size:11px;letter-spacing:.02em;color:var(--ink2)}
+#aiScopeMenu .bm-item .t{font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── Лента: обёртка .ai-feed + кнопка «к последнему сообщению» ──────── */
+.ai-feed{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+.ai-jump{
+  position:absolute;right:12px;bottom:12px;z-index:2;
+  width:30px;height:30px;border-radius:8px;
+  display:grid;place-items:center;cursor:pointer;color:var(--ink2);
+  background:var(--card);border:1px solid var(--line);
+  opacity:0;transform:translateY(6px);pointer-events:none;
+  transition:opacity .18s,transform .18s,border-color .15s,color .15s;
+}
+.ai-jump svg{width:14px;height:14px}
+.ai-jump.on{opacity:1;transform:none;pointer-events:auto}
+.ai-jump:hover{border-color:var(--accent);color:var(--accent)}
+.ai-jump:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ── Сообщения ─────────────────────────────────────────────────────── */
-.ai-msgs{flex:1;overflow-y:auto;padding:14px 14px 12px;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin}
-.ai-msgs::-webkit-scrollbar{width:7px}
-.ai-msgs::-webkit-scrollbar-thumb{background:var(--line);border-radius:9999px;background-clip:content-box}
+.ai-msgs{flex:1;overflow-y:auto;padding:14px 12px 12px;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin}
+.ai-msgs::-webkit-scrollbar{width:5px}
+.ai-msgs::-webkit-scrollbar-thumb{background:var(--line);border:none;border-radius:5px}
+/* Без анимации появления: лента пересобирается на каждый чанк стрима —
+   анимация на .ai-msg мигала бы всеми сообщениями при каждой пересборке */
 .ai-msg{
-  max-width:88%;padding:9px 12px;border-radius:14px;
-  font-size:13.5px;line-height:1.62;white-space:pre-wrap;word-break:break-word;
-  text-wrap:pretty;border:1px solid transparent;
+  max-width:88%;padding:8px 12px;border-radius:var(--r-md);
+  font-family:var(--f-serif);font-size:13.5px;line-height:1.62;
+  white-space:pre-wrap;word-break:break-word;text-wrap:pretty;
 }
 .ai-msg.tight{margin-top:-5px}   /* серия реплик одного собеседника — плотнее */
-.ai-msg.user{
-  align-self:flex-end;background:var(--sel);border-color:rgba(201,58,43,.22);color:var(--ink);
-  border-radius:14px 14px 4px 14px;
-}
-.ai-msg.bot{
-  align-self:flex-start;background:var(--card);border-color:var(--line2);color:var(--ink);
-  border-radius:14px 14px 14px 4px;
-}
+/* пользователь — фоном идёт --sel (тот же оттенок, что у выделения
+   и активных элементов сайта), без теней и градиентов */
+.ai-msg.user{align-self:flex-end;background:var(--sel);color:var(--ink)}
+/* ответ — карточка с тонкой рамкой, как .bv-card/.wv-col */
+.ai-msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line2);color:var(--ink)}
 .ai-msg.bot.empty{color:var(--ink3);font-style:italic}
-/* «Рассуждение» — сворачиваемая деталь, а не стена текста */
+/* пузырёк «печатает…» — пока модель молчит, а размышление уже кончилось.
+   Точки только мерцают (как micPill), без прыжков */
+.ai-typing{display:inline-flex;gap:4px;align-items:center;height:12px;vertical-align:-1px}
+.ai-typing i{width:4px;height:4px;border-radius:50%;background:var(--ink3);animation:aiDot 1.1s ease-in-out infinite}
+.ai-typing i:nth-child(2){animation-delay:.15s}
+.ai-typing i:nth-child(3){animation-delay:.3s}
+@keyframes aiDot{0%,60%,100%{opacity:.25}30%{opacity:1}}
+/* ── Чип цитаты: ссылка на конкретное место в тексте (оформление .hit-flash) ── */
+.ai-cite{
+  display:inline;font:inherit;cursor:pointer;text-align:left;
+  padding:0 3px;margin:0 1px;border-radius:4px;
+  background:var(--sel);border:0;
+  color:var(--accent);white-space:normal;
+  transition:box-shadow .14s;
+}
+.ai-cite:hover{box-shadow:0 0 0 1px var(--accent)}
+.ai-cite:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* ── «Размышление»: живая карточка при стриминге, компактная потом ──── */
 details.ai-think{
   align-self:flex-start;max-width:88%;margin:0;
-  background:var(--hover);border-radius:9px;overflow:hidden;
+  background:var(--hover);border:1px solid var(--line2);border-radius:var(--r-md);overflow:hidden;
+  transition:border-color .16s;
 }
+details.ai-think.live{border-color:var(--accent)}
 details.ai-think summary{
-  cursor:pointer;list-style:none;padding:6px 10px;
-  font-family:var(--f-ui);font-size:9px;letter-spacing:.2em;text-transform:uppercase;
-  color:var(--ink2);user-select:none;
+  cursor:pointer;list-style:none;padding:7px 11px;
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink2);user-select:none;display:flex;align-items:center;gap:7px;
 }
 details.ai-think summary::-webkit-details-marker{display:none}
-details.ai-think summary::after{content:' ▸';letter-spacing:0;opacity:.7}
+details.ai-think summary::after{content:'▸';letter-spacing:0;opacity:.7}
 details.ai-think[open] summary{border-bottom:1px solid var(--line2)}
-details.ai-think[open] summary::after{content:' ▾'}
+details.ai-think[open] summary::after{content:'▾'}
+/* живая точка — ритм micPulse из 04-editor.css */
+.ai-th-dot{
+  width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:var(--accent);
+  animation:aiThPulse 1.1s ease-in-out infinite;
+}
+@keyframes aiThPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.65)}}
+.ai-th-t{margin-left:auto;font-size:9px;letter-spacing:.06em;color:var(--ink3);font-variant-numeric:tabular-nums}
 .ai-think-b{
-  display:block;padding:7px 10px 8px;max-height:210px;overflow-y:auto;scrollbar-width:thin;
-  font-size:11.5px;line-height:1.55;white-space:pre-wrap;color:var(--ink3);
+  display:block;padding:7px 11px 9px;max-height:210px;overflow-y:auto;scrollbar-width:thin;
+  font-family:var(--f-serif);font-size:12.5px;line-height:1.6;white-space:pre-wrap;color:var(--ink2);
 }
 .ai-empty{margin:auto;text-align:center;color:var(--ink3);font-size:12.5px;line-height:1.6;max-width:78%}
 .ai-empty .ai-spark{display:block;margin:0 auto 9px}
-.ai-empty .ai-spark svg{width:22px;height:22px;color:var(--accent);opacity:.9}
-.ai-empty b{display:block;font-family:var(--f-disp);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px}
+.ai-empty .ai-spark svg{width:20px;height:20px;color:var(--accent);opacity:.9}
+.ai-empty b{display:block;font-family:var(--f-ui);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3);margin-bottom:7px}
 .ai-err{
-  align-self:stretch;padding:8px 11px;border-radius:10px;
-  background:var(--sel);border:1px solid rgba(201,58,43,.3);color:var(--accent);
+  align-self:stretch;padding:8px 11px;border-radius:var(--r-md);
+  background:var(--sel);border:1px solid var(--accent);color:var(--accent);
   font-family:var(--f-ui);font-size:11px;line-height:1.5;word-break:break-word;
 }
 .ai-err span{display:block}
 .ai-err .retry{
   display:block;margin-top:6px;padding:0;border:0;background:none;
-  font-family:var(--f-ui);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  font-family:var(--f-ui);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
   color:var(--accent);cursor:pointer;
 }
 .ai-err .retry:hover{text-decoration:underline}
 
-/* ── Быстрые вопросы ───────────────────────────────────────────────── */
-.ai-chips{display:flex;flex-wrap:wrap;gap:5px;padding:0 14px 9px}
+/* ── Быстрые вопросы — тот же паттерн, что .sb-chips button (04-editor.css) ── */
+.ai-chips{display:flex;flex-wrap:wrap;gap:5px;padding:0 12px 9px}
 .ai-chips button{
-  font-family:var(--f-serif);font-size:12px;line-height:1;padding:5px 9px;
-  border-radius:8px;background:var(--card);border:1px solid var(--line2);color:var(--ink2);
-  cursor:pointer;transition:border-color .12s,color .12s,background .12s;
+  font-family:var(--f-serif);font-size:12.5px;line-height:1;padding:5px 10px;
+  border-radius:7px;background:var(--card);border:1px solid var(--line2);color:var(--ink2);
+  cursor:pointer;transition:border-color .12s,color .12s,background .12s,transform .1s;
 }
-.ai-chips button:hover{border-color:var(--accent);color:var(--accent);background:var(--sel)}
+.ai-chips button:hover{border-color:var(--accent);color:var(--accent);background:var(--sel);transform:translateY(-1px)}
+.ai-chips button:active{transform:translateY(0)}
 .ai-chips button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-/* чипы действий: создать книгу/главу, переписать главу — акцентом */
-.ai-chips.ai-acts button{
-  color:var(--accent);border-color:var(--sel);
-  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+/* ── Подсветка цитаты в тексте: оверлей поверх #editor (DOM не трогаем) ─ */
+/* Паттерн .hit-flash: фон --sel + кольцо --sel, только вместо мгновенного
+   перехода — затухание, потому что оверлей живёт ~2с и исчезает сам */
+.ai-flash-host{position:fixed;inset:0;pointer-events:none;z-index:130}
+.ai-flash{
+  position:absolute;border-radius:4px;
+  background:var(--sel);
+  box-shadow:0 0 0 3px var(--sel);
+  animation:aiFlash 2.2s ease forwards;
 }
-.ai-chips.ai-acts button:hover{border-color:var(--accent);background:var(--sel)}
+@keyframes aiFlash{
+  0%{opacity:0}
+  10%{opacity:1}
+  75%{opacity:1}
+  100%{opacity:0}
+}
+@media print{.ai-flash-host{display:none}}
 
-/* ── Карточка действия (модель прислала план книги/главы) ──────────── */
-.ai-act{
-  align-self:stretch;border:1px solid var(--line2);border-left:2px solid var(--accent);border-radius:12px;
-  background:var(--card);overflow:hidden;
-  animation:aiActIn .22s ease;
-}
-@keyframes aiActIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.ai-act-h{
-  display:flex;align-items:center;gap:7px;
-  padding:8px 11px;border-bottom:1px solid var(--line2);
-  font-family:var(--f-disp);font-size:9px;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--ink2);
-}
-.ai-act-h .ai-spark{display:grid;place-items:center;flex:0 0 auto}
-.ai-act-h .ai-spark svg{width:11px;height:11px;color:var(--accent)}
-.ai-act-list{
-  margin:0;padding:8px 12px 9px 30px;
-  font-size:12.5px;line-height:1.75;color:var(--ink2);
-  max-height:170px;overflow-y:auto;scrollbar-width:thin;
-}
-.ai-act-list li::marker{color:var(--accent);font-family:var(--f-ui);font-size:10px}
-.ai-act-prev{
-  padding:8px 11px;font-size:12.5px;line-height:1.55;color:var(--ink3);
-  white-space:pre-wrap;word-break:break-word;max-height:132px;overflow-y:auto;
-}
-.ai-act-foot{
-  display:flex;align-items:center;gap:9px;
-  padding:8px 9px;border-top:1px solid var(--line2);background:var(--hover);
-}
-.ai-act-foot .note{
-  flex:1;min-width:0;
-  font-family:var(--f-ui);font-size:9px;letter-spacing:.05em;color:var(--ink3);
-}
-/* «Создать книгу» — главное действие карточки: акцентная заливка,
-   чтобы кнопку было видно сразу */
-.ai-act-foot .go{
-  flex:0 0 auto;
-  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
-  padding:7px 13px;border-radius:9px;cursor:pointer;
-  background:var(--accent);border:1px solid var(--accent);color:#fff;
-  box-shadow:0 7px 16px -9px rgba(201,58,43,.85);
-  transition:background .12s,color .12s,transform .12s,border-color .12s;
-}
-.ai-act-foot .go:hover{background:var(--ink);border-color:var(--ink);color:var(--bg);transform:translateY(-1px)}
-.ai-act-foot .go:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.ai-act-foot .go[disabled]{opacity:.5;pointer-events:none}
-.ai-act.done{
-  padding:9px 11px;background:transparent;
-  border-color:rgba(93,166,120,.4);color:var(--neg);
-  font-family:var(--f-ui);font-size:10.5px;letter-spacing:.03em;
-}
-
-/* ── Поле ввода ────────────────────────────────────────────────────── */
-.ai-foot{border-top:1px solid var(--line2);padding:10px 12px;display:flex;gap:7px;align-items:flex-end}
+/* ── Поле ввода — паттерн .m-field textarea (05-modals-notes.css) ───── */
+.ai-foot{border-top:1px solid var(--line2);padding:10px 12px;display:flex;gap:8px;align-items:flex-end}
 .ai-foot textarea{
-  flex:1;resize:none;max-height:110px;min-height:34px;overflow-y:auto;
+  flex:1;resize:none;max-height:110px;min-height:36px;overflow-y:auto;
+  scrollbar-width:none;-ms-overflow-style:none;
   font-family:var(--f-serif);font-size:13.5px;line-height:1.5;
-  padding:7px 10px;border-radius:10px;border:1px solid var(--line);
-  background:var(--card);color:var(--ink);
+  padding:8px 11px;border-radius:var(--r-md);border:1px solid var(--line);
+  background:transparent;color:var(--ink);
+  transition:border-color .2s;
 }
-.ai-foot textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
-.ai-foot textarea::placeholder{color:var(--ink3);opacity:.8}
+.ai-foot textarea::-webkit-scrollbar{width:0;height:0;display:none}
+.ai-foot textarea:focus{outline:none;border-color:var(--accent)}
+.ai-foot textarea::placeholder{color:var(--ink3)}
+/* отправка — .m-btn.primary в миниатюре: чернильный квадрат, hover — акцент */
 .ai-send{
-  width:34px;height:34px;flex:0 0 auto;border-radius:10px;
+  width:36px;height:36px;flex:0 0 auto;border-radius:var(--r-md);
   display:grid;place-items:center;cursor:pointer;
-  background:var(--ink);color:var(--card);border:1px solid var(--ink);
-  transition:opacity .12s,transform .12s;
+  background:var(--ink);color:var(--bg);border:1px solid var(--ink);
+  transition:background .15s,border-color .15s,color .15s,opacity .12s;
 }
-.ai-send:hover{transform:translateY(-1px)}
-.ai-send[disabled]{opacity:.4;pointer-events:none;transform:none}
+.ai-send:hover{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.ai-send[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}
 .ai-send svg{width:16px;height:16px}
-.ai-send.busy{background:var(--accent);border-color:var(--accent)}
+.ai-send.busy{background:var(--accent);border-color:var(--accent);color:var(--bg)}
 
 /* ── Настройки — общая модалка (⚙ в панели и на странице) ──────────── */
 #aiSetModal{
   position:fixed;inset:0;z-index:110;
-  background:var(--veil-glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  background:var(--veil-glass);backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s,visibility .18s;
   display:flex;align-items:center;justify-content:center;padding:20px;
 }
@@ -239,22 +299,22 @@ details.ai-think[open] summary::after{content:' ▾'}
 #aiSetModal.on .ai-set-card{transform:none}
 .ai-set-body{padding:14px 16px;display:flex;flex-direction:column;gap:9px;overflow-y:auto}
 .ai-set-body label{display:flex;flex-direction:column;gap:4px}
-.ai-set-body .lbl{font-family:var(--f-ui);font-size:8.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink3)}
+.ai-set-body .lbl{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3)}
 .ai-set-body input,.ai-set-body select{
   font-family:var(--f-ui);font-size:12px;padding:7px 9px;border-radius:8px;
-  border:1px solid var(--line);background:var(--card);color:var(--ink);
+  border:1px solid var(--line);background:transparent;color:var(--ink);
 }
-.ai-set-body input:focus,.ai-set-body select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
+.ai-set-body input:focus,.ai-set-body select:focus{outline:none;border-color:var(--accent)}
 .ai-set-row{display:flex;align-items:center;gap:10px;justify-content:space-between}
 .ai-set-body .ai-link{font-family:var(--f-ui);font-size:10.5px;color:var(--ink3);text-decoration:none;letter-spacing:.04em}
 .ai-set-body .ai-link:hover{color:var(--accent);text-decoration:underline}
-.ai-hint{font-family:var(--f-ui);font-size:10px;line-height:1.6;color:var(--ink3);opacity:.9;margin:0}
+.ai-hint{font-family:var(--f-ui);font-size:10px;line-height:1.6;color:var(--ink3);margin:0}
 .ai-hint code{font-size:10px;background:var(--hover);padding:1px 4px;border-radius:4px}
 
 /* ── Модальный результат (домашний паттерн как #dayModal) ─────────── */
 #aiResModal{
   position:fixed;inset:0;z-index:110;
-  background:var(--veil-glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  background:var(--veil-glass);backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s,visibility .18s;
   display:flex;align-items:center;justify-content:center;padding:20px;
 }
@@ -268,16 +328,16 @@ details.ai-think[open] summary::after{content:' ▾'}
 #aiResModal.on .ai-res-card{transform:none}
 .ai-res-head{display:flex;align-items:center;gap:8px;padding:12px 12px 12px 16px;border-bottom:1px solid var(--line2)}
 .ai-res-head .ai-spark{display:grid;place-items:center;color:var(--accent)}
-.ai-res-head b{font-family:var(--f-disp);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase}
+.ai-res-head b{font-family:var(--f-serif);font-size:14px;font-weight:600}
 .ai-res-head .sp{flex:1}
 .ai-res-body{padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
-.ai-res-src{border:1px dashed var(--line);border-radius:10px;padding:9px 11px;background:var(--hover)}
+.ai-res-src{border:1px dashed var(--line);border-radius:var(--r-md);padding:9px 11px;background:var(--hover)}
 .ai-res-src summary{cursor:pointer;font-family:var(--f-ui);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink3)}
 .ai-res-src pre{margin:8px 0 0;white-space:pre-wrap;word-break:break-word;font-family:var(--f-serif);font-size:13px;line-height:1.55;color:var(--ink3)}
 .ai-res-out{
   white-space:pre-wrap;word-break:break-word;
   font-family:var(--f-serif);font-size:14px;line-height:1.62;color:var(--ink);
-  border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--r-md);padding:11px 13px;background:transparent;
   min-height:56px;
 }
 .ai-res-out.loading{color:var(--ink3);font-style:italic}
@@ -287,91 +347,6 @@ details.ai-think[open] summary::after{content:' ▾'}
 .ai-res-foot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--line2);flex-wrap:wrap}
 .ai-res-foot .sp{flex:1}
 .ai-res-note{font-family:var(--f-ui);font-size:10px;color:var(--ink3)}
-
-/* ── Полностраничный чат (#aiPage): сайдбар истории + лента ────────── */
-#aiPage{
-  position:fixed;inset:0;z-index:98;display:flex;   /* 98: над фабами (96), под панелью (100) */
-  background:var(--bg);
-}
-#aiPage[hidden]{display:none}
-@keyframes aiPgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-#aiPage.view-in{animation:aiPgIn .22s ease}
-@media print{#aiPage{display:none}}
-
-.ai-side{
-  width:266px;flex:0 0 266px;display:flex;flex-direction:column;gap:10px;
-  padding:14px 12px;border-right:1px solid var(--line2);
-  background:var(--card-glass);
-}
-.ai-side-head{display:flex;align-items:center;gap:8px;padding:0 4px}
-.ai-side-head .ai-spark{display:grid;place-items:center;color:var(--accent);flex:0 0 auto}
-.ai-side-head .ai-spark svg{width:14px;height:14px}
-.ai-side-head b{font-family:var(--f-disp);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink2)}
-.ai-side-head .sp{flex:1}
-.ai-side-head .sibtn{display:none}    /* крестик сайдбара — только на мобильном */
-.ai-new{
-  display:flex;align-items:center;justify-content:center;gap:6px;
-  padding:9px 10px;border-radius:10px;cursor:pointer;
-  font-family:var(--f-ui);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
-  background:transparent;border:1px solid var(--accent);color:var(--accent);
-  transition:background .12s,color .12s;
-}
-.ai-new:hover{background:var(--sel)}
-.ai-threads{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;scrollbar-width:thin}
-.ai-thread{
-  position:relative;display:flex;flex-direction:column;gap:2px;
-  padding:8px 26px 8px 10px;border-radius:9px;cursor:pointer;
-  border:1px solid transparent;color:var(--ink2);
-  transition:background .12s,border-color .12s;
-}
-.ai-thread:hover{background:var(--hover)}
-.ai-thread.on{background:var(--sel);border-color:rgba(201,58,43,.25)}
-.ai-thread .t{
-  font-family:var(--f-serif);font-size:12.5px;line-height:1.35;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.ai-thread .m{
-  font-family:var(--f-ui);font-size:9px;letter-spacing:.04em;color:var(--ink3);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.ai-thread .del{
-  position:absolute;top:50%;right:4px;transform:translateY(-50%);
-  width:20px;height:20px;border:0;border-radius:6px;background:none;
-  color:var(--ink3);opacity:0;cursor:pointer;font-size:13px;line-height:1;
-}
-.ai-thread:hover .del{opacity:1}
-.ai-thread .del:hover{color:var(--accent);background:var(--sel)}
-
-.ai-pg{flex:1;min-width:0;display:flex;flex-direction:column}
-.ai-pg-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line2)}
-.ai-pg-head b{
-  font-family:var(--f-disp);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42%;min-width:0;
-}
-.ai-pg-head .sp{flex:1}
-.ai-side-btn{display:none}             /* кнопка «история» — только на мобильном */
-.ai-pg .ai-msgs{padding:20px max(16px,7%) 14px}
-.ai-pg .ai-msg{max-width:76%}
-.ai-pg .ai-empty{max-width:420px}
-.ai-pg .ai-chips{padding:0 max(16px,7%) 9px}
-.ai-pg .ai-foot{padding:10px max(16px,7%) 12px}
-
-/* узкие экраны: сайдбар — выдвижной ящик поверх ленты */
-@media (max-width:880px){
-  .ai-side{
-    position:fixed;left:0;top:0;bottom:0;z-index:10;
-    width:280px;flex-basis:280px;
-    box-shadow:14px 0 40px -20px rgba(0,0,0,.45);
-    transform:translateX(-100%);transition:transform .2s ease;
-  }
-  .ai-side.open{transform:none}
-  .ai-side-head .sibtn{display:grid}
-  .ai-side-btn{display:grid}
-  .ai-pg .ai-msgs{padding:16px 14px 12px}
-  .ai-pg .ai-msg{max-width:86%}
-  .ai-pg .ai-chips{padding:0 14px 9px}
-  .ai-pg .ai-foot{padding:10px 12px 12px}
-}
 
 /* ── Кнопки ИИ в панели выделения (#selbar) ────────────────────────── */
 .sb-ai{display:flex;gap:2px;margin-left:5px;padding-left:5px;border-left:1px solid var(--line2)}

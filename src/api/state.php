@@ -79,27 +79,58 @@ $savedPrefs = false;
 if (isset($j['prefs']) && is_array($j['prefs']) && array_key_exists('data', $j['prefs']) && is_array($j['prefs']['data'])) {
     $data = $j['prefs']['data'];
     $upd  = (int)($j['prefs']['updated'] ?? 0);
+    /* F10: часы клиента далеко впереди — не даём «будущему» выигрывать LWW
+       навсегда (то же правило, что в book.php) */
+    if ($upd > ts() + 600000) $upd = ts();
+    if ($upd < 0) $upd = 0;
+    /* json_encode обязан вернуть строку: INF/NaN/слишком глубокая вложенность
+       дали false, который молча превращался в пустые настройки */
+    $enc = json_encode($data, JSON_UNESCAPED_UNICODE);
+    if ($enc === false) json_err(422, 'bad prefs');
+    if (strlen($enc) > 512 * 1024) json_err(413, 'prefs too big');
     $row  = db_one('SELECT updated FROM prefs WHERE user_id = ?', [$u['id']]);
     if (!$row) {
-        db_run('INSERT INTO prefs(user_id,data,updated) VALUES(?,?,?)', [$u['id'], json_encode($data, JSON_UNESCAPED_UNICODE), $upd]);
+        try {
+            db_run('INSERT INTO prefs(user_id,data,updated) VALUES(?,?,?)', [$u['id'], $enc, $upd]);
+        } catch (PDOException $e) {
+            /* гонка: второе устройство успело вставить prefs первой */
+            db_run('UPDATE prefs SET data = ?, updated = ? WHERE user_id = ?', [$enc, $upd, $u['id']]);
+        }
         $savedPrefs = true;
     } elseif ($upd >= (int)$row['updated']) {
-        db_run('UPDATE prefs SET data = ?, updated = ? WHERE user_id = ?', [json_encode($data, JSON_UNESCAPED_UNICODE), $upd, $u['id']]);
+        db_run('UPDATE prefs SET data = ?, updated = ? WHERE user_id = ?', [$enc, $upd, $u['id']]);
         $savedPrefs = true;
     }
 }
 
 if (isset($j['stats']) && is_array($j['stats'])) {
     $incoming = stats_merge(null, $j['stats']);
+    if (count($incoming) > 1000) json_err(413, 'too many days');   /* защита от накрутки строк */
+    /* Сначала готовим ВСЕ дни (включая байтовый лимит), потом пишем:
+       ошибка в середине цикла не должна оставлять часть дней недописанной.
+       Лимит байт нужен: колонка MEDIUMTEXT = 16М, при жёстком SQL-режиме
+       MySQL необработанный переполнение — это 500 посреди цикла, а при
+       мягком — молчаливая обрезка и битый JSON дня. */
+    $plan = [];
     foreach ($incoming as $day => $entry) {
         $cur = db_one('SELECT data, updated FROM stats WHERE user_id = ? AND day = ?', [$u['id'], $day]);
         $curData = $cur ? json_decode((string)$cur['data'], true) : null;
         $merged = stats_merge(is_array($curData) ? [$day => $curData] : null, [$day => $entry]);
         $payload = json_encode($merged[$day] ?? [], JSON_UNESCAPED_UNICODE);
-        if ($cur) {
-            db_run('UPDATE stats SET data = ?, updated = ? WHERE user_id = ? AND day = ?', [$payload, ts(), $u['id'], $day]);
+        if ($payload === false) continue;   /* INF/NaN: старое значение дня остаётся, не затираем пустым */
+        if (strlen($payload) > 4 * 1024 * 1024) json_err(413, 'stats too big');
+        $plan[] = [$day, $payload, $cur !== null];
+    }
+    foreach ($plan as $p) {
+        if ($p[2]) {
+            db_run('UPDATE stats SET data = ?, updated = ? WHERE user_id = ? AND day = ?', [$p[1], ts(), $u['id'], $p[0]]);
         } else {
-            db_run('INSERT INTO stats(user_id,day,data,updated) VALUES(?,?,?,?)', [$u['id'], $day, $payload, ts()]);
+            try {
+                db_run('INSERT INTO stats(user_id,day,data,updated) VALUES(?,?,?,?)', [$u['id'], $p[0], $p[1], ts()]);
+            } catch (PDOException $e) {
+                /* гонка: второе устройство успело вставить этот день */
+                db_run('UPDATE stats SET data = ?, updated = ? WHERE user_id = ? AND day = ?', [$p[1], ts(), $u['id'], $p[0]]);
+            }
         }
     }
 }

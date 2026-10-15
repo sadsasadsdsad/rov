@@ -45,12 +45,27 @@ aside .brand{padding:20px 18px 6px}
 .bookbox{padding:14px 18px 10px}
 #bookTitle{width:100%;margin-top:7px;background:transparent;border:0;border-bottom:1px solid var(--line2);outline:none;font-family:var(--f-serif);font-weight:600;font-size:15.5px;color:var(--ink);padding:5px 2px;transition:border-color .25s}
 #bookTitle:focus{border-color:var(--accent)}
-.chapters-label{padding:12px 20px 6px;display:flex;justify-content:space-between;align-items:baseline}
-#chlist{flex:1;overflow-y:auto;overflow-x:visible;padding:2px 8px 10px;border-radius:10px;min-height:70px;display:flex;flex-direction:column;gap:3px}
-.ch{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:grab;position:relative;transition:background .18s;border:1px solid transparent}
+.chapters-label{padding:12px 18px 6px;display:flex;justify-content:space-between;align-items:baseline}
+/* базовый список: скроллбар скрыт, затемнения-маски нет — в раскрытом
+   виде панель чистая, маска-edge живёт только в рейке (ниже) */
+/* «колесо»: ряды съезжают по горизонтали волной (--wx, JS) и срезаются краем
+   списка: сверху уходят вправо за экран, снизу — влево (как на рисунке);
+   размеры строк/символов/палок не меняются — никакого rotateX и сжатия */
+#chlist{flex:1;overflow-y:auto;overflow-x:clip;padding:2px 8px 10px;border-radius:var(--r-md);min-height:70px;display:flex;flex-direction:column;gap:3px;scrollbar-width:none;-ms-overflow-style:none;position:relative}
+#chlist::-webkit-scrollbar{width:0;height:0;display:none}
+.ch{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r-lg);cursor:grab;position:relative;transition:background .18s,border-color .18s,translate .18s,opacity .16s;border:1px solid transparent;transform:translateX(var(--wx,0px));opacity:var(--wo,1)}
 .ch:active{cursor:grabbing}
-.ch.boot{animation:rise .4s cubic-bezier(.2,.7,.2,1) both}
-.ch:hover{background:var(--hover);border-color:var(--line2)}
+/* копии строк кольца — только в свёрнутой рейке на десктопе (бесшовный
+   бесконечный цикл); в раскрытом списке и на мобиле они скрыты; если с
+   копиями список всё равно помещается — .no-loop прячет их, чтобы не было
+   видимых дублей по центру */
+.ch.dupe{display:none}
+@media (min-width:881px){body.side-hidden .ch.dupe{display:flex}#chlist.no-loop .ch.dupe{display:none}}
+/* boot-анимация на translate (не transform): transform отдан барабану-колесу,
+   fill backwards — после анимации hover/колесо снова работают */
+.ch.boot{animation:riseY .4s cubic-bezier(.2,.7,.2,1) backwards}
+@keyframes riseY{from{opacity:0;translate:0 14px}to{opacity:1;translate:none}}
+.ch:hover{background:var(--hover);border-color:var(--line2);translate:2px 0}
 .ch.active{background:var(--hover);border-color:var(--line2)}
 .ch.active::before{content:"";position:absolute;left:-1px;top:8px;bottom:8px;width:2.5px;background:var(--accent);border-radius:2px}
 .ch.drag{opacity:.35}
@@ -66,14 +81,14 @@ aside .brand{padding:20px 18px 6px}
 .ch.notes-ch .num{color:var(--accent);border-color:var(--accent);border-style:dashed}
 .ch.notes-ch .ttl{font-style:italic;color:var(--ink2)}
 .ch .ttl{flex:1;font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
-.ch .wc{font-family:var(--f-ui);font-size:9.5px;color:var(--ink3);transition:opacity .15s}
+.ch .wc{font-family:var(--f-ui);font-size:9.5px;color:var(--ink3);transition:opacity .15s;opacity:var(--wco,1)}
 .ch .del{position:absolute;right:9px;width:20px;height:20px;display:grid;place-items:center;color:var(--ink3);opacity:0;transition:opacity .18s;font-size:14px;line-height:1;background:transparent;border:0}
 .ch:hover .del{opacity:1}
 .ch:hover .wc{opacity:0}
 .ch .del:hover{color:var(--accent)}
 body.side-hidden aside .brand,body.side-hidden aside .bookbox,body.side-hidden aside .chapters-label,body.side-hidden aside #addCh,body.side-hidden aside .side-foot{display:none}
-body.side-hidden #chlist{padding:14px 0;gap:0;justify-content:center;align-items:stretch;overflow:visible}
-body.side-hidden .ch{padding:7px 0;justify-content:center;align-items:center;width:100%;cursor:pointer;border-color:transparent;background:transparent;flex:0 0 auto;gap:0;overflow:visible}
+body.side-hidden #chlist{padding:0;gap:0;justify-content:safe center;align-items:stretch;overflow-y:auto;overflow-x:clip;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 44px,#000 calc(100% - 44px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 44px,#000 calc(100% - 44px),transparent 100%)}
+body.side-hidden .ch{padding:7px 0 7px 12px;justify-content:center;align-items:center;width:100%;cursor:pointer;border-color:transparent;background:transparent;flex:0 0 auto;gap:0;overflow:visible}
 body.side-hidden .ch:hover{background:transparent;border-color:transparent}
 body.side-hidden .ch.active{background:transparent;border-color:transparent}
 body.side-hidden .ch .ttl,body.side-hidden .ch .wc,body.side-hidden .ch .del,body.side-hidden .ch.active::before{display:none}
@@ -83,15 +98,20 @@ body.side-hidden .ch:hover .num{color:var(--ink)}
 body.side-hidden .ch:hover .num::after{opacity:.85}
 body.side-hidden .ch.active .num{color:var(--accent)}
 body.side-hidden .ch.active .num::after{opacity:1}
-#addCh{margin:8px 10px 12px;padding:10px;border:1px dashed var(--line);border-radius:9px;font-family:var(--f-ui);font-size:10.5px;letter-spacing:.14em;color:var(--ink2);transition:color .2s,border-color .2s,background .2s;width:calc(100% - 20px);background:transparent}
-#addCh:hover{border-color:var(--accent);color:var(--accent);background:var(--sel)}
-.side-foot{padding:12px 20px;border-top:1px solid var(--line2);font-family:var(--f-ui);font-size:10px;color:var(--ink3);display:flex;justify-content:space-between;gap:8px}
+#addCh{margin:8px 8px 12px;padding:10px 12px;border:1px dashed var(--line);border-radius:var(--r-md);font-family:var(--f-ui);font-size:10px;letter-spacing:.18em;color:var(--ink2);transition:color .2s,border-color .2s,background .2s,transform .2s;width:calc(100% - 16px);background:transparent}
+#addCh:hover{border-color:var(--accent);color:var(--accent);background:var(--sel);transform:translateY(-1px)}
+#addCh:active{transform:none}
+.side-foot{padding:12px 18px;border-top:1px solid var(--line2);font-family:var(--f-ui);font-size:10px;color:var(--ink3);display:flex;justify-content:space-between;gap:8px}
 #edRz{position:fixed;top:22%;bottom:22%;width:6px;cursor:col-resize;border-radius:3px;background:transparent;transition:background .15s;z-index:34}
 #edRz:hover,#edRz.on{background:var(--line)}
 body.zen #edRz{display:none}
 #main #topbar{height:54px;flex:0 0 54px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line2);user-select:none;background:var(--bg);position:relative;z-index:12;transition:background-color .4s}
 .tb-left,.tb-right{display:flex;align-items:center;gap:6px;flex:1 1 0;min-width:80px}
 .tb-right{justify-content:flex-end;min-width:max-content}
+/* заметки и метки — одна подложка в топбаре: соседние кнопки на общем
+   фоне, без слияния в один «взломанный» блок (у .ibtn прозрачный фон,
+   группе — мягкая подложка и тонкая рамка) */
+.tb-grp{display:flex;align-items:center;gap:2px;padding:2px;background:var(--hover);border:1px solid var(--line2);border-radius:var(--r-md);margin-right:2px}
 .tb-center{display:flex;align-items:center;justify-content:center;flex:0 1 auto;min-width:0}
 .crumb{display:flex;align-items:center;gap:9px;min-width:0;flex:1 1 auto;max-width:100%}
 .crumb .cd{width:4px;height:4px;background:var(--accent);transform:rotate(45deg);flex:0 0 auto}
@@ -122,7 +142,7 @@ body.zen #edRz{display:none}
 .sp-item{border:1px dashed var(--line);border-radius:9px;padding:7px 10px;cursor:pointer;transition:border-color .15s,background .15s;flex:0 0 auto}
 .sp-item:hover,.sp-item.act{border-color:var(--accent);background:var(--hover)}
 .sp-item .t{font-family:var(--f-ui);font-size:8.5px;color:var(--ink3);letter-spacing:.08em;display:flex;align-items:center;gap:6px;margin-bottom:3px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sp-item .t em{font-style:normal;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:1px 6px;font-size:7.5px;flex:0 0 auto;letter-spacing:.06em}
+.sp-item .t em{font-style:normal;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:1px 6px;font-size:8px;flex:0 0 auto;letter-spacing:.06em}
 .sp-item .t em.wk{background:var(--sel)}
 .sp-item .t em.nt{background:var(--sel);border-style:dashed}
 .sp-item .s{font-size:11.5px;color:var(--ink2);line-height:1.5;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}

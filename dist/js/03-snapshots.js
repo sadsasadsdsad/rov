@@ -20,21 +20,51 @@ function initSnapshots(){
     }
   }catch(e){}
 }
+/* вторая вкладка написала историю — подхватываем: без этого наш следующий
+   запись-через-чтение затирал бы её копией (last-writer-wins в обе стороны) */
+addEventListener('storage',function(e){
+  if(!e||e.key!==SNAP_LS)return;
+  try{var p=JSON.parse(e.newValue||'');if(p&&typeof p==='object')snapshots=p}catch(err){}
+});
+/** метка времени начала дня из ключа 'YYYY-MM-DD' (0 — ключ не дата) */
+function dayTs(k){
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(k));
+  if(!m)return 0;
+  var t=new Date(+m[1],+m[2]-1,+m[3]).getTime();
+  return isFinite(t)?t:0;
+}
 function persistSnapshots(){
+  if(writeSnapshots(SNAP_MAX_DAYS,SNAP_MAX_BYTES))return;
+  /* не влезло (переполнение/запрет хранилища) — пробуем оставить только свежее */
+  if(writeSnapshots(7,500000))return;
+  /* и это не вышло: НЕ стираем историю — прошлая запись целее, чем пустота.
+     В памяти snapshots остаётся, попробуем сохранить при следующем кадре */
+}
+/** Собирает допустимый словарь дней и кладёт его в localStorage.
+ *  Возвращает false, если записать не удалось; snapshots меняется ТОЛЬКО
+ *  после успешной записи. */
+function writeSnapshots(maxDays,maxBytes){
   try{
     var keys=Object.keys(snapshots).sort();
-    if(keys.length>SNAP_MAX_DAYS)keys.slice(0,keys.length-SNAP_MAX_DAYS).forEach(function(k){delete snapshots[k]});
-    var json=JSON.stringify(snapshots);
-    while(json.length>SNAP_MAX_BYTES && Object.keys(snapshots).length>3){
-      var ks=Object.keys(snapshots).sort();
-      delete snapshots[ks[0]];
-      json=JSON.stringify(snapshots);
+    var keep={},total=0;
+    for(var i=keys.length-1;i>=0;i--){      /* сначала новые — старые отбрасываем */
+      var k=keys[i],e=snapshots[k];
+      if(!e||typeof e!=='object')continue;
+      if(dayTs(k)<=0)continue;
+      if(Math.floor((Date.now()-dayTs(k))/86400000)>=maxDays)continue;
+      var bytes=JSON.stringify(e).length;
+      if(total+bytes>maxBytes)continue;
+      keep[k]=e;total+=bytes;
     }
+    var json=JSON.stringify(keep);
+    /* ни один день не влез (один снапшот > лимита) — НЕ затираем всю
+       историю пустым объектом: раньше это роняло весь архив, старый код
+       держал минимум 3 дня. Пусть решит фолбэк writeSnapshots(7,500000). */
+    if(!Object.keys(keep).length&&Object.keys(snapshots).length)return false;
     localStorage.setItem(SNAP_LS,json);
-  }catch(e){
-    try{localStorage.removeItem(SNAP_LS)}catch(e2){}
-    snapshots={};
-  }
+    snapshots=keep;
+    return true;
+  }catch(e){return false}
 }
 function takeSnapshot(){
   try{
@@ -44,6 +74,11 @@ function takeSnapshot(){
       books:state.books.map(function(b){
         return {
           id:b.id,title:b.title,color:b.color,updated:b.updated,current:b.current,
+          /* доступ и автора тоже храним: без них откат возвращал публичную
+             книгу в «закрытую» и стирал имя автора */
+          author:(typeof b.author==='string')?b.author:'',
+          visibility:(b.visibility==='unlisted'||b.visibility==='public')?b.visibility:'private',
+          share_token:(typeof b.share_token==='string')?b.share_token:'',
           customTypes:b.customTypes||[],wiki:b.wiki||[],
           chapters:(b.chapters||[]).map(function(c){return {id:c.id,html:c.html,pos:c.pos,marks:c.marks||[],kind:c.kind||''}})
         };
@@ -67,7 +102,7 @@ function openDayModal(key){
   var prevSnap=prevKey?snapshots[prevKey]:null;
 
   function collectBooks(bs){
-    return (bs||[]).map(function(b){
+    return (Array.isArray(bs)?bs:[]).map(function(b){
       var words=0,chs={};
       (b.chapters||[]).forEach(function(c){
         if(c.kind==='notes')return;
@@ -148,7 +183,10 @@ $('#dayModal').addEventListener('click',function(e){if(e.target===this)closeDayM
 
 function restoreFromSnapshot(key){
   var snap=snapshots[key];
-  if(!snap)return;
+  if(!snap||!Array.isArray(snap.books)){
+    toast('Снапшот за этот день повреждён — восстановить нельзя');
+    return;
+  }
   var d=new Date(key+'T12:00:00');
   var dateStr=d.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
   var bookCount=snap.books.length;

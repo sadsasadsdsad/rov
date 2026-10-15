@@ -53,13 +53,35 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function escAttr(s){return esc(s).replace(/"/g,'&quot;')}
 function escRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}
 function todayKey(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+/* Цвета приходят из localStorage/сервера/бэкапа — принимаем от них только
+   литерал CSS (без ';' и скобок с содержимым), иначе «red;background:url(...)»
+   уезжает прямо в style-атрибут и в --tc. */
+function safeColor(c,fb){
+  if(typeof c!=='string')return fb;
+  var s=c.trim();
+  return (/^(#[0-9a-f]{3,8}|[a-z]+|rgba?\([\d.,\s%]+\)|hsla?\([\d.,\s%]+\))$/i.test(s))?s:fb;
+}
+/** копия типа вики с проверенным цветом (экземпляры не переиспользуем:
+ *  вызывающие не меняют объекты, а чужие данные не должны попадать в DOM) */
+function safeType(tp){
+  var fb=WIKI_TYPES[WIKI_TYPES.length-1];
+  if(!tp||typeof tp!=='object')return {k:fb.k,t:fb.t,s:fb.s,color:fb.color};
+  var o={};
+  for(var k in tp)if(Object.prototype.hasOwnProperty.call(tp,k))o[k]=tp[k];
+  o.color=safeColor(tp.color,fb.color);
+  return o;
+}
 function getWikiType(k){
   for(var i=0;i<WIKI_TYPES.length;i++)if(WIKI_TYPES[i].k===k)return WIKI_TYPES[i];
   var b=book();
-  if(b&&b.customTypes)for(var j=0;j<b.customTypes.length;j++)if(b.customTypes[j].k===k)return b.customTypes[j];
+  if(b&&b.customTypes)for(var j=0;j<b.customTypes.length;j++)if(b.customTypes[j].k===k)return safeType(b.customTypes[j]);
   return WIKI_TYPES[WIKI_TYPES.length-1];
 }
-function allTypes(){var b=book();return WIKI_TYPES.concat((b&&b.customTypes)||[])}
+function allTypes(){
+  var b=book(),ct=(b&&b.customTypes)||[],out=WIKI_TYPES.slice();
+  for(var i=0;i<ct.length;i++)out.push(safeType(ct[i]));
+  return out;
+}
 function wikiTypeLabel(k){return getWikiType(k).s}
 function wikiTypeColor(k){return getWikiType(k).color}
 function timeAgo(ts){
