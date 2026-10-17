@@ -1,0 +1,14 @@
+{
+   "Abbr": {
+      "message": "IDL Helper"
+   },
+   "appDescription": {
+      "message": "인스타그램과 OK.ru에서 음악 및 동영상을 MP3, MP4, WEBM으로 빠르게 다운로드한다. 스크린숏을 찍을 수 있다."
+   },
+   "appName": {
+      "message": "OK.ru Downloader (IDL Helper)"
+   },
+   "browserActionDefaultTitle": {
+      "message": "IDL Helper"
+   }
+}

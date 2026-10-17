@@ -1,0 +1,14 @@
+{
+   "Abbr": {
+      "message": "IDL Helper"
+   },
+   "appDescription": {
+      "message": "OK.ruやInstagramからのMP3、MP4、WEBMの音楽やビデオのすばやいダウンロード。フレームのスクリーンショットを撮る機能。"
+   },
+   "appName": {
+      "message": "OK.ru Downloader (IDL Helper)"
+   },
+   "browserActionDefaultTitle": {
+      "message": "IDL Helper"
+   }
+}

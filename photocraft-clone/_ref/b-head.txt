@@ -1,0 +1,45 @@
+
+<meta charset="utf-8"/>
+
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+<title>
+PhotoCraft: The image editor you already know how to use. - ArtCraft</title>
+
+<meta name="description" content="Layers, masks, adjustment layers, layer styles, type, vectors and brushes in a native app written entirely in Rust. Open source, offline, and yours."/>
+
+<meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)"/>
+
+<meta name="theme-color" content="#0b0b0c" media="(prefers-color-scheme: dark)"/>
+
+<meta property="og:title" content="PhotoCraft: The image editor you already know how to use."/>
+
+<meta property="og:description" content="The open-source image editor you already know how to use."/>
+
+<meta property="og:url" content="https://getartcraft.com/apps/photocraft"/>
+
+<meta property="og:site_name" content="ArtCraft"/>
+
+<meta property="og:image" content="https://getartcraft.com/images/apps/photocraft/og.jpg"/>
+
+<meta property="og:image:width" content="1200"/>
+
+<meta property="og:image:height" content="630"/>
+
+<meta property="og:image:alt" content="PhotoCraft editing The Great Wave off Kanagawa with a Curves adjustment and type layers in the Layers panel"/>
+
+<meta property="og:type" content="website"/>
+
+<meta name="twitter:card" content="summary_large_image"/>
+
+<meta name="twitter:title" content="PhotoCraft: The image editor you already know how to use."/>
+
+<meta name="twitter:description" content="The open-source image editor you already know how to use."/>
+
+<meta name="twitter:image" content="https://getartcraft.com/images/apps/photocraft/og.jpg"/>
+
+<link rel="icon" href="https://getartcraft.com/artcraft-icon.svg"/>
+
+<link rel="stylesheet" href="style.css"/>
+
+<link rel="stylesheet" href="clone.css"/>

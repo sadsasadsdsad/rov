@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>OK.ru Downloader (IDL Helper)</title>
+    <script type="text/javascript" src="welcome.js"></script>
+    <style>
+      body {
+        background-image: url('background.png');
+        background-repeat: no-repeat;
+        background-size: cover;
+        font-family: common, Helvetica, sans-serif;
+        font-size: 16px;
+        max-width: 720px;
+        margin: auto;
+      }
+      h1 {
+        color: #5065c8;
+        font-weight: normal;
+        font-size: 27px;
+        text-align: center;
+      }
+      a {
+        color: black;
+      }
+      button {
+        height: 48px;
+        font-size: 14px;
+        min-width: 210px;
+        max-width: 230px;
+        text-transform: uppercase;
+        padding: 0;
+        margin-left: 8px;
+        margin-right: 8px;
+        background-color: #5065c8;
+        background-image: none;
+        background-position: right 10px center;
+        background-repeat: no-repeat;
+        background-size: 10px 10px;
+        border: none;
+        color: white;
+        border-radius: 5px;
+      }
+      button:hover {
+        background-color: #e66e04;
+        -webkit-transition: background-color 0.3s ease;
+        transition: background-color 0.3s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>OK.ru Downloader (IDL Helper) has been installed</h1>
+    <p>We are <a href="https://extensionworkshop.com/documentation/publish/add-on-policies/#data-disclosure-collection-and-management" target="blank">required</a> to get your permission to collect analytics. The following information is needed to maintain and develop OK.ru Downloader:</p>
+    <ul>
+      <li>browsing activity data (URLs of online video players where OK.ru Downloader is active, installation IDs - large random numbers)</li>
+      <li>technical data (event type, browser family and version, extension version)</li>
+    </ul>
+    <p>This information is aggregated (i.e. no single user is being tracked) and is used to estimate an audience size and to find cases where OK.ru Downloader is failing.
+    <p>This function is optional and won't affect the rest of OK.ru Downloader.</p>
+    <p>To change the settings later, please reinstall the extension.</p>
+    <div style="display: inline-flex;">
+      <button id="statsDisable">Do not share anything</button>
+      <button id="statsEnableTech" style="font-size: 13px;">Share technical data only</button>
+      <button id="statsEnableAll" style="font-size: 13px;">Share technical and <br/>browsing activity data</button>
+    </div>
+  </body>
+</html>

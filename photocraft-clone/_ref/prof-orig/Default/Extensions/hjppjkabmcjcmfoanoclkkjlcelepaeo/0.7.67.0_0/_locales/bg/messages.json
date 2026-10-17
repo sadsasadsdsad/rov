@@ -1,0 +1,14 @@
+{
+   "Abbr": {
+      "message": "IDL Helper"
+   },
+   "appDescription": {
+      "message": "Изтеглете музика и видеоклипове от OK.ru и Instagram в MP3, MP4, WEBM. Бутон за екранна снимка за онлайн видео плейъри."
+   },
+   "appName": {
+      "message": "OK.ru Downloader (IDL Helper)"
+   },
+   "browserActionDefaultTitle": {
+      "message": "IDL Helper"
+   }
+}

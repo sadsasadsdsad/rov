@@ -1,0 +1,32 @@
+{
+   "background": {
+      "service_worker": "background_script.js"
+   },
+   "content_scripts": [ {
+      "all_frames": true,
+      "js": [ "content_script.js" ],
+      "matches": [ "\u003Call_urls>" ],
+      "run_at": "document_start"
+   } ],
+   "content_security_policy": {
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+   },
+   "default_locale": "en",
+   "description": "__MSG_appDescription__",
+   "host_permissions": [ "http://*/*", "https://*/*" ],
+   "icons": {
+      "32": "icon32.png",
+      "64": "icon64.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnVetos2LkTEMREbYFqkQtj6tm5xeUCgVJhtHP+GCR/VPf7frkx5RwL9tvItMeBjtFwba0O4oWrn23qUdrF6mqf/E3ldtD8D/ljyDaFZAEdW96U1LtOovq7W2lB49StN2Zxtp7KhVJpGclVSt9ZPMe5AMG90M0/Mq14tsDzJjjnVsknbbSp9Xf9b7FjQoDu9FMMeRMytV9ztkNT8df+AnGWrnIyX27YuEY5hmgaePh+04geh5vwY0svWWiDhl1JEqcl2gJbvkt3P8S3lRYzxoxoCKDWOWSEWCNRHjhwW6fkWzVsBTOehndPrHzDdCwfHVWxu3PK+rbIv4uQnYX/9RJwIDAQAB",
+   "manifest_version": 3,
+   "name": "__MSG_appName__",
+   "permissions": [ "storage", "unlimitedStorage" ],
+   "short_name": "__MSG_Abbr__",
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "0.7.67.0",
+   "web_accessible_resources": [ {
+      "matches": [ "\u003Call_urls>" ],
+      "resources": [ "/inject-scripts/*", "/ffmpeg-core.wasm" ]
+   } ]
+}

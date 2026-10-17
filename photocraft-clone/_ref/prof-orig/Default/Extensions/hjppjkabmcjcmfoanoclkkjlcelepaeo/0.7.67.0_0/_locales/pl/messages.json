@@ -1,0 +1,14 @@
+{
+   "Abbr": {
+      "message": "IDL Helper"
+   },
+   "appDescription": {
+      "message": "Szybkie pobieranie muzyki i filmów z OK.ru i Instagram do MP3, MP4, WEBM. Możliwość zrobienia zrzutu ekranu ramki."
+   },
+   "appName": {
+      "message": "OK.ru Downloader (IDL Helper)"
+   },
+   "browserActionDefaultTitle": {
+      "message": "IDL Helper"
+   }
+}

@@ -1,0 +1,14 @@
+{
+   "Abbr": {
+      "message": "IDL Helper"
+   },
+   "appDescription": {
+      "message": "Быстрое скачивание музыки и видео с OK.ru и Instagram в MP3, MP4, WEBM. Возможность сделать скриншот кадра."
+   },
+   "appName": {
+      "message": "OK.ru Downloader (IDL Helper)"
+   },
+   "browserActionDefaultTitle": {
+      "message": "IDL Helper"
+   }
+}

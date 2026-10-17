@@ -1,0 +1,14 @@
+{
+   "Abbr": {
+      "message": "IDL Helper"
+   },
+   "appDescription": {
+      "message": "OK.ru ve Instagram'dan MP3, MP4, WEBM olarak müzik ve video indirin. Çevrimiçi video oynatıcılar için ekran görüntüsü düğmesi."
+   },
+   "appName": {
+      "message": "OK.ru Downloader (IDL Helper)"
+   },
+   "browserActionDefaultTitle": {
+      "message": "IDL Helper"
+   }
+}

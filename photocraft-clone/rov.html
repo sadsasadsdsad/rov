@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Черновик — веб-редактор рукописей с энциклопедией мира и ИИ</title>
+<meta name="description" content="Черновик (rov.smartliba.ru): библиотека книг, редактор с автосохранением, энциклопедия мира, карта связей, заметки, снапшоты, диктовка и ИИ-ассистент на DeepSeek. Всё в браузере."/>
+<meta name="theme-color" content="#f2f1ee" media="(prefers-color-scheme: light)"/>
+<meta name="theme-color" content="#0b0b0c" media="(prefers-color-scheme: dark)"/>
+<meta property="og:title" content="Черновик — веб-редактор рукописей"/>
+<meta property="og:description" content="Библиотека, энциклопедия мира, карта связей, снапшоты и ИИ-ассистент: от первой строки до готовой рукописи."/>
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://rov.smartliba.ru"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23191712'/%3E%3Crect x='11' y='11' width='10' height='10' fill='%23c93a2b' transform='rotate(45 16 16)'/%3E%3C/svg%3E"/>
+<link rel="stylesheet" href="style.css"/>
+<link rel="stylesheet" href="clone.css"/>
+<link rel="stylesheet" href="rov.css"/>
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+
+<nav id="site-nav" class="sticky top-0 left-0 z-50 w-full border-b border-line bg-bg/95 backdrop-blur-sm">
+  <div class="flex h-12 items-stretch justify-between">
+    <div class="flex min-w-0 items-stretch">
+      <a class="flex items-center gap-2 border-r border-line px-4 hover:opacity-70 sm:px-5" href="#overview" aria-label="Черновик — наверх">
+        <svg viewBox="0 0 32 32" class="h-5 w-5 shrink-0" aria-hidden="true"><rect x="8" y="8" width="16" height="16" fill="currentColor" transform="rotate(45 16 16)"/></svg>
+        <span class="hud-label whitespace-nowrap text-ink">Черновик</span>
+      </a>
+      <nav aria-label="Разделы" class="hidden min-w-0 items-stretch lg:flex">
+        <ul class="flex h-full items-stretch">
+          <li class="flex items-stretch"><a class="group flex h-full items-center px-2.5 hud-label whitespace-nowrap text-muted hover:text-ink" href="#highlights"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">Что внутри</span></a></li>
+          <li class="flex items-stretch"><a class="group flex h-full items-center px-2.5 hud-label whitespace-nowrap text-muted hover:text-ink" href="#screens"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">Экраны</span></a></li>
+          <li class="flex items-stretch"><a class="group flex h-full items-center px-2.5 hud-label whitespace-nowrap text-muted hover:text-ink" href="#ai"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">ИИ-ассистент</span></a></li>
+          <li class="flex items-stretch"><a class="group flex h-full items-center px-2.5 hud-label whitespace-nowrap text-muted hover:text-ink" href="#tech"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">Технологии</span></a></li>
+          <li class="flex items-stretch ml-1.5 border-l border-line pl-1.5"><a class="group flex h-full items-center px-2.5 hud-label whitespace-nowrap text-ink" href="#use"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg bg-invert-bg text-invert-fg">Доступ</span></a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="flex shrink-0 items-stretch">
+      <a class="group flex h-full items-center px-2.5 hud-label whitespace-nowrap text-muted hover:text-ink" href="https://rov.smartliba.ru" target="_blank" rel="noopener noreferrer"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">Открыть ↗</span></a>
+      <button type="button" class="invert-block flex w-12 items-center justify-center border-l border-line text-muted" aria-label="Переключить тему">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="h-4 w-4" aria-hidden="true"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5Z"/></svg>
+      </button>
+      <button type="button" class="flex w-12 items-center justify-center border-l border-line text-muted hover:bg-invert-bg hover:text-invert-fg lg:hidden" aria-controls="mobile-nav" aria-expanded="false" aria-label="Меню">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" class="h-5 w-5" aria-hidden="true"><path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h16"></path></svg>
+      </button>
+    </div>
+  </div>
+  <div id="mobile-nav" class="hidden border-b border-line bg-bg lg:hidden">
+    <ul>
+      <li><a class="group flex items-center border-b border-line px-4 py-3 hud-label whitespace-nowrap text-muted hover:text-ink" href="#highlights"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">Что внутри</span></a></li>
+      <li><a class="group flex items-center border-b border-line px-4 py-3 hud-label whitespace-nowrap text-muted hover:text-ink" href="#screens"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">Экраны</span></a></li>
+      <li><a class="group flex items-center border-b border-line px-4 py-3 hud-label whitespace-nowrap text-muted hover:text-ink" href="#ai"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">ИИ-ассистент</span></a></li>
+      <li><a class="group flex items-center border-b border-line px-4 py-3 hud-label whitespace-nowrap text-muted hover:text-ink" href="#tech"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">Технологии</span></a></li>
+      <li><a class="group flex items-center border-b border-line px-4 py-3 hud-label whitespace-nowrap text-muted hover:text-ink" href="#use"><span class="flex items-center gap-1.5 px-1.5 py-0.5 group-hover:bg-invert-bg group-hover:text-invert-fg">Доступ</span></a></li>
+      <li><a class="group flex items-center border-b border-line px-4 py-3 hud-label whitespace-nowrap text-ink" href="https://rov.smartliba.ru" target="_blank" rel="noopener noreferrer"><span class="flex items-center gap-1.5 px-1.5 py-0.5 bg-invert-bg text-invert-fg">Открыть rov.smartliba.ru ↗</span></a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main"><div class="app-rov">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Черновик","alternateName":"rov","applicationCategory":"BookWritingApplication","operatingSystem":"Web","description":"Веб-редактор рукописей: библиотека книг, энциклопедия мира, карта связей, снапшоты, диктовка и ИИ-ассистент.","url":"https://rov.smartliba.ru","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+
+<!-- ============================== 01 / герой ============================== -->
+<section id="overview" data-choreo="true" class="relative">
+  <span aria-hidden="true" data-draw-rule="true" class="absolute inset-x-0 top-0 h-px origin-left bg-line"></span>
+  <div class="relative mx-auto max-w-[1280px] border-x border-line">
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -left-[6px]"></span>
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -right-[5px]"></span>
+    <div data-draw-eyebrow="true" class="sticky top-12 z-30 border-y border-line bg-bg/60 backdrop-blur-md">
+      <div class="flex items-center justify-between gap-4 px-6 py-3 md:px-10">
+        <p class="hud-label text-muted"><span class="text-faint">01</span><span aria-hidden="true" class="mx-2 text-faint">/</span>Черновик</p>
+        <p class="hud-label hidden text-faint sm:block">Веб-редактор рукописей · v0.02</p>
+      </div>
+    </div>
+
+    <div data-reveal-group="true" class="flex flex-col items-center px-6 py-14 text-center md:px-10 md:py-20">
+      <div data-reveal="true" class="mb-6">
+        <span class="flex flex-col items-center gap-5">
+          <svg viewBox="0 0 32 32" width="256" height="256" aria-hidden="true" class="shrink-0 drop-shadow-[0_6px_14px_rgba(0,0,0,0.28)] h-24 w-24 md:h-28 md:w-28"><rect width="32" height="32" rx="7" fill="#191712"/><rect x="11" y="11" width="10" height="10" fill="#c93a2b" transform="rotate(45 16 16)"/></svg>
+          <span class="flex items-center gap-3">
+            <span class="hud-label bg-(--app) px-2 py-1 font-bold text-black">01</span>
+            <span class="font-display font-medium tracking-[-0.03em] text-ink-strong text-2xl">Черно<span class="text-(--app-ink,var(--accent-ink))">вик</span></span>
+          </span>
+        </span>
+      </div>
+      <h1 data-reveal="true" class="max-w-4xl font-display text-4xl font-medium leading-[1.02] tracking-[-0.035em] text-ink-strong sm:text-5xl md:text-6xl lg:text-7xl">Весь мир вашей книги — <span class="text-(--app-ink,var(--accent-ink))">в одном редакторе</span>.</h1>
+      <p data-reveal="true" class="mt-6 max-w-xl text-lg leading-relaxed text-muted">Библиотека, автосохранение, энциклопедия персонажей, карта связей, заметки, история версий и ИИ-ассистент. Всё в браузере — от первой строки до готовой рукописи.</p>
+      <div data-reveal="true" class="mt-8 w-full">
+        <div class="flex flex-col items-center gap-6">
+          <div class="flex flex-wrap items-start justify-center gap-3">
+            <span class="flex flex-col gap-2">
+              <a href="https://rov.smartliba.ru" target="_blank" rel="noopener noreferrer" class="inline-flex w-fit items-center justify-center gap-2 rounded-none font-mono font-bold uppercase tracking-[0.12em] whitespace-nowrap transition-colors duration-150 bg-invert-bg text-invert-fg hover:opacity-80 h-12 px-6 text-[11px]">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path></svg>
+                Открыть Черновик
+              </a>
+              <span class="hud-label text-faint">Работает в браузере · rov.smartliba.ru</span>
+            </span>
+            <span class="flex flex-col gap-2">
+              <a href="#highlights" class="inline-flex w-fit items-center justify-center gap-2 rounded-none font-mono font-bold uppercase tracking-[0.12em] whitespace-nowrap transition-colors duration-150 invert-block border border-line-strong bg-bg text-ink hover:border-transparent h-12 px-6 text-[11px]">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg>
+                Что внутри
+              </a>
+              <span class="hud-label text-faint">Девять возможностей · ниже</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <figure class="border-t border-line">
+      <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2 md:px-10">
+        <figcaption class="hud-label text-faint">Библиотека — неделя, 30 дней, график письма и полоса дней</figcaption>
+        <p class="hud-label text-faint">Скриншот</p>
+      </div>
+      <div class="relative w-full overflow-hidden bg-bg-sunken rov-shot">
+        <img src="images/rov/library.png" alt="Экран «Библиотека»: статистика письма за неделю и месяц, график по дням, тепловая карта и полка из трёх книг" width="1440" height="900" loading="eager" fetchPriority="high" decoding="async" class="absolute inset-0 h-full w-full object-cover"/>
+        <span aria-hidden="true" class="tick top-2 left-2 opacity-60"></span>
+        <span aria-hidden="true" class="tick top-2 right-2 opacity-60"></span>
+        <span aria-hidden="true" class="tick bottom-2 left-2 opacity-60"></span>
+        <span aria-hidden="true" class="tick bottom-2 right-2 opacity-60"></span>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- =========================== 02 / что внутри =========================== -->
+<section id="highlights" data-choreo="true" class="relative">
+  <span aria-hidden="true" data-draw-rule="true" class="absolute inset-x-0 top-0 h-px origin-left bg-line"></span>
+  <div class="relative mx-auto max-w-[1280px] border-x border-line">
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -left-[6px]"></span>
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -right-[5px]"></span>
+    <div data-draw-eyebrow="true" class="sticky top-12 z-30 border-y border-line bg-bg/60 backdrop-blur-md">
+      <div class="flex items-center justify-between gap-4 px-6 py-3 md:px-10">
+        <p class="hud-label text-muted"><span class="text-faint">02</span><span aria-hidden="true" class="mx-2 text-faint">/</span>Что внутри</p>
+        <p class="hud-label hidden text-faint sm:block">Библиотека → редактор → мир → ИИ</p>
+      </div>
+    </div>
+
+    <div data-reveal-group="true" class="border-b border-line px-6 py-10 md:px-10 md:py-14">
+      <h2 data-reveal="true" class="max-w-3xl font-display text-3xl font-medium leading-[1.05] tracking-[-0.03em] text-ink-strong md:text-4xl">Не блокнот и не вики — <span class="text-(--app-ink,var(--accent-ink))">рабочий стол писателя</span></h2>
+      <p data-reveal="true" class="mt-4 max-w-2xl leading-relaxed text-muted">Каждая часть «Черновика» держится на одном принципе: то, что вы пишете, сохраняется само, а то, что вы знаете о мире книги, всегда под рукой.</p>
+    </div>
+
+    <div class="grid gap-px bg-line md:grid-cols-3">
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Библиотека</p><p class="hud-label text-faint">01</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Полка книг</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">Обложки-цвета, статистика недели и месяца, среднее в день, график письма и полоса дней.</p>
+          <p class="mt-1 text-sm text-muted">Клик по дню — прирост и убыль слов по каждой главе.</p>
+        </div>
+      </article>
+
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Редактор</p><p class="hud-label text-faint">02</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Письмо без ручного сохранения</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">Меню блоков по «/», заголовки по #, разделитель по ---, хоткеи, ползунок ширины текста.</p>
+          <p class="mt-1 text-sm text-muted">Автосейв на лету, режим фокуса (Esc — выход), метки и закладки в тексте.</p>
+        </div>
+      </article>
+
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Мир книги</p><p class="hud-label text-faint">03</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3.5 12h17"></path><path d="M12 3.5c2.6 2.3 3.9 5.1 3.9 8.5s-1.3 6.2-3.9 8.5c-2.6-2.3-3.9-5.1-3.9-8.5s1.3-6.2 3.9-8.5z"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Энциклопедия</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">Персонажи, города, страны, организации, предметы и события — с типами, цветами и описаниями.</p>
+          <p class="mt-1 text-sm text-muted">«Другие имена» (прозвища, титулы) делают поиск упоминаний точнее.</p>
+        </div>
+      </article>
+
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Карта связей</p><p class="hud-label text-faint">04</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><circle cx="12" cy="5" r="2.2"></circle><circle cx="5" cy="19" r="2.2"></circle><circle cx="19" cy="19" r="2.2"></circle><path d="M12 7.2v4.3M12 11.5 5.9 17.2M12 11.5l6.1 5.7"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Схема книги</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">Со-встречаемость имён в тексте превращается в граф: главный герой в центре, вокруг — связи.</p>
+          <p class="mt-1 text-sm text-muted">Радиальная, круг и силы; глубина и порог связи; фокус по двойному клику, узлы тащатся.</p>
+        </div>
+      </article>
+
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Заметки</p><p class="hud-label text-faint">05</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><path d="M4 4h16v12l-4 4H4z"></path><path d="M20 16h-4v4"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Три вида заметок</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">Врезка прямо в тексте (Ctrl+Alt+N) — видна только вам и никогда не попадает в печать.</p>
+          <p class="mt-1 text-sm text-muted">Панель собирает все врезки, отдельная глава — для свободных записей.</p>
+        </div>
+      </article>
+
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">История</p><p class="hud-label text-faint">06</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Снапшоты</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">30 дней истории: по каждой книге и главе видно, сколько слов прибыло и убыло.</p>
+          <p class="mt-1 text-sm text-muted">Откат одной кнопкой — рукопись возвращается на любой из последних дней.</p>
+        </div>
+      </article>
+
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Голос</p><p class="hud-label text-faint">07</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><rect x="9.3" y="3" width="5.4" height="11" rx="2.7"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0"></path><path d="M12 18v3"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Диктовка и читалка</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">Голосовой ввод Ctrl+Alt+R — диктуйте, не отрываясь от сюжета.</p>
+          <p class="mt-1 text-sm text-muted">На телефоне — тап-зоны, шрифт и тема, оглавление и прогресс чтения.</p>
+        </div>
+      </article>
+
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Синхронизация</p><p class="hud-label text-faint">08</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"></path><path d="M21 3v6h-6"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Аккаунты и общий доступ</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">Профили с опциональным паролем; на сервере — PHP API и SQLite/MySQL.</p>
+          <p class="mt-1 text-sm text-muted">Резервные копии, книга по share-ссылке, режим чтения для чужих рукописей.</p>
+        </div>
+      </article>
+
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Экспорт</p><p class="hud-label text-faint">09</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center border border-line text-ink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 11 5 5 5-5"></path><path d="M5 21h14"></path></svg></span>
+            <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">TXT, Markdown, HTML</h3>
+          </div>
+          <p class="mt-5 text-sm text-ink">Один клик — и рукопись уходит в файл ровно в том виде, в каком её увидит читатель.</p>
+          <p class="mt-1 text-sm text-muted">Заметки и служебные главы в экспорт и печать не попадают.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================= 03 / экраны ============================= -->
+<section id="screens" data-choreo="true" class="relative">
+  <span aria-hidden="true" data-draw-rule="true" class="absolute inset-x-0 top-0 h-px origin-left bg-line"></span>
+  <div class="relative mx-auto max-w-[1280px] border-x border-line">
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -left-[6px]"></span>
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -right-[5px]"></span>
+    <div data-draw-eyebrow="true" class="sticky top-12 z-30 border-y border-line bg-bg/60 backdrop-blur-md">
+      <div class="flex items-center justify-between gap-4 px-6 py-3 md:px-10">
+        <p class="hud-label text-muted"><span class="text-faint">03</span><span aria-hidden="true" class="mx-2 text-faint">/</span>Экраны</p>
+        <p class="hud-label hidden text-faint sm:block">Живые скриншоты приложения</p>
+      </div>
+    </div>
+
+    <div class="grid gap-px bg-line md:grid-cols-2">
+      <figure data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2 md:px-8">
+          <figcaption class="hud-label text-faint">Редактор — подсветка имён, врезка-заметка, панель глав</figcaption>
+          <p class="hud-label text-faint">01</p>
+        </div>
+        <div class="relative w-full overflow-hidden bg-bg-sunken rov-shot">
+          <img src="images/rov/editor.png" alt="Редактор: глава «I · Прибытие», имена персонажей подсвечены и связаны со статьями энциклопедии, в тексте — врезка-заметка" width="1440" height="900" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full object-cover"/>
+          <span aria-hidden="true" class="tick top-2 left-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick top-2 right-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick bottom-2 left-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick bottom-2 right-2 opacity-60"></span>
+        </div>
+      </figure>
+
+      <figure data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2 md:px-8">
+          <figcaption class="hud-label text-faint">ИИ-ассистент — рассуждение, цитата-переход, быстрые действия</figcaption>
+          <p class="hud-label text-faint">02</p>
+        </div>
+        <div class="relative w-full overflow-hidden bg-bg-sunken rov-shot">
+          <img src="images/rov/ai.png" alt="Панель ИИ-ассистента: вопрос о персонаже, свёрнутое «Рассуждение», ответ с цитатой-ссылкой на место в тексте и подсказками быстрых действий" width="1440" height="900" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full object-cover"/>
+          <span aria-hidden="true" class="tick top-2 left-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick top-2 right-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick bottom-2 left-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick bottom-2 right-2 opacity-60"></span>
+        </div>
+      </figure>
+
+      <figure data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2 md:px-8">
+          <figcaption class="hud-label text-faint">Энциклопедия — статьи мира, фильтры типов, упоминания по главам</figcaption>
+          <p class="hud-label text-faint">03</p>
+        </div>
+        <div class="relative w-full overflow-hidden bg-bg-sunken rov-shot">
+          <img src="images/rov/world.png" alt="Панель «Энциклопедия»: семь статей мира книги с типами, другими именами и таймлайнами упоминаний по главам" width="1440" height="900" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full object-cover"/>
+          <span aria-hidden="true" class="tick top-2 left-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick top-2 right-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick bottom-2 left-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick bottom-2 right-2 opacity-60"></span>
+        </div>
+      </figure>
+
+      <figure data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2 md:px-8">
+          <figcaption class="hud-label text-faint">Карта связей — раскладки, фильтры типов и структура книги</figcaption>
+          <p class="hud-label text-faint">04</p>
+        </div>
+        <div class="relative w-full overflow-hidden bg-bg-sunken rov-shot">
+          <img src="images/rov/map.png" alt="«Карта связей»: радиальная схема персонажей и объектов книги с весами связей и списком «Структура книги»" width="1440" height="900" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full object-cover"/>
+          <span aria-hidden="true" class="tick top-2 left-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick top-2 right-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick bottom-2 left-2 opacity-60"></span>
+          <span aria-hidden="true" class="tick bottom-2 right-2 opacity-60"></span>
+        </div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- =========================== 04 / ИИ-ассистент ========================= -->
+<section id="ai" data-choreo="true" class="relative">
+  <span aria-hidden="true" data-draw-rule="true" class="absolute inset-x-0 top-0 h-px origin-left bg-line"></span>
+  <div class="relative mx-auto max-w-[1280px] border-x border-line">
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -left-[6px]"></span>
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -right-[5px]"></span>
+    <div data-draw-eyebrow="true" class="sticky top-12 z-30 border-y border-line bg-bg/60 backdrop-blur-md">
+      <div class="flex items-center justify-between gap-4 px-6 py-3 md:px-10">
+        <p class="hud-label text-muted"><span class="text-faint">04</span><span aria-hidden="true" class="mx-2 text-faint">/</span>ИИ-ассистент</p>
+        <p class="hud-label hidden text-faint sm:block">DeepSeek через ваш сервер · ключей у читателя нет</p>
+      </div>
+    </div>
+
+    <div class="grid gap-px bg-line md:grid-cols-2">
+      <div data-reveal="true" class="min-w-0 bg-bg p-6 md:p-10">
+        <h2 class="max-w-3xl font-display text-3xl font-medium leading-[1.05] tracking-[-0.03em] text-ink-strong md:text-4xl">ИИ, который <span class="text-(--app-ink,var(--accent-ink))">прочитал вашу книгу</span></h2>
+        <p class="mt-4 leading-relaxed text-muted">Чат подхватывает контекст сам: текущая глава, соседние, вся книга или только выделение — охват переключается в шапке панели.</p>
+        <p class="mt-4 leading-relaxed text-muted">Где ассистент находит ошибку, он цитирует место — по цитате вы переходите прямо в текст. А ещё — исправление и улучшение выделенного, создание книг и глав по словесной команде и полностраничный чат с историей диалогов.</p>
+        <ul class="mt-6 flex flex-col gap-2.5 text-sm text-ink">
+          <li class="flex items-start gap-3"><span class="hud-label mt-0.5 text-(--app-ink,var(--accent-ink))">—</span>Стриминг ответа и свёрнутые «Рассуждения» модели</li>
+          <li class="flex items-start gap-3"><span class="hud-label mt-0.5 text-(--app-ink,var(--accent-ink))">—</span>Быстрые действия: пересказ, ошибки, образы, вопросы к тексту</li>
+          <li class="flex items-start gap-3"><span class="hud-label mt-0.5 text-(--app-ink,var(--accent-ink))">—</span>Rate-limit 20 запросов в минуту, same-origin и свой ключ релея</li>
+          <li class="flex items-start gap-3"><span class="hud-label mt-0.5 text-(--app-ink,var(--accent-ink))">—</span>Работает с любого устройства: браузер не знает про прокси</li>
+        </ul>
+      </div>
+      <div data-reveal="true" class="min-w-0 bg-bg p-6 md:p-10">
+        <p class="hud-label text-faint">Путь запроса</p>
+        <p class="mt-3 text-sm leading-relaxed text-muted">Браузер → PHP-релей <span class="font-mono text-ink">/api/ai.php</span> → локальный прокси на VPS <span class="font-mono text-ink">127.0.0.1:8080</span> → DeepSeek. Ответ приходит SSE-стримом, без буферизации.</p>
+        <figure class="mt-6 border border-line bg-bg-sunken">
+          <div class="flex items-center justify-between border-b border-line pl-4">
+            <figcaption class="hud-label flex items-center gap-2 text-faint"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal h-3.5 w-3.5" aria-hidden="true"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg>Terminal</figcaption>
+            <button type="button" class="inline-flex w-fit items-center justify-center gap-2 rounded-none font-mono font-bold uppercase tracking-[0.12em] whitespace-nowrap transition-colors duration-150 text-muted hover:bg-invert-bg hover:text-invert-fg py-2 text-[11px] h-9 border-l border-line px-3" data-track="copy_command"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy h-3.5 w-3.5" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg><span aria-live="polite">Copy</span></button>
+          </div>
+          <pre class="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed text-ink"><code># браузер → релей → прокси → DeepSeek
+curl -N https://rov.smartliba.ru/api/ai.php?action=chat \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"deepseek-chat","messages":[…],"stream":true}'</code></pre>
+        </figure>
+        <p class="mt-6 text-sm leading-relaxed text-muted">Разработчику — свой прокси: база и ключ в настройках панели, тот же формат OpenAI-совместимого стрима. Ответы лежат в localStorage, диалоги переживают перезагрузку.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================== 05 / как устроено ========================== -->
+<section id="tech" data-choreo="true" class="relative">
+  <span aria-hidden="true" data-draw-rule="true" class="absolute inset-x-0 top-0 h-px origin-left bg-line"></span>
+  <div class="relative mx-auto max-w-[1280px] border-x border-line">
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -left-[6px]"></span>
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -right-[5px]"></span>
+    <div data-draw-eyebrow="true" class="sticky top-12 z-30 border-y border-line bg-bg/60 backdrop-blur-md">
+      <div class="flex items-center justify-between gap-4 px-6 py-3 md:px-10">
+        <p class="hud-label text-muted"><span class="text-faint">05</span><span aria-hidden="true" class="mx-2 text-faint">/</span>Как устроено</p>
+        <p class="hud-label hidden text-faint sm:block">22 модуля · PHP API · SQLite · nginx</p>
+      </div>
+    </div>
+
+    <div data-reveal-group="true" class="border-b border-line px-6 py-10 md:px-10 md:py-14">
+      <h2 data-reveal="true" class="max-w-3xl font-display text-3xl font-medium leading-[1.05] tracking-[-0.03em] text-ink-strong md:text-4xl">Без сборки, без фреймворков, <span class="text-(--app-ink,var(--accent-ink))">без магии</span></h2>
+      <p data-reveal="true" class="mt-4 max-w-2xl leading-relaxed text-muted">Один HTML-файл, классические скрипты строго по номерам и серверная часть, которую можно прочитать за вечер.</p>
+    </div>
+
+    <div class="grid gap-px bg-line md:grid-cols-3">
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Клиент</p><p class="hud-label text-faint">01</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">22 JS-модуля</h3>
+          <p class="mt-5 text-sm text-ink">Ядро, тезаурус, снапшоты, граф, вики, редактор, аккаунты, синхронизация, читалка, ИИ — каждый файл со своей шапкой и списком зависимостей.</p>
+          <p class="mt-1 text-sm text-muted">Подключаются строго по номеру, строгий режим в каждом.</p>
+        </div>
+      </article>
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Стили</p><p class="hud-label text-faint">02</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">12 CSS-файлов</h3>
+          <p class="mt-5 text-sm text-ink">Каскад по слоям: база, библиотека, рабочая область, редактор, модалки, граф, вики, доступ, читалка, ассистент.</p>
+          <p class="mt-1 text-sm text-muted">Порядок правок сохранён байт-в-байт — линт и визуальная регрессия.</p>
+        </div>
+      </article>
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Сервер</p><p class="hud-label text-faint">03</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">PHP API</h3>
+          <p class="mt-5 text-sm text-ink">bootstrap / book / read / state / auth: same-origin проверяется по Origin, лимиты заданы в байтах, книга пишется атомарным UPDATE.</p>
+          <p class="mt-1 text-sm text-muted">Гонка «последний победил» решена проверкой rowCount → stale.</p>
+        </div>
+      </article>
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Хранилище</p><p class="hud-label text-faint">04</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">SQLite / MySQL</h3>
+          <p class="mt-5 text-sm text-ink">Книги, снапшоты и статистика живут на сервере; локально — localStorage этого браузера.</p>
+          <p class="mt-1 text-sm text-muted">MEDIUMTEXT-лимит учтён, prefs и статистика валидируются на входе.</p>
+        </div>
+      </article>
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Транспорт</p><p class="hud-label text-faint">05</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">nginx</h3>
+          <p class="mt-5 text-sm text-ink">Rate-limit 20 р/мин на ИИ-релей, fastcgi_read_timeout 300s и отключённое буферизация — нужна для SSE-стрима.</p>
+          <p class="mt-1 text-sm text-muted">HTML — no-cache, статика — на сутки с версией в index.html.</p>
+        </div>
+      </article>
+      <article data-reveal="true" class="flex min-w-0 flex-col bg-bg">
+        <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2.5 md:px-8"><p class="hud-label text-muted">Качество</p><p class="hud-label text-faint">06</p></div>
+        <div class="flex flex-1 flex-col p-6 md:p-8">
+          <h3 class="font-display text-2xl font-medium tracking-[-0.02em] text-ink-strong">Аудит и тесты</h3>
+          <p class="mt-5 text-sm text-ink">Аудит 07.10.2026: XSS, троттлинг логина, подделка Origin: null, лимиты read_json — исправлено и сверено с кодом.</p>
+          <p class="mt-1 text-sm text-muted">18 наборов, 434 проверки — все зелёные; php -l и node --check чистые.</p>
+        </div>
+      </article>
+    </div>
+
+    <figure class="border-t border-line">
+      <div class="flex items-center justify-between gap-4 border-b border-line px-6 py-2 md:px-10">
+        <figcaption class="hud-label text-faint">Обзор книги — главы, их начало и место, где вы остановились</figcaption>
+        <p class="hud-label text-faint">Скриншот</p>
+      </div>
+      <div class="relative w-full overflow-hidden bg-bg-sunken rov-shot">
+        <img src="images/rov/overview.png" alt="Экран обзор книги: заголовок, автор, пилюли со статистикой и карточки глав с началом текста каждой" width="1440" height="900" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full object-cover"/>
+        <span aria-hidden="true" class="tick top-2 left-2 opacity-60"></span>
+        <span aria-hidden="true" class="tick top-2 right-2 opacity-60"></span>
+        <span aria-hidden="true" class="tick bottom-2 left-2 opacity-60"></span>
+        <span aria-hidden="true" class="tick bottom-2 right-2 opacity-60"></span>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- ============================== 06 / доступ ============================ -->
+<section id="use" data-choreo="true" class="relative">
+  <span aria-hidden="true" data-draw-rule="true" class="absolute inset-x-0 top-0 h-px origin-left bg-line"></span>
+  <div class="relative mx-auto max-w-[1280px] border-x border-line">
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -left-[6px]"></span>
+    <span aria-hidden="true" data-draw-tick="true" class="tick tick-half z-[31] -top-[5px] -right-[5px]"></span>
+    <div data-draw-eyebrow="true" class="sticky top-12 z-30 border-y border-line bg-bg/60 backdrop-blur-md">
+      <div class="flex items-center justify-between gap-4 px-6 py-3 md:px-10">
+        <p class="hud-label text-muted"><span class="text-faint">06</span><span aria-hidden="true" class="mx-2 text-faint">/</span>Доступ</p>
+        <p class="hud-label hidden text-faint sm:block">Браузер · локальный режим · свой сервер</p>
+      </div>
+    </div>
+
+    <div data-reveal-group="true" class="flex flex-col items-center px-6 py-14 text-center md:px-10 md:py-20">
+      <h2 data-reveal="true" class="max-w-4xl font-display text-4xl font-medium leading-[1.02] tracking-[-0.035em] text-ink-strong sm:text-5xl md:text-6xl">Откройте — <span class="text-(--app-ink,var(--accent-ink))">и пишите</span></h2>
+      <p data-reveal="true" class="mt-6 max-w-xl text-lg leading-relaxed text-muted">Страница работает прямо в браузере: рукописи локально, синхронизация — на вашем сервере. Или возьмите исходники и разверните свой «Черновик».</p>
+      <div data-reveal="true" class="mt-8 w-full">
+        <div class="flex flex-col items-center gap-6">
+          <div class="flex flex-wrap items-start justify-center gap-3">
+            <span class="flex flex-col gap-2">
+              <a href="https://rov.smartliba.ru" target="_blank" rel="noopener noreferrer" class="inline-flex w-fit items-center justify-center gap-2 rounded-none font-mono font-bold uppercase tracking-[0.12em] whitespace-nowrap transition-colors duration-150 bg-invert-bg text-invert-fg hover:opacity-80 h-12 px-6 text-[11px]">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path></svg>
+                rov.smartliba.ru
+              </a>
+              <span class="hud-label text-faint">Аккаунт создаётся за пару секунд</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <figure class="mt-10 w-full max-w-2xl min-w-0 border border-line bg-bg-sunken text-left">
+        <div class="flex items-center justify-between border-b border-line pl-4">
+          <figcaption class="hud-label flex items-center gap-2 text-faint"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-terminal h-3.5 w-3.5" aria-hidden="true"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg>Развернуть у себя</figcaption>
+          <button type="button" class="inline-flex w-fit items-center justify-center gap-2 rounded-none font-mono font-bold uppercase tracking-[0.12em] whitespace-nowrap transition-colors duration-150 text-muted hover:bg-invert-bg hover:text-invert-fg py-2 text-[11px] h-9 border-l border-line px-3" data-track="copy_command"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy h-3.5 w-3.5" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg><span aria-live="polite">Copy</span></button>
+        </div>
+        <pre class="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed text-ink"><code>git pull && sudo bash setup-server.sh   # ключ релея + location /api/ai.php
+sudo bash nginx-ai-patch.sh             # разово: бэкап, nginx -t, перезапуск
+# локально без сервера: откройте src/index.html</code></pre>
+      </figure>
+      <p class="mt-6 hud-label text-faint">Рукописи без сервера хранятся в localStorage браузера — ничего настраивать не нужно</p>
+    </div>
+  </div>
+</section>
+
+</div></main>
+
+<footer class="border-t border-line"><div class="mx-auto max-w-[1280px] border-x border-line"><div class="grid gap-px bg-line md:grid-cols-4 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr]">
+  <div class="bg-bg p-6 md:col-span-4 md:p-10 lg:col-span-1">
+    <span class="flex items-center gap-3">
+      <svg viewBox="0 0 32 32" class="h-8 w-8 shrink-0" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#191712"/><rect x="11" y="11" width="10" height="10" fill="#c93a2b" transform="rotate(45 16 16)"/></svg>
+      <span class="font-display text-2xl font-medium tracking-[-0.03em] text-ink-strong">Черно<span class="text-(--app-ink,var(--accent-ink))">вик</span></span>
+    </span>
+    <p class="mt-4 max-w-xs leading-relaxed text-muted">Веб-редактор рукописей: библиотека, мир книги, карта связей, снапшоты и ИИ-ассистент.</p>
+    <a href="https://rov.smartliba.ru" target="_blank" rel="noopener noreferrer" class="hud-label mt-6 inline-block text-faint hover:text-ink">rov.smartliba.ru</a>
+  </div>
+  <nav aria-label="Разделы" class="bg-bg p-6 md:p-8">
+    <p class="hud-label text-faint">Разделы</p>
+    <ul class="mt-4 flex flex-col gap-2.5">
+      <li><a class="text-muted hover:text-ink" href="#overview">Обзор</a></li>
+      <li><a class="text-muted hover:text-ink" href="#highlights">Что внутри</a></li>
+      <li><a class="text-muted hover:text-ink" href="#screens">Экраны</a></li>
+      <li><a class="text-muted hover:text-ink" href="#use">Доступ</a></li>
+    </ul>
+  </nav>
+  <nav aria-label="Возможности" class="bg-bg p-6 md:p-8">
+    <p class="hud-label text-faint">Возможности</p>
+    <ul class="mt-4 flex flex-col gap-2.5">
+      <li><a class="text-muted hover:text-ink" href="#highlights">Библиотека</a></li>
+      <li><a class="text-muted hover:text-ink" href="#highlights">Энциклопедия мира</a></li>
+      <li><a class="text-muted hover:text-ink" href="#screens">Карта связей</a></li>
+      <li><a class="text-muted hover:text-ink" href="#ai">ИИ-ассистент</a></li>
+    </ul>
+  </nav>
+  <nav aria-label="Технологии" class="bg-bg p-6 md:p-8">
+    <p class="hud-label text-faint">Технологии</p>
+    <ul class="mt-4 flex flex-col gap-2.5">
+      <li><a class="text-muted hover:text-ink" href="#tech">22 JS-модуля</a></li>
+      <li><a class="text-muted hover:text-ink" href="#tech">PHP API</a></li>
+      <li><a class="text-muted hover:text-ink" href="#tech">Синхронизация</a></li>
+      <li><a class="text-muted hover:text-ink" href="#tech">Аудит и тесты</a></li>
+    </ul>
+  </nav>
+  <nav aria-label="Ссылки" class="bg-bg p-6 md:p-8">
+    <p class="hud-label text-faint">Ссылки</p>
+    <ul class="mt-4 flex flex-col gap-2.5">
+      <li><a class="text-muted hover:text-ink" href="https://rov.smartliba.ru" target="_blank" rel="noopener noreferrer">Открыть ↗</a></li>
+      <li><a class="text-muted hover:text-ink" href="#use">Локальный режим</a></li>
+      <li><a class="text-muted hover:text-ink" href="#use">Развернуть на сервере</a></li>
+      <li><a class="text-muted hover:text-ink" href="#tech">Как это устроено</a></li>
+    </ul>
+  </nav>
+</div></div></footer>
+
+<script src="clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+   "Abbr": {
+      "message": "IDL Helper"
+   },
+   "appDescription": {
+      "message": "Lataa musiikkia ja videoita OK.ru:sta ja Instagramista MP3-, MP4- ja WEBM-muodossa. Kuvakaappauspainike online-videosoittimille."
+   },
+   "appName": {
+      "message": "OK.ru Downloader (IDL Helper)"
+   },
+   "browserActionDefaultTitle": {
+      "message": "IDL Helper"
+   }
+}

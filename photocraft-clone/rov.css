@@ -1,0 +1,22 @@
+/* rov.css — brand tokens and small additions for the «Черновик» page.
+   Everything else comes from the compiled style.css bundle; only classes
+   missing from that bundle are defined here (see _ref/classcheck.py). */
+
+/* «Черновик» brand: paper-and-red ink (matches the app accent #c93a2b) */
+.app-rov { --app: #c93a2b; --app-ink: #c93a2b; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .app-rov { --app-ink: #ff7a6a; }
+}
+:root[data-theme="dark"] .app-rov { --app-ink: #ff7a6a; }
+
+/* Screenshots are 16:10 captures (1440×900 @2x) — keep the full frame */
+.rov-shot { aspect-ratio: 16 / 10; }
+
+/* Two md:-utilities the original page never used (not in the compiled bundle) */
+@media (min-width: 48rem) {
+  .md\:text-4xl { font-size: 2.25rem; }
+  .md\:py-14 { padding-top: 3.5rem; padding-bottom: 3.5rem; }
+}
+
+/* Footer accent uses the token above but sits outside .app-rov */
+:root { --rov-red: #c93a2b; }
