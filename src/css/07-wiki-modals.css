@@ -42,18 +42,30 @@
 .wv-alias span{font-family:var(--f-ui);font-size:9.5px;color:var(--ink2);border:1px dashed var(--line);border-radius:99px;padding:3px 9px}
 #wikiViewModal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:var(--veil-glass);backdrop-filter:blur(18px) saturate(1.15);-webkit-backdrop-filter:blur(18px) saturate(1.15);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .28s,visibility .28s}
 #wikiViewModal.on{opacity:1;visibility:visible;pointer-events:auto}
-.wv-inner{position:relative;width:min(1180px,96vw);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;transform:translateY(12px) scale(.985);transition:transform .28s cubic-bezier(.2,.7,.2,1),opacity .28s}
+/* прокрутка — вся страница модалки целиком (просьба: «чтобы прокручивались
+   не только эти блоки а вся страница»): скроллит только .wv-inner,
+   внутренние блоки (.wv-col .col-body, #wvQuotes) не имеют своего скролла.
+   Скроллбар визуально скрыт («убери элемент скролл»), колесо сглажено
+   лерпом в 13-wiki-modal.js (smoothWheel) */
+.wv-inner{position:relative;width:min(1180px,96vw);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;transform:translateY(12px) scale(.985);transition:transform .28s cubic-bezier(.2,.7,.2,1),opacity .28s}
+.wv-inner::-webkit-scrollbar{width:0;height:0;display:none}
+/* без карточек цитат (нет .wv-q) — листать нечего и нечего: прокрутка
+   страницы полностью отключается (класс ставит openWikiView) */
+.wv-inner.no-scroll{overflow-y:hidden}
+.wv-inner > *{flex:0 0 auto}
 #wikiViewModal.on .wv-inner{transform:none}
 .wv-head{position:relative;display:flex;align-items:center;justify-content:center;gap:12px}
 .wv-head > .sibtn{position:absolute;right:0;top:50%;transform:translateY(-50%)}
 #wvName{font-size:clamp(22px,3.2vw,30px);font-weight:700;letter-spacing:-.01em}
 #wvDesc{max-width:760px;margin:12px auto 0;color:var(--ink2);line-height:1.65;font-size:14px;text-align:center}
 .wv-tl{width:min(520px,86%);margin:14px auto 0}
-#wvQuotes{flex:1;min-height:0;overflow-y:auto;margin-top:8px}
+#wvQuotes{margin-top:8px}
 .wv-single{display:flex;flex-direction:column;gap:8px;max-width:760px;width:100%;margin:0 auto;padding:4px 6px}
 #wvQuotes.cols{padding:10px 4px 14px}
 .wv-cols-wrap{display:flex;flex-wrap:wrap;justify-content:center;align-items:stretch;gap:14px;width:100%;max-width:1140px;margin:0 auto;padding:0 4px}
-.wv-col{flex:0 1 276px;width:276px;max-width:100%;min-height:250px;max-height:430px;display:flex;flex-direction:column;background:var(--card-glass);border:1px solid var(--line2);border-radius:var(--r-lg);padding:12px;animation:rise .45s cubic-bezier(.2,.7,.2,1) both;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .18s,box-shadow .18s,border-color .18s}
+/* 4 карточки в ряд (просьба: «сделай чтобы в ряду было 4 карточки»):
+   база = четверть строки минус gaps; ≤880px — прежнее 240px с переносом */
+.wv-col{flex:0 1 calc((100% - 42px) / 4);width:auto;max-width:100%;min-height:250px;max-height:430px;display:flex;flex-direction:column;background:var(--card-glass);border:1px solid var(--line2);border-radius:var(--r-lg);padding:12px;animation:rise .45s cubic-bezier(.2,.7,.2,1) both;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .18s,box-shadow .18s,border-color .18s}
 .wv-col:hover{transform:translateY(-3px);border-color:var(--line);box-shadow:var(--shadow-sm)}
 .wv-col .wc-h{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink3);display:flex;justify-content:space-between;align-items:baseline;gap:8px;cursor:pointer;transition:color .15s}
 .wv-col .wc-h:hover{color:var(--accent)}

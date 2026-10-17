@@ -645,6 +645,12 @@ function aiRenderCtx(){
 
 /* ── Панель чата ───────────────────────────────────────────────────────── */
 function aiOpenPanel(){
+  /* ИИ открывается ТОЛЬКО на странице книги (просьба) — на полке
+     библиотеки кнопок для него больше нет, а программные пути глушим */
+  if(typeof inBookPage==='function'&&!inBookPage()){
+    if(typeof toast==='function')toast('ИИ открывается на странице книги');
+    return;
+  }
   var p=aiEl('aiPanel');
   if(!p)return;
   p.classList.add('on');

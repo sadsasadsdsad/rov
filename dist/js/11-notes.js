@@ -65,6 +65,7 @@ function renderNoteFilters(all){
   var byCh={};all.forEach(function(n){byCh[n.chId]=1});
   info.textContent='глав: '+Object.keys(byCh).length;
   box.appendChild(info);
+  wpFiltersBind(box);requestAnimationFrame(function(){wpFiltersEdge(box)});
 }
 function renderNotes(){
   var box=$('#npBody');if(!box)return;

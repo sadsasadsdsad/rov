@@ -132,6 +132,10 @@ $('#wpFull').addEventListener('click',function(){
   updatePanelTabs();
   requestAnimationFrame(updatePanelTabs);
   setTimeout(updatePanelTabs,520);
+  /* полоса тегов: после смены ширины пересчитать затемнение краёв */
+  if(typeof wpFiltersEdge==='function')requestAnimationFrame(function(){
+    wpFiltersEdge($('#wpFilters'));wpFiltersEdge($('#npFilters'));
+  });
 });
 $('#wpAdd').addEventListener('click',function(){openWikiModal(null)});
 $('#wpSearch').addEventListener('input',function(){

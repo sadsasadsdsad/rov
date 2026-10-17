@@ -28,6 +28,10 @@ var WIKI_TYPES=[
 function $(s){return document.querySelector(s)}
 function isReader(){return document.body.classList.contains('reader')}
 function isReadOnly(){return document.body.classList.contains('ro')}
+/* страница книги открыта (не полка библиотеки): #library скрыт.
+   На ней только и доступны ИИ и окно музыки (просьба: «открывать
+   только на странице книги») — см. aiOpenPanel и openMusic */
+function inBookPage(){return !!(typeof library!=='undefined'&&library&&library.hidden===true)}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 var editor=$('#editor'), scroller=$('#scroller'), list=$('#chlist'),
     selbar=$('#selbar'), synbar=$('#synbar'), menu=$('#blockmenu'),

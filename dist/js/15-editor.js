@@ -1287,6 +1287,7 @@ function toLibrary(){
   commitNow();
   closeMenu();selbar.classList.remove('on');hideSynbar();clearSearch();
   toggleWikiPanel(false);hideMarkTip();
+  if(typeof closeMusic==='function')closeMusic();   /* музыка — только на странице книги */
   library.hidden=false;bookView.hidden=true;
   setWorkspaceVisible(false);
   library.scrollTop=0;viewIn(library);
@@ -1548,6 +1549,10 @@ document.addEventListener('keydown',function(e){
   }
   if($('#dayModal').classList.contains('on')){
     if(e.key==='Escape'){e.preventDefault();closeDayModal()}return;
+  }
+  if($('#musicModal').classList.contains('on')){
+    /* Escape только закрывает окно — мелодия продолжает играть */
+    if(e.key==='Escape'){e.preventDefault();closeMusic()}return;
   }
   if(isReader()&&(e.ctrlKey||e.metaKey||e.altKey))return;
   if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')){e.preventDefault();scheduleSave()}

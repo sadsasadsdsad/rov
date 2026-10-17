@@ -270,6 +270,27 @@ function renderWikiFilters(){
     b.addEventListener('click',function(){wikiTypeFilter=tp.k;renderWikiFilters();renderWiki()});
     box.appendChild(b);
   });
+  wpFiltersBind(box);requestAnimationFrame(function(){wpFiltersEdge(box)});
+}
+/* ── Полоса тегов в свёрнутой энц: листается колесом, края затемнены,
+   когда есть что листать (просьба: «не листается и нет затемнения
+   по краям») ── */
+function wpFiltersEdge(box){
+  if(!box)return;
+  box.classList.toggle('edge-l',box.scrollLeft>2);
+  box.classList.toggle('edge-r',box.scrollLeft+box.clientWidth<box.scrollWidth-2);
+}
+function wpFiltersBind(box){
+  if(!box||box._wfBound)return;
+  box._wfBound=1;
+  box.addEventListener('scroll',function(){wpFiltersEdge(box)});
+  box.addEventListener('wheel',function(e){
+    if(box.scrollWidth<=box.clientWidth)return;
+    var d=Math.abs(e.deltaY)>Math.abs(e.deltaX)?e.deltaY:e.deltaX;
+    if(!d)return;
+    box.scrollLeft+=d;wpFiltersEdge(box);e.preventDefault();
+  },{passive:false});
+  window.addEventListener('resize',function(){wpFiltersEdge(box)});
 }
 function renderWiki(){
   wpBody.innerHTML='';

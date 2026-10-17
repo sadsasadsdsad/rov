@@ -3,18 +3,20 @@
  * Проект: «Черновик» — веб-редактор рукописей. tests/ — разобранная копия
  *   src/index.html: 18 JS-скриптов, подключаются строго по номеру.
  * Раздел оригинала: src/index.html, строки 3245–4038 (раздел 12 из 18).
- * Что делает: данные графа из wiki-связей, три раскладки (круг / BFS-ряды / силы), отрисовка SVG, тулбар с фильтрами типов и слайдерами, зум и перетаскивание.
- * Ключевое: buildAndRenderGraph, scheduleGraph, layoutForce, layoutCircle, paintGraph, renderGraphTypeBar, zoomBy, graphState.
- * Зависимости: 01-core, 04-state-seed, 09-cooccurrence; тулбар разметки — 06-graph.css.
+ * Что делает: данные графа из wiki-связей; четыре раскладки (ноды-Blender / радиальные кольца / круг / силы); отрисовка SVG карточками-нодами с цветной шапкой, телом и гнёздами, нити-кривые от гнезда к гнезду, точечная сетка; плавная камера (зум «доезжает», пан с инерцией), плавный переезд узлов при пересборке, одноразовые анимации появления и фокуса; тулбар с фильтрами и слайдерами, зум, перетаскивание узлов.
+ * Ключевое: buildAndRenderGraph, scheduleGraph, layoutTree, layoutForce, layoutCircle, layoutRadial, paintGraph, renderGraphTypeBar, zoomBy, graphFitTarget, graphView, nodeBox, graphState.
+ * Зависимости: 01-core, 04-state-seed, 09-cooccurrence; стили — 06-graph.css.
  * ========================================================================== */
 "use strict";
 /* =========================================================================
    СХЕМА КНИГИ — УЛУЧШЕННАЯ ВЕРСИЯ
    ========================================================================= */
 var graphState={
-  mode:'radial',           /* radial | circle | force */
+  mode:'tree',             /* tree | radial | circle | force */
   people:false,
   labels:true,
+  showOrphans:true,        /* одиночки без связей — отдельной колонкой/кольцом */
+  rankOpen:false,          /* выдвижная «Структура книги» поверх карты */
   depth:2,
   minWeight:1,
   hiddenTypes:{},          /* map type->true => скрыт */
@@ -30,22 +32,153 @@ var graphState={
   posCache:{},             /* id -> {x,y,w,h} закреплённых узлов */
   lastClickId:null,
   lastClickTime:0,
-  lastPainted:0
+  lastPainted:0,
+  needFit:true,            /* первый показ — сразу вписать схему в окно */
+  enter:false,             /* одноразовая анимация появления (paintGraph её съедает) */
+  dimAnim:false,           /* одноразовая анимация «приглушения» при смене фокуса */
+  tweenRaf:null
 };
 var graphTimer=null;
 var graphRafId=null;
 var graphOpenTimer=null;
+var graphTipHide=null;      /* гасит подсказку узла — функцию ставит блок событий */
 
+/* ---------- Плавный вид: камера «доезжает» до цели, а не прыгает ----------
+   Ноды Blender живут с плавным зумом-паном: колесо/кнопки задают цель,
+   кадровый цикл мягко ведёт текущий вид к ней, а после броска фон ещё
+   скользит по инерции. При «уменьшении движения» в системе — мгновенно. */
+var graphView={tZoom:1,tPanX:0,tPanY:0,vx:0,vy:0,raf:0,last:0};
+function graphReduced(){
+  try{return window.matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}
+}
+function graphViewSync(){
+  graphView.tZoom=graphState.zoom;
+  graphView.tPanX=graphState.panX;
+  graphView.tPanY=graphState.panY;
+  graphView.vx=0;graphView.vy=0;
+}
+function graphViewKick(){
+  if(graphReduced()){
+    graphState.zoom=graphView.tZoom;
+    graphState.panX=graphView.tPanX;
+    graphState.panY=graphView.tPanY;
+    graphView.vx=0;graphView.vy=0;
+    applyGraphTransform();
+    return;
+  }
+  if(graphView.raf)return;
+  graphView.last=0;
+  graphView.raf=requestAnimationFrame(graphViewTick);
+}
+function graphViewTick(ts){
+  graphView.raf=0;
+  var dt=graphView.last?Math.min(64,ts-graphView.last):16.7;
+  graphView.last=ts;
+  var k=1-Math.exp(-dt/72);      /* «доезд» ~70 мс — быстро, но без рывка */
+  /* инерция живёт в цели: текущий вид догоняет её и плавно тормозит */
+  graphView.tPanX+=graphView.vx*dt;
+  graphView.tPanY+=graphView.vy*dt;
+  var dec=Math.exp(-dt/230);
+  graphView.vx*=dec;graphView.vy*=dec;
+  if(Math.abs(graphView.vx)<0.006)graphView.vx=0;
+  if(Math.abs(graphView.vy)<0.006)graphView.vy=0;
+  graphState.zoom+=(graphView.tZoom-graphState.zoom)*k;
+  graphState.panX+=(graphView.tPanX-graphState.panX)*k;
+  graphState.panY+=(graphView.tPanY-graphState.panY)*k;
+  var done=!graphView.vx&&!graphView.vy&&
+    Math.abs(graphView.tZoom-graphState.zoom)<0.0008&&
+    Math.abs(graphView.tPanX-graphState.panX)<0.35&&
+    Math.abs(graphView.tPanY-graphState.panY)<0.35;
+  if(done){
+    graphState.zoom=graphView.tZoom;
+    graphState.panX=graphView.tPanX;
+    graphState.panY=graphView.tPanY;
+  }
+  applyGraphTransform();
+  if(!done)graphView.raf=requestAnimationFrame(graphViewTick);
+}
+/* зум колесом к точке под курсором — цель считается от цели, чтобы
+   быстрые прокрутки не «теряли» масштаб */
+function graphWheelZoom(mx,my,factor){
+  var z0=graphView.tZoom;
+  var z1=Math.max(0.3,Math.min(3.4,z0*factor));
+  if(z1===z0)return;
+  if(graphReduced()){
+    var kk0=z1/z0;
+    graphState.panX=mx-kk0*(mx-graphState.panX);
+    graphState.panY=my-kk0*(my-graphState.panY);
+    graphState.zoom=z1;
+    graphViewSync();
+    applyGraphTransform();
+    return;
+  }
+  var kk=z1/z0;
+  graphView.tPanX=mx-kk*(mx-graphView.tPanX);
+  graphView.tPanY=my-kk*(my-graphView.tPanY);
+  graphView.tZoom=z1;
+  graphView.vx=0;graphView.vy=0;
+  graphViewKick();
+}
+/* вписать схему в окно (как «Home» в нодах Blender) */
+function graphFitTarget(){
+  var d=graphState.data;if(!d||!d.nodes.length)return;
+  var W=graphState.W,H=graphState.H;
+  var minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  d.nodes.forEach(function(n){
+    var b=nodeBox(n,n.id===d.mainId);
+    /* если идёт переезд — вписываем по цели, а не по «старому» месту */
+    var px=n._fx?n._tx:n.x,py=n._fx?n._ty:n.y;
+    minX=Math.min(minX,px-b.w/2);maxX=Math.max(maxX,px+b.w/2);
+    minY=Math.min(minY,py-b.h/2);maxY=Math.max(maxY,py+b.h/2);
+  });
+  var bw=Math.max(1,maxX-minX),bh=Math.max(1,maxY-minY);
+  var m=54;
+  var z=Math.min((W-m*2)/bw,(H-m*2)/bh);
+  z=Math.max(0.3,Math.min(1.35,z));
+  graphView.tZoom=z;
+  graphView.tPanX=(W-bw*z)/2-minX*z;
+  graphView.tPanY=(H-bh*z)/2-minY*z;
+  graphView.vx=0;graphView.vy=0;
+  graphViewKick();
+}
 /* перерисовка не чаще кадра — при быстром перетаскивании узлов */
 function scheduleGraphPaint(){
   if(graphRafId)return;
   graphRafId=requestAnimationFrame(function(){graphRafId=null;paintGraph()});
 }
-/* только transform — без перестройки SVG (пан и зум) */
+/* только transform — без перестройки SVG (пан и зум).
+   Сетка «миллиметровки» едет вместе с камерой: ей правим patternTransform,
+   а шаг кратно удваиваем, чтобы точки не сливались и не редели. */
+function graphGridStep(){
+  var z=graphState.zoom||1,step=26;
+  while(step*z<15)step*=2;
+  while(step*z>60)step/=2;
+  return step;
+}
+function graphGridDotR(){
+  return Math.max(0.45,Math.min(2.6,1.15/(graphState.zoom||1)));
+}
 function applyGraphTransform(){
   var g=document.getElementById('graphTransform');
   if(!g){paintGraph();return}
   g.setAttribute('transform','translate('+graphState.panX.toFixed(1)+','+graphState.panY.toFixed(1)+') scale('+graphState.zoom.toFixed(3)+')');
+  var pat=document.getElementById('gpGrid');
+  if(pat){
+    pat.setAttribute('patternTransform','translate('+graphState.panX.toFixed(1)+','+graphState.panY.toFixed(1)+') scale('+graphState.zoom.toFixed(3)+')');
+    var step=graphGridStep();
+    if(pat.getAttribute('data-step')!==String(step)){
+      pat.setAttribute('data-step',String(step));
+      pat.setAttribute('width',step);pat.setAttribute('height',step);
+      var dot=pat.querySelector('circle');
+      if(dot){dot.setAttribute('cx',step/2);dot.setAttribute('cy',step/2)}
+    }
+    var r=graphGridDotR();
+    var dotR=pat.querySelector('circle');
+    if(dotR){
+      var have=+dotR.getAttribute('r');
+      if(!have||Math.abs(have-r)>0.06)dotR.setAttribute('r',r.toFixed(2));
+    }
+  }
 }
 
 function scheduleGraph(){
@@ -56,7 +189,7 @@ function scheduleGraph(){
 
 function buildGraphData(){
   var b=book();
-  if(!b)return {nodes:[],links:[],dropped:0};
+  if(!b)return {nodes:[],links:[],dropped:0,isolated:0};
   var co=buildCoOccurrence();
   var all=(b.wiki||[]).filter(function(e){return e.name});
   var nodes=[];
@@ -90,7 +223,7 @@ function buildGraphData(){
   /* отсекаем недостижимые на глубине depth от главного */
   var sorted=nodes.slice().sort(function(a,b){return b.score-a.score});
   var mainId=sorted[0]?sorted[0].id:null;
-  if(!mainId)return {nodes:[],links:[],dropped:0};
+  if(!mainId)return {nodes:[],links:[],dropped:0,isolated:0};
   var maxDepth=graphState.depth|0;
   var adj={};nodes.forEach(function(n){adj[n.id]=[]});
   links.forEach(function(l){adj[l.s.id].push(l.t.id);adj[l.t.id].push(l.s.id)});
@@ -104,20 +237,104 @@ function buildGraphData(){
       seen[nb]=1;lvl[nb]=lvl[cur]+1;reach[nb]=1;q.push(nb);
     });
   }
-  var kept=[],dropped=0;
+  /* Одиночки без связей («материки», «места» и прочие статьи, которые в
+     тексте ни с кем рядом не встречались) раньше тихо пропадали с карты.
+     Теперь они остаются и помечаются iso: раскладка выносит их отдельной
+     колонкой (в дереве) или внешним кольцом (в радиальной), чтобы паутина
+     связей не выглядела полной без них */
+  var kept=[],dropped=0,isolated=[];
   nodes.forEach(function(n){
-    if(reach[n.id])kept.push(n);
-    else dropped++;
+    if(reach[n.id]){kept.push(n);return}
+    if(!n.degree){
+      if(graphState.showOrphans){n.iso=true;isolated.push(n)}
+      return;
+    }
+    dropped++;
   });
-  nodes=kept;
+  nodes=kept.concat(isolated);
   var byId2={};nodes.forEach(function(n){byId2[n.id]=n});
   links=links.filter(function(l){return byId2[l.s.id]&&byId2[l.t.id]});
-  return {nodes:nodes,links:links,dropped:dropped,mainId:mainId};
+  return {nodes:nodes,links:links,dropped:dropped,isolated:isolated.length,mainId:mainId};
 }
 
-function nodeRadius(n,isMain){
-  var base=8+Math.min(14,Math.sqrt(Math.max(1,n.mentions))*3);
-  return isMain?base+6:base;
+/* Карточка узла — бокс как в нодах Blender: шапка с именем, тело со
+   сводкой и гнёзда связей по краям. Ширина зависит от длины имени. */
+function nodeBox(n,isMain){
+  var raw=n.name||'';
+  var name=raw.length>26?(raw.slice(0,25)+'…'):raw;
+  var w=Math.round(Math.max(128,Math.min(230,name.length*7+46)))+(isMain?10:0);
+  return {w:w,h:isMain?56:52,head:24,name:name};
+}
+/* у шапки скруглены только верхние углы — путь вместо rect */
+function headPath(x,y,w,hh,r){
+  return 'M '+x.toFixed(1)+','+(y+r).toFixed(1)+
+    ' a'+r+','+r+' 0 0 1 '+r+','+(-r)+
+    ' h'+(w-2*r).toFixed(1)+
+    ' a'+r+','+r+' 0 0 1 '+r+','+r+
+    ' v'+(hh-r).toFixed(1)+
+    ' h'+(-w).toFixed(1)+' z';
+}
+/* разведение боксов: пересечения гасим по оси меньшего наложения,
+   главный узел и закреплённые остаются на месте */
+function separateBoxes(nodes,iters,mainId){
+  var n=nodes.length;
+  for(var it=0;it<iters;it++){
+    var moved=false;
+    for(var i=0;i<n;i++){
+      var a=nodes[i];
+      for(var j=i+1;j<n;j++){
+        var b=nodes[j];
+        var pa=(a.id===mainId)||graphState.pinned[a.id];
+        var pb=(b.id===mainId)||graphState.pinned[b.id];
+        if(pa&&pb)continue;
+        var ba=nodeBox(a),bb=nodeBox(b);
+        var minX=(ba.w+bb.w)/2+24,minY=(ba.h+bb.h)/2+14;
+        var dx=b.x-a.x,dy=b.y-a.y;
+        if(Math.abs(dx)>=minX||Math.abs(dy)>=minY)continue;
+        var ox=minX-Math.abs(dx),oy=minY-Math.abs(dy);
+        var pushX=ox<=oy;
+        var amt=pushX?ox:oy;
+        var d=pushX?dx:dy;
+        var dir=d>=0?1:-1;
+        var fa=pa?0:(pb?1:0.5),fb=pb?0:(pa?1:0.5);
+        if(pushX){a.x-=dir*amt*fa;b.x+=dir*amt*fb}
+        else{a.y-=dir*amt*fa;b.y+=dir*amt*fb}
+        moved=true;
+      }
+    }
+    if(!moved)break;
+  }
+}
+/* плавный переезд узлов на новые места после пересборки раскладки.
+   stopTween(true) просто останавливает цикл (позиции не трогает —
+   новый переезд стартует с текущих); stopTween() доводит узлы до цели */
+function cancelGraphTween(keepPositions){
+  if(graphState.tweenRaf){cancelAnimationFrame(graphState.tweenRaf);graphState.tweenRaf=null}
+  if(keepPositions)return;
+  var d=graphState.data;
+  if(d)d.nodes.forEach(function(nd){
+    if(nd._fx){nd.x=nd._tx;nd.y=nd._ty;nd._fx=0}
+  });
+}
+function startGraphTween(){
+  cancelGraphTween(true);
+  var d=graphState.data;if(!d)return;
+  var nodes=d.nodes,t0=0,dur=620;
+  function frame(ts){
+    if(!t0)t0=ts;
+    var t=Math.min(1,(ts-t0)/dur);
+    var e=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;   /* easeInOutCubic */
+    nodes.forEach(function(nd){
+      if(!nd._fx)return;
+      nd.x=nd._sx+(nd._tx-nd._sx)*e;
+      nd.y=nd._sy+(nd._ty-nd._sy)*e;
+      if(t>=1)nd._fx=0;
+    });
+    paintGraph();
+    if(t<1)graphState.tweenRaf=requestAnimationFrame(frame);
+    else graphState.tweenRaf=null;
+  }
+  graphState.tweenRaf=requestAnimationFrame(frame);
 }
 
 /* ---------- Раскладка: радиальная (BFS-кольца) ---------- */
@@ -146,8 +363,11 @@ function layoutRadial(nodes,links,W,H,mainId){
       seen[x.id]=1;parent[x.id]=cur;level[x.id]=level[cur]+1;order.push(x.id);
     }
   }
+  /* одиночки без связей — внешним кольцом, после всех уровней сети */
+  var maxSeen=0;
+  nodes.forEach(function(x){if(seen[x.id]&&level[x.id]>maxSeen)maxSeen=level[x.id]});
   nodes.forEach(function(x){
-    if(!seen[x.id]){seen[x.id]=1;parent[x.id]=mainId;level[x.id]=1;order.push(x.id)}
+    if(!seen[x.id]){seen[x.id]=1;parent[x.id]=mainId;level[x.id]=maxSeen+1;order.push(x.id)}
   });
   var byLevel={},maxLevel=0;
   nodes.forEach(function(x){
@@ -157,15 +377,17 @@ function layoutRadial(nodes,links,W,H,mainId){
     if(L>maxLevel)maxLevel=L;
   });
   var cx=W/2,cy=H/2;
-  var maxR=Math.max(80,Math.min(W,H)/2-60);
-  var levelRadius=[0],prevR=70;
+  /* Кольца растут по вместимости: длине окружности под карточки уровня.
+     Потолка радиуса нет — если колец/карточек много, схема станет шире
+     окна, но камера впишет её целиком (graphFitTarget), зато карточки
+     не сбиваются в кучу, как раньше при жёстком ограничении. */
+  var levelRadius=[0],prevR=100;
   for(var L=1;L<=maxLevel;L++){
-    var cnt=(byLevel[L]||[]).length;
-    var minSpacing=96;
-    var minR=cnt>0?((cnt*minSpacing)/(2*Math.PI)):prevR+80;
-    var levelR=maxR*(L/maxLevel);
-    var r=Math.max(prevR+50,minR,levelR);
-    if(r>maxR)r=maxR;
+    var ring0=byLevel[L]||[];
+    var cnt=ring0.length;
+    var maxW=0;ring0.forEach(function(x){var b=nodeBox(x);if(b.w>maxW)maxW=b.w});
+    var minR=cnt>0?((cnt*(maxW+50))/(2*Math.PI)):prevR+90;
+    var r=Math.max(prevR+60,minR);
     levelRadius.push(r);
     prevR=r;
   }
@@ -200,32 +422,9 @@ function layoutRadial(nodes,links,W,H,mainId){
   /* разведение наложений — число итераций ограничено размером графа,
      чтобы раскладка сотен узлов не подвешивала интерфейс */
   var sepIter=n>200?8:(n>100?20:50);
-  for(var iter=0;iter<sepIter;iter++){
-    var moved=false;
-    for(var i=0;i<nodes.length;i++){
-      var a=nodes[i];if(a.id===mainId)continue;
-      if(graphState.pinned[a.id])continue;
-      for(var j=i+1;j<nodes.length;j++){
-        var b=nodes[j];if(b.id===mainId)continue;
-        var dx=b.x-a.x,dy=b.y-a.y;
-        var d=Math.sqrt(dx*dx+dy*dy)||0.01;
-        var minD=nodeRadius(a,false)+nodeRadius(b,false)+26;
-        if(d<minD){
-          var push=(minD-d)/2;
-          var ux=dx/d,uy=dy/d;
-          if(!graphState.pinned[b.id]){b.x+=ux*push;b.y+=uy*push}
-          a.x-=ux*push;a.y-=uy*push;
-          moved=true;
-        }
-      }
-    }
-    if(!moved)break;
-  }
-  var pad=44;
-  nodes.forEach(function(nd){
-    nd.x=Math.max(pad,Math.min(W-pad,nd.x));
-    nd.y=Math.max(pad,Math.min(H-pad,nd.y));
-  });
+  separateBoxes(nodes,sepIter,mainId);
+  /* без зажима по краям: разведённые карточки не заталкиваем обратно
+     в окно (это снова сбивало их в стопку), всю картину впишет камера */
 }
 
 /* ---------- Раскладка: круг ---------- */
@@ -237,17 +436,18 @@ function layoutCircle(nodes,links,W,H,mainId){
     return b.score-a.score;
   });
   var cx=W/2,cy=H/2;
-  /* радиус кольца — от вместимости: узлы с крупными радиусами не налезают */
+  /* кольцо — эллипс по форме окна: карточкам нужна длина обхода
+     (периметр по Рамануджану), иначе на круглом кольце они налезают */
   var need=0;
-  sorted.forEach(function(nd){need+=nodeRadius(nd,nd.id===mainId)*2+26});
-  var rMax=Math.min(W,H)/2-70;
-  var rMin=need/(Math.PI*2);
-  var r=Math.max(70,Math.min(rMax,Math.max(rMin,Math.min(W,H)/4)));
+  sorted.forEach(function(nd){need+=nodeBox(nd,nd.id===mainId).w+44});
+  var rx=Math.max(140,W/2-90),ry=Math.max(100,H/2-80);
+  var per=Math.PI*(3*(rx+ry)-Math.sqrt((3*rx+ry)*(rx+3*ry)));
+  if(per<need){var kk=need/per;rx*=kk;ry*=kk}
   var step=(Math.PI*2)/n;
   sorted.forEach(function(nd,i){
     var ang=-Math.PI/2+step*i;
-    nd.x=cx+Math.cos(ang)*r;
-    nd.y=cy+Math.sin(ang)*r;
+    nd.x=cx+Math.cos(ang)*rx;
+    nd.y=cy+Math.sin(ang)*ry;
   });
   /* закреплённые узлы остаются на своих местах */
   var pc=graphState.posCache;
@@ -275,8 +475,9 @@ function layoutForce(nodes,links,W,H,mainId){
   nodes.forEach(function(nd,i){
     if(!nd._placed && (nd.x===0&&nd.y===0)){
       var ang=(i/n)*Math.PI*2;
-      nd.x=cx+Math.cos(ang)*40;
-      nd.y=cy+Math.sin(ang)*40;
+      var r0=Math.min(W,H)*0.3;
+      nd.x=cx+Math.cos(ang)*r0;
+      nd.y=cy+Math.sin(ang)*r0;
     }
     nd._dx=0; nd._dy=0;
   });
@@ -332,32 +533,110 @@ function layoutForce(nodes,links,W,H,mainId){
   }
   /* финальная уборка границ и наложений */
   var forceSep=n>200?6:(n>100?14:30);
-  for(var iter=0;iter<forceSep;iter++){
-    var moved=false;
-    for(var i=0;i<n;i++){
-      var a=nodes[i]; if(graphState.pinned[a.id])continue;
-      for(var j=i+1;j<n;j++){
-        var b=nodes[j]; if(graphState.pinned[b.id])continue;
-        var dx=b.x-a.x,dy=b.y-a.y;
-        var d=Math.sqrt(dx*dx+dy*dy)||0.01;
-        var minD=nodeRadius(a,false)+nodeRadius(b,false)+22;
-        if(d<minD){
-          var push=(minD-d)/2;
-          var ux=dx/d,uy=dy/d;
-          a.x-=ux*push;a.y-=uy*push;
-          b.x+=ux*push;b.y+=uy*push;
-          moved=true;
-        }
-      }
-    }
-    if(!moved)break;
-  }
-  var pad=44;
+  separateBoxes(nodes,forceSep,mainId);
+  var padX=64,padY=44;
   nodes.forEach(function(nd){
     if(graphState.pinned[nd.id])return;
-    nd.x=Math.max(pad,Math.min(W-pad,nd.x));
-    nd.y=Math.max(pad,Math.min(H-pad,nd.y));
+    nd.x=Math.max(padX,Math.min(W-padX,nd.x));
+    nd.y=Math.max(padY,Math.min(H-padY,nd.y));
   });
+}
+
+/* ---------- Раскладка: ноды Blender (колонки слева-вправо) ----------
+   Главный узел — исток; каждый шаг от него — новая колонка. Внутри
+   колонки порядок по «центру тяжести» родителей, поэтому нити почти не
+   пересекаются. Именно так выглядит граф шейдеров в Blender. */
+function layoutTree(nodes,links,W,H,mainId){
+  var n=nodes.length;if(!n)return;
+  var byId={};nodes.forEach(function(x){byId[x.id]=x});
+  if(!mainId||!byId[mainId]){
+    var best=nodes.slice().sort(function(a,b){return b.score-a.score});
+    mainId=best[0]?best[0].id:null;
+  }
+  if(!mainId)return;
+  var adj={};nodes.forEach(function(x){adj[x.id]=[]});
+  links.forEach(function(l){
+    if(adj[l.s.id])adj[l.s.id].push({id:l.t.id,w:l.w});
+    if(adj[l.t.id])adj[l.t.id].push({id:l.s.id,w:l.w});
+  });
+  var seen={},level={},parent={},order=[mainId],qi=0;
+  seen[mainId]=1;parent[mainId]=null;level[mainId]=0;
+  while(qi<order.length){
+    var cur=order[qi++];
+    var nbrs=(adj[cur]||[]).slice().sort(function(a,b){return b.w-a.w});
+    for(var i=0;i<nbrs.length;i++){
+      var x=nbrs[i];
+      if(seen[x.id])continue;
+      seen[x.id]=1;parent[x.id]=cur;level[x.id]=level[cur]+1;order.push(x.id);
+    }
+  }
+  /* узлы вне паутины связей (одиночки) — отдельная колонка справа, после
+     всех уровней сети: в первой колонке они смешивались бы с шагом 1 */
+  var maxLevel=0;
+  nodes.forEach(function(x){if(level[x.id]>maxLevel)maxLevel=level[x.id]});
+  nodes.forEach(function(x){
+    if(!seen[x.id]){seen[x.id]=1;parent[x.id]=mainId;level[x.id]=maxLevel+1;order.push(x.id)}
+  });
+  maxLevel=0;
+  nodes.forEach(function(x){if(level[x.id]>maxLevel)maxLevel=level[x.id]});
+  var byLevel=[];
+  nodes.forEach(function(x){
+    var L=level[x.id];
+    if(!byLevel[L])byLevel[L]=[];
+    byLevel[L].push(x);
+  });
+  /* ширина колонки — самая широкая карточка + проход для нитей */
+  var colW=0;
+  nodes.forEach(function(x){var b=nodeBox(x);if(b.w>colW)colW=b.w});
+  colW+=120;
+  var padX=70,padY=46;
+  var availW=W-padX*2;
+  if((maxLevel+1)*colW>availW&&maxLevel>0)colW=Math.max(180,availW/(maxLevel+1));
+  var totalW=(maxLevel+1)*colW;
+  var x0=Math.max(padX+colW/2-40,(W-totalW)/2+colW/2);
+  var L0;
+  for(L0=0;L0<=maxLevel;L0++){
+    (byLevel[L0]||[]).forEach(function(nd){nd.x=x0+L0*colW});
+  }
+  /* вертикаль: внутри колонки — по родителям, затем равномерно, по центру */
+  for(L0=0;L0<=maxLevel;L0++){
+    var col=byLevel[L0]||[];
+    if(!col.length)continue;
+    if(L0>0){
+      col.sort(function(a,b){
+        var pa=byId[parent[a.id]],pb=byId[parent[b.id]];
+        var ya=pa?(pa._ord||0):999,yb=pb?(pb._ord||0):999;
+        if(ya!==yb)return ya-yb;
+        return b.score-a.score;
+      });
+    }else{
+      col.sort(function(a,b){return b.score-a.score});
+    }
+    var totalH=0;
+    col.forEach(function(nd){totalH+=nodeBox(nd).h});
+    var gap=30;
+    if(col.length>1){
+      var free=(H-padY*2)-totalH;
+      gap=Math.max(10,Math.min(46,free/(col.length-1)));
+    }
+    var blockH=totalH+gap*Math.max(0,col.length-1);
+    var y=Math.max(padY,(H-blockH)/2);
+    col.forEach(function(nd,i){
+      nd._ord=i;
+      var bh=nodeBox(nd).h;
+      nd.y=y+bh/2;
+      y+=bh+gap;
+    });
+  }
+  /* закреплённые узлы возвращаем на сохранённую позицию */
+  var pc=graphState.posCache;
+  nodes.forEach(function(nd){
+    if(graphState.pinned[nd.id]&&pc[nd.id]){nd.x=pc[nd.id].x;nd.y=pc[nd.id].y}
+  });
+  separateBoxes(nodes,n>200?8:(n>100?18:36),mainId);
+  /* НЕ зажимаем колонку в окно: если узлов в шаге много, колонка выше
+     холста — её покажет «вписать» (graphFitTarget), а камера отъедет;
+     зажим по краю раньше сбивал карточки в стопку у нижней границы */
 }
 
 function svgVars(){
@@ -366,6 +645,8 @@ function svgVars(){
     accent:(cs.getPropertyValue('--accent')||'#c93a2b').trim(),
     card:(cs.getPropertyValue('--card')||'#fff').trim(),
     line:(cs.getPropertyValue('--line')||'#ccc').trim(),
+    line2:(cs.getPropertyValue('--line2')||'#ddd').trim(),
+    ink:(cs.getPropertyValue('--ink')||'#111').trim(),
     ink2:(cs.getPropertyValue('--ink2')||'#555').trim(),
     ink3:(cs.getPropertyValue('--ink3')||'#888').trim(),
     bg:(cs.getPropertyValue('--bg')||'#f4f2ec').trim()
@@ -396,8 +677,11 @@ function paintGraph(){
   var mainId=d.mainId;
   var activeId=focusId||mainId;
 
-  /* связи: если есть фокус — от фокусного узла, иначе от главного */
-  var visibleLinks=d.links.filter(function(l){
+  /* связи: при фокусе — только окружение фокусного узла; в режиме нод
+     без фокуса видна вся паутина (иначе колонки выглядят разрозненными),
+     в остальных режимах — лучи от главного */
+  var showAll=(graphState.mode==='tree')&&!focusId;
+  var visibleLinks=showAll?d.links:d.links.filter(function(l){
     return (l.s.id===activeId || l.t.id===activeId);
   });
 
@@ -410,6 +694,20 @@ function paintGraph(){
     });
   }
   svg.classList.toggle('focused',!!focusId);
+  /* одноразовые анимации: появление после пересборки и «приглушение»
+     окружения при смене фокуса — paintGraph их съедает (иначе они
+     перезапускались бы на каждой перерисовке при перетаскивании) */
+  var enter=graphState.enter;graphState.enter=false;
+  var dimAnim=graphState.dimAnim;graphState.dimAnim=false;
+  svg.classList.toggle('enter',enter);
+  var boxOf={};
+  d.nodes.forEach(function(nd){boxOf[nd.id]=nodeBox(nd,nd.id===mainId)});
+
+  /* одиночки без связей: в дереве — отдельная колонка справа, в
+     радиальной — внешнее кольцо; подписи к ним рисуются ниже */
+  var isoNodes=[];
+  d.nodes.forEach(function(nd){if(nd.iso)isoNodes.push(nd)});
+  var isoCount=isoNodes.length;
 
   var tip=$('#gpTip');
   if(tip){
@@ -425,7 +723,13 @@ function paintGraph(){
 
   var legendHint=$('#gpLegend');
 
-  var s='<g id="graphTransform" transform="translate('+graphState.panX.toFixed(1)+','+graphState.panY.toFixed(1)+') scale('+graphState.zoom.toFixed(3)+')">';
+  /* СЕТКА: точки «миллиметровки» живут вместе с камерой — шаг кратно
+     меняется от масштаба (graphGridStep), поэтому точки не сливаются
+     и не сереют; при пане и зуме её двигает applyGraphTransform */
+  var gstep=graphGridStep();
+  var s='<defs><pattern id="gpGrid" data-step="'+gstep+'" width="'+gstep+'" height="'+gstep+'" patternUnits="userSpaceOnUse" patternTransform="translate('+graphState.panX.toFixed(1)+','+graphState.panY.toFixed(1)+') scale('+graphState.zoom.toFixed(3)+')"><circle cx="'+(gstep/2)+'" cy="'+(gstep/2)+'" r="'+graphGridDotR().toFixed(2)+'" fill="'+V.line2+'"/></pattern></defs>';
+  s+='<rect class="gp-grid" x="0" y="0" width="'+W+'" height="'+H+'" fill="url(#gpGrid)" pointer-events="none"/>';
+  s+='<g id="graphTransform" transform="translate('+graphState.panX.toFixed(1)+','+graphState.panY.toFixed(1)+') scale('+graphState.zoom.toFixed(3)+')">';
 
   /* Концентрические направляющие для радиального режима — по реальным
      радиусам из layoutRadial (graphState.rings), а не по формуле от depth.
@@ -435,98 +739,91 @@ function paintGraph(){
     for(var L=1;L<rings.length;L++){
       var rLevel=rings[L];
       s+='<circle class="gp-ring" cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="'+rLevel.toFixed(1)+'"/>';
-      s+='<text class="gp-ring-label" x="'+(cx+rLevel+4).toFixed(1)+'" y="'+(cy-4).toFixed(1)+'">'+L+'</text>';
+      var ringName=(isoCount&&L===rings.length-1)?'без связей':(''+L);
+      s+='<text class="gp-ring-label" x="'+(cx+rLevel+4).toFixed(1)+'" y="'+(cy-4).toFixed(1)+'">'+ringName+'</text>';
     }
   }
 
-  /* Рёбра — лёгкие кривые (дуги) между узлами */
+  /* Нити связей — кубические кривые от гнезда к гнезду, как нудлы в
+     нодах Blender: выходят горизонтально вправо, входят в левое гнездо,
+     поэтому стрелки не нужны. При появлении схемы нити «прорисовываются»
+     (pathLength=1 + stroke-dashoffset в CSS) */
   visibleLinks.forEach(function(l){
     var isRel=focusId&&(l.s.id===focusId||l.t.id===focusId);
     var ratio=l.w/maxW;
-    var o=isRel?(0.55+0.35*ratio):(0.22+0.36*ratio);
-    var sw=isRel?(1.4+2*ratio):(0.7+1.6*ratio);
-    var color=isRel?V.accent:V.ink3;
-    var cls='glink'+(isRel?' grel':'');
-
-    /* Небольшое искривление — сдвигаем среднюю точку перпендикулярно */
-    var x1=l.s.x,y1=l.s.y,x2=l.t.x,y2=l.t.y;
-    var dx=x2-x1,dy=y2-y1;
-    var len=Math.sqrt(dx*dx+dy*dy)||1;
-    var offset=Math.min(28,len*0.12);
-    var mx=(x1+x2)/2 - dy/len*offset;
-    var my=(y1+y2)/2 + dx/len*offset;
-    var path='M '+x1.toFixed(1)+' '+y1.toFixed(1)+' Q '+mx.toFixed(1)+' '+my.toFixed(1)+' '+x2.toFixed(1)+' '+y2.toFixed(1);
-    s+='<path class="'+cls+'" d="'+path+'" fill="none" stroke="'+color+'" stroke-width="'+sw.toFixed(2)+'" stroke-linecap="round" opacity="'+o.toFixed(2)+'"/>';
+    var o,sw,color;
+    if(focusId){
+      o=isRel?(0.6+0.32*ratio):0.2;
+      sw=isRel?(1.5+2.1*ratio):0.8;
+      color=isRel?V.accent:V.ink3;
+    }else if(showAll){
+      o=0.16+0.4*ratio;
+      sw=0.8+1.4*ratio;
+      color=V.ink3;
+      if(l.s.id===mainId||l.t.id===mainId){o+=0.12;sw+=0.25}
+    }else{
+      o=0.22+0.36*ratio;
+      sw=0.7+1.6*ratio;
+      color=V.ink3;
+    }
+    var cls='glink'+(isRel?' grel':'')+(dimAnim&&focusId&&!isRel?' gdim':'')+(enter?' gdraw':'');
+    var a=l.s,b=l.t;
+    if(a.x>b.x){a=l.t;b=l.s}
+    var ba=boxOf[a.id],bb=boxOf[b.id];
+    var x1=a.x+ba.w/2,y1=a.y,x2=b.x-bb.w/2,y2=b.y;
+    var dxb=Math.max(26,Math.abs(x2-x1)*0.46);
+    var path='M '+x1.toFixed(1)+' '+y1.toFixed(1)+
+      ' C '+(x1+dxb).toFixed(1)+' '+y1.toFixed(1)+' '+(x2-dxb).toFixed(1)+' '+y2.toFixed(1)+' '+x2.toFixed(1)+' '+y2.toFixed(1);
+    s+='<path class="'+cls+'" pathLength="1" d="'+path+'" fill="none" stroke="'+color+'" stroke-width="'+sw.toFixed(2)+'" stroke-linecap="round" opacity="'+o.toFixed(2)+'"/>';
   });
 
-  /* Узлы */
-  var labelQueue=[];
-  d.nodes.forEach(function(n){
+  /* Узлы — карточки как ноды Blender: цветная шапка с именем, тело со
+     сводкой («тип · упоминания · связи») и гнёзда по краям. Подписи
+     больше не «плавают» вокруг круга — имя живёт в шапке, поэтому
+     коллизий подписей не бывает. */
+  d.nodes.forEach(function(n,ni){
     var isMain=n.id===mainId;
-    var isActive=n.id===activeId;
     var isRel=focusId&&rel[n.id];
-    var r=nodeRadius(n,isMain);
+    var bx=boxOf[n.id];
+    var w=bx.w,h=bx.h,hh=bx.head;
+    var x=n.x-w/2,y=n.y-h/2;
     var col=wikiTypeColor(n.type);
-    var nodeCls='gnode'+(isRel?' grel':'')+(graphState.pinned[n.id]?' pinned':'');
-
-    /* Ореол — тонкий круг цвета фона */
-    s+='<circle class="'+nodeCls+'" data-id="'+escAttr(n.id)+'" cx="'+n.x.toFixed(1)+'" cy="'+n.y.toFixed(1)+'" r="'+(r+3).toFixed(1)+'" fill="'+V.card+'" opacity="0.9"/>';
+    var cls='gnode'+(isMain?' is-main':'')+(isRel?' grel':'')+
+      (graphState.pinned[n.id]?' pinned':'')+
+      (dimAnim&&focusId&&!isRel?' gdim':'')+
+      (dimAnim&&isRel?' glit':'');
+    var stl=enter?(' style="animation-delay:'+((ni%14)*22)+'ms"'):'';
+    s+='<g class="'+cls+'" data-id="'+escAttr(n.id)+'"'+stl+'>';
+    /* ореол активной ноды и рамка закреплённой */
     if(isMain){
-      s+='<circle class="'+nodeCls+'" data-id="'+escAttr(n.id)+'" cx="'+n.x.toFixed(1)+'" cy="'+n.y.toFixed(1)+'" r="'+(r+6).toFixed(1)+'" fill="none" stroke="'+V.accent+'" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.7"/>';
+      s+='<rect class="gn-halo" x="'+(x-5).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" width="'+(w+10).toFixed(1)+'" height="'+(h+10).toFixed(1)+'" rx="15"/>';
     }
     if(graphState.pinned[n.id]){
-      s+='<circle class="'+nodeCls+'" data-id="'+escAttr(n.id)+'" cx="'+n.x.toFixed(1)+'" cy="'+n.y.toFixed(1)+'" r="'+(r+9).toFixed(1)+'" fill="none" stroke="'+V.ink3+'" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>';
+      s+='<rect class="gn-halo gn-pinring" x="'+(x-6).toFixed(1)+'" y="'+(y-6).toFixed(1)+'" width="'+(w+12).toFixed(1)+'" height="'+(h+12).toFixed(1)+'" rx="16"/>';
     }
-    s+='<circle class="'+nodeCls+'" data-id="'+escAttr(n.id)+'" cx="'+n.x.toFixed(1)+'" cy="'+n.y.toFixed(1)+'" r="'+r.toFixed(1)+'" fill="'+col+'" fill-opacity="'+(n.mentions?0.92:0.5)+'" stroke="'+(isMain?V.accent:V.card)+'" stroke-width="'+(isMain?2:1.4)+'"/>';
-
+    s+='<rect class="gn-bg" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w+'" height="'+h+'" rx="11"/>';
+    var hp=headPath(x,y,w,hh,11);
+    s+='<path class="gn-head" d="'+hp+'" fill="'+col+'"/>';
+    /* пастель: тот же путь под цветом карточки — краска не «кричит» */
+    s+='<path class="gn-head gn-head-soft" d="'+hp+'" fill="'+V.card+'" opacity="0.58"/>';
+    s+='<line class="gn-sep" x1="'+x.toFixed(1)+'" x2="'+(x+w).toFixed(1)+'" y1="'+(y+hh).toFixed(1)+'" y2="'+(y+hh).toFixed(1)+'"/>';
     if(graphState.labels){
-      var ang=Math.atan2(n.y-cy,n.x-cx);
-      var lx,ly,anchor;
-      if(Math.abs(Math.cos(ang))>0.55){
-        lx=n.x+Math.cos(ang)*(r+11);
-        ly=n.y+3.5;
-        anchor=Math.cos(ang)>0?'start':'end';
-      }else{
-        lx=n.x;
-        ly=n.y+(Math.sin(ang)>0?(r+16):-(r+11));
-        anchor='middle';
-      }
-      var labelCls='glabel'+(isMain?' gmain':'')+(isRel?' grel':'');
-      var label=n.name.length>22?n.name.slice(0,21)+'…':n.name;
-      labelQueue.push({x:lx,y:ly,anchor:anchor,cls:labelCls,text:label,
-        pri:(isMain?2:(isRel?1:0))});
+      s+='<text class="gn-name" x="'+(x+13).toFixed(1)+'" y="'+(y+hh-8).toFixed(1)+'">'+esc(bx.name)+'</text>';
+      var meta=esc(wikiTypeLabel(n.type))+' · упом. '+fmt(n.mentions)+' · связ. '+fmt(Math.round(n.degree));
+      s+='<text class="gn-meta" x="'+(x+13).toFixed(1)+'" y="'+(y+hh+19).toFixed(1)+'">'+meta+'</text>';
     }
+    /* гнёзда: вход слева, выход справа — к ним цепляются нити */
+    s+='<circle class="gn-sock" cx="'+x.toFixed(1)+'" cy="'+n.y.toFixed(1)+'" r="3.4" stroke="'+col+'"/>';
+    s+='<circle class="gn-sock" cx="'+(x+w).toFixed(1)+'" cy="'+n.y.toFixed(1)+'" r="3.4" stroke="'+col+'"/>';
+    s+='</g>';
   });
 
-  /* Размещение подписей без пересечений: сначала приоритетные (главный,
-     окружение фокуса), затем остальные. Конфликтующие сдвигаются вверх/вниз,
-     без места — скрываются, кроме приоритетных. */
-  if(labelQueue.length){
-    labelQueue.sort(function(a,b){return b.pri-a.pri});
-    var placed=[];
-    labelQueue.forEach(function(L){
-      var w=L.text.length*5.6+6,h=11;
-      var x0=L.anchor==='start'?L.x:(L.anchor==='end'?L.x-w:L.x-w/2);
-      var box={x0:x0,y0:L.y-h,x1:x0+w,y1:L.y+3};
-      var cand=[[0,0],[0,-12],[0,12],[-w*0.6,0],[w*0.6,0]];
-      var ok=null;
-      for(var ci=0;ci<cand.length;ci++){
-        var b2={x0:box.x0+cand[ci][0],y0:box.y0+cand[ci][1],x1:box.x1+cand[ci][0],y1:box.y1+cand[ci][1]};
-        var hit=false;
-        for(var pi=0;pi<placed.length;pi++){
-          var p=placed[pi];
-          if(b2.x0<p.x1&&b2.x1>p.x0&&b2.y0<p.y1&&b2.y1>p.y0){hit=true;break}
-        }
-        if(!hit){ok=b2;break}
-      }
-      if(!ok&&L.pri<2)return;
-      var px=(ok||box);
-      placed.push(px);
-      var dx=px.x0-box.x0,dy=px.y0-box.y0;
-      if(dx||dy)s+='<g transform="translate('+dx.toFixed(1)+','+dy.toFixed(1)+')">';
-      s+='<text class="'+L.cls+'" x="'+L.x.toFixed(1)+'" y="'+L.y.toFixed(1)+'" text-anchor="'+L.anchor+'">'+esc(L.text)+'</text>';
-      if(dx||dy)s+='</g>';
-    });
+  /* подпись колонки одиночек в дереве: карточки без нитей стоят справа —
+     подпись объясняет, что связей у них просто нет */
+  if(graphState.mode==='tree'&&!focusId&&isoCount){
+    var capTop=1e9;
+    isoNodes.forEach(function(nd){var ib=boxOf[nd.id];if(nd.y-ib.h/2<capTop)capTop=nd.y-ib.h/2});
+    s+='<text class="gn-cap" x="'+isoNodes[0].x.toFixed(1)+'" y="'+Math.max(12,capTop-14).toFixed(1)+'" text-anchor="middle">без связей · '+isoCount+'</text>';
   }
 
   s+='</g>';
@@ -539,8 +836,10 @@ function paintGraph(){
     var hint=mk('span');hint.className='gp-legend-hint';
     if(focusId){
       hint.textContent='фокус на узле · двойной клик — сбросить';
+    }else if(showAll){
+      hint.textContent='вся паутина: '+visibleLinks.length+' '+(visibleLinks.length===1?'связь':(visibleLinks.length<5?'связи':'связей'))+' · главный — '+((d.nodes.find(function(x){return x.id===mainId})||{}).name||'—')+(isoCount?(' · без связей '+isoCount):'');
     }else{
-      hint.textContent=visibleLinks.length+' '+(visibleLinks.length===1?'связь':(visibleLinks.length<5?'связи':'связей'))+' от '+((d.nodes.find(function(x){return x.id===mainId})||{}).name||'главного');
+      hint.textContent=visibleLinks.length+' '+(visibleLinks.length===1?'связь':(visibleLinks.length<5?'связи':'связей'))+' от '+((d.nodes.find(function(x){return x.id===mainId})||{}).name||'главного')+(isoCount?(' · без связей '+isoCount):'');
     }
     legendHint.appendChild(hint);
   }
@@ -605,6 +904,9 @@ function renderGraphRank(){
   if(d.dropped){
     html+='<div class="wp-empty" style="margin-top:12px">'+fmt(d.dropped)+' '+plural(d.dropped,'статья','статьи','статей')+' вне видимой глубины или порога.</div>';
   }
+  if(d.isolated){
+    html+='<div class="wp-empty" style="margin-top:12px">'+fmt(d.isolated)+' '+plural(d.isolated,'статья','статьи','статей')+' без связей — показаны отдельно, без нитей.</div>';
+  }
   box.innerHTML=html;
   box.querySelectorAll('.gp-row[data-id]').forEach(function(row){
     row.addEventListener('click',function(){
@@ -612,9 +914,22 @@ function renderGraphRank(){
       if(!id)return;
       graphState.focusId=(graphState.focusId===id)?null:id;
       graphState.selectedId=id;
+      graphState.dimAnim=true;
       paintGraph();renderGraphRank();
     });
   });
+}
+/* «Структура книги» теперь выдвигается поверх карты (кнопка «структура»
+   в тулбаре): карта получает почти всю высоту окна, а список рангов
+   открывается по кнопке и не сжимает холст */
+function setGraphRankOpen(on){
+  graphState.rankOpen=!!on;
+  var box=$('#gpRank'),btn=$('#gpRankBtn');
+  if(box)box.classList.toggle('on',graphState.rankOpen);
+  if(btn){
+    btn.classList.toggle('on',graphState.rankOpen);
+    btn.setAttribute('aria-pressed',graphState.rankOpen?'true':'false');
+  }
 }
 
 function renderGraphTypeBar(){
@@ -647,24 +962,28 @@ function renderGraphTypeBar(){
 function buildAndRenderGraph(rebuild,keepView){
   var pane=$('#paneGraph');
   if(!pane||pane.hidden)return;
+  if(graphTipHide)graphTipHide();
   var box=$('#graphCanvas');
   var W=box.clientWidth|0,H=box.clientHeight|0;
   if(W<40||H<40){setTimeout(function(){buildAndRenderGraph(rebuild,keepView)},120);return}
+  /* старые позиции — чтобы узлы переехали на новые места плавно */
+  var oldPos={};
+  if(graphState.data)graphState.data.nodes.forEach(function(n){oldPos[n.id]={x:n.x,y:n.y}});
   var d=buildGraphData();
   graphState.data=d;
   graphState.W=W;graphState.H=H;
-  /* вид (зум/пан) сохраняем по умолчанию — не сбрасываем при рефлоу и
-     мелких перестройках; явный сброс — через keepView=true (fit/смена режима) */
-  if(keepView){graphState.zoom=1;graphState.panX=0;graphState.panY=0}
   if(graphState.mode!=='radial')graphState.rings=null;
   var svg=$('#graphSvg');
   if(!d.nodes.length){
+    cancelGraphTween();
     svg.innerHTML='';
     graphState.mainId=null;
     graphState.posCache={};
+    graphState.enter=false;graphState.dimAnim=false;
     renderGraphTypeBar();
     renderGraphLegend();
     renderGraphRank();
+    setGraphRankOpen(true);   /* пустая карта — открываем «структуру» с подсказкой */
     return;
   }
   graphState.mainId=d.mainId;
@@ -674,7 +993,9 @@ function buildAndRenderGraph(rebuild,keepView){
   }
   var nodes=d.nodes,links=d.links;
   if(rebuild){
-    if(graphState.mode==='radial')layoutRadial(nodes,links,W,H,graphState.mainId);
+    cancelGraphTween();
+    if(graphState.mode==='tree')layoutTree(nodes,links,W,H,graphState.mainId);
+    else if(graphState.mode==='radial')layoutRadial(nodes,links,W,H,graphState.mainId);
     else if(graphState.mode==='circle')layoutCircle(nodes,links,W,H,graphState.mainId);
     else layoutForce(nodes,links,W,H,graphState.mainId);
     /* запоминаем позиции закреплённых узлов для следующих перестроек */
@@ -682,21 +1003,71 @@ function buildAndRenderGraph(rebuild,keepView){
     nodes.forEach(function(nd){if(graphState.pinned[nd.id])pc[nd.id]={x:nd.x,y:nd.y}});
     graphState.posCache=pc;
   }
-  paintGraph();
+  /* Плавный переезд: узлы едут из старых позиций в новые (как переезд
+     рамок нод при смене раскладки), а не телепортируются */
+  var tweening=false;
+  if(rebuild&&!graphReduced()){
+    nodes.forEach(function(nd){
+      var o=oldPos[nd.id];
+      if(o&&!graphState.pinned[nd.id]&&(Math.abs(o.x-nd.x)>0.5||Math.abs(o.y-nd.y)>0.5)){
+        nd._fx=1;nd._sx=o.x;nd._sy=o.y;
+        nd._tx=nd.x;nd._ty=nd.y;
+        nd.x=o.x;nd.y=o.y;
+        tweening=true;
+      }else nd._fx=0;
+    });
+  }else{
+    nodes.forEach(function(nd){nd._fx=0});
+  }
+  graphState.enter=!!rebuild&&!tweening;
+  var wantFit=keepView||graphState.needFit;
+  graphState.needFit=false;
+  /* Тулбар, легенда и список рангов только что заняли своё место — от них
+     высота холста меняется. Если размер уплыл (на первом показе список
+     рангов «съедает» пол-панели), раскладываем заново на верную площадь
+     и только потом вписываем камеру — иначе вписывание считалось по
+     высоте без рангов и схема оказывалась обрезанной снизу. */
   renderGraphTypeBar();
   renderGraphLegend();
   renderGraphRank();
+  var W2=box.clientWidth|0,H2=box.clientHeight|0;
+  if(W2>=40&&H2>=40&&(Math.abs(W2-W)>2||Math.abs(H2-H)>2)){
+    W=W2;H=H2;
+    graphState.W=W;graphState.H=H;
+    if(graphState.mode==='tree')layoutTree(nodes,links,W,H,graphState.mainId);
+    else if(graphState.mode==='radial')layoutRadial(nodes,links,W,H,graphState.mainId);
+    else if(graphState.mode==='circle')layoutCircle(nodes,links,W,H,graphState.mainId);
+    else layoutForce(nodes,links,W,H,graphState.mainId);
+    var pc2={};
+    nodes.forEach(function(nd){if(graphState.pinned[nd.id])pc2[nd.id]={x:nd.x,y:nd.y}});
+    graphState.posCache=pc2;
+    if(tweening){
+      /* переезд уже начат — просто перенацеливаем узлы на новые места */
+      nodes.forEach(function(nd){
+        if(nd._fx){nd._tx=nd.x;nd._ty=nd.y;nd.x=nd._sx;nd.y=nd._sy}
+      });
+    }
+  }
+  /* камера: первый показ, кнопка «вписать» и смена режима — вписываем;
+     обычные перестройки вид не трогают (вид сохраняется по умолчанию) */
+  if(wantFit)graphFitTarget();
+  if(tweening)startGraphTween();
+  paintGraph();
 }
 function zoomBy(k){
   if(!graphState.data)return;
+  if(graphTipHide)graphTipHide();
   var W=graphState.W,H=graphState.H;
   var cx=W/2,cy=H/2;
-  var newZoom=Math.max(0.35,Math.min(3.2,graphState.zoom*k));
-  var kk=newZoom/graphState.zoom;
-  graphState.panX=cx-kk*(cx-graphState.panX);
-  graphState.panY=cy-kk*(cy-graphState.panY);
-  graphState.zoom=newZoom;
-  applyGraphTransform();
+  var z0=graphView.tZoom;
+  var z1=Math.max(0.3,Math.min(3.4,z0*k));
+  if(z1===z0)return;
+  var kk=z1/z0;
+  graphView.tPanX=cx-kk*(cx-graphView.tPanX);
+  graphView.tPanY=cy-kk*(cy-graphView.tPanY);
+  graphView.tZoom=z1;
+  graphView.vx=0;graphView.vy=0;
+  graphViewKick();
 }
 document.querySelectorAll('.gp-mode').forEach(function(b){
   b.addEventListener('click',function(){
@@ -720,6 +1091,17 @@ $('#gpPeople').addEventListener('click',function(){
   this.setAttribute('aria-pressed',graphState.people?'true':'false');
   buildAndRenderGraph(true);
 });
+/* «без связей» — одиночки на карте (по умолчанию показаны) */
+$('#gpOrphans').addEventListener('click',function(){
+  graphState.showOrphans=!graphState.showOrphans;
+  this.classList.toggle('on',graphState.showOrphans);
+  this.setAttribute('aria-pressed',graphState.showOrphans?'true':'false');
+  buildAndRenderGraph(true);
+});
+$('#gpOrphans').classList.add('on');
+$('#gpOrphans').setAttribute('aria-pressed','true');
+/* кнопка выдвижной «Структуры книги» */
+$('#gpRankBtn').addEventListener('click',function(){setGraphRankOpen(!graphState.rankOpen)});
 $('#gpLabels').addEventListener('click',function(){
   graphState.labels=!graphState.labels;
   this.classList.toggle('on',graphState.labels);
@@ -745,11 +1127,18 @@ $('#gpExport').addEventListener('click',function(){
   var V=svgVars();
   /* внешний файл не видит 06-graph.css — впрыскиваем стили явно */
   var st='<style>'+
-    'text{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;fill:'+V.ink3+';letter-spacing:.01em;paint-order:stroke;stroke:'+V.card+';stroke-width:3px;stroke-linejoin:round}'+
-    'text.gmain{fill:'+V.accent+';font-weight:600;font-size:12.5px}'+
-    'text.grel{fill:'+V.ink2+';font-weight:500}'+
+    '.gn-bg{fill:'+V.card+';stroke:'+V.line2+';stroke-width:1}'+
+    '.gn-name{font-family:Georgia,"Times New Roman",serif;font-size:12px;font-weight:600;fill:'+V.ink+'}'+
+    '.gnode.is-main .gn-name{fill:'+V.accent+'}'+
+    '.gn-meta{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:8.5px;letter-spacing:.04em;fill:'+V.ink3+'}'+
+    '.gn-cap{font-family:system-ui,"Segoe UI",sans-serif;font-size:9px;letter-spacing:.14em;text-transform:uppercase;fill:'+V.ink3+';opacity:.6}'+
+    '.gn-sep{stroke:'+V.line2+';stroke-width:1}'+
+    '.gn-sock{fill:'+V.card+';stroke-width:1.3}'+
+    '.gn-halo{fill:none;stroke:'+V.accent+';stroke-width:1.2;stroke-dasharray:3 4;opacity:.7}'+
+    '.gn-pinring{stroke:'+V.ink3+';stroke-dasharray:2 3;opacity:.55}'+
+    '.glink{fill:none}'+
     '.gp-ring{fill:none;stroke:'+V.line+';stroke-dasharray:2 5;opacity:.5}'+
-    '.gp-ring-label{font-size:8px;fill:'+V.ink3+';stroke:none;opacity:.6}'+
+    '.gp-ring-label{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:8px;fill:'+V.ink3+';opacity:.6}'+
     '</style>';
   clone.insertAdjacentHTML('afterbegin',st);
   /* фон-прямоугольник — style="background" часть вьюеры SVG игнорируют */
@@ -784,6 +1173,7 @@ $('#gpWeight').addEventListener('change',function(){
   if(!canvas||!svg)return;
   var drag=null,moved=false,startX=0,startY=0;
   var panning=false,px=0,py=0,startPanX=0,startPanY=0;
+  var panHist=[];               /* след пальца — для инерции после броска */
   var nodeTip=$('#gpNodeTip');
   var pointers={},pinch=null;   /* пинч-зум двумя пальцами */
 
@@ -793,24 +1183,55 @@ $('#gpWeight').addEventListener('change',function(){
     return null;
   }
 
-  function showNodeTip(n,clientX,clientY){
-    if(!n||!nodeTip)return;
-    var tp=wikiTypeLabel(n.type);
-    var col=wikiTypeColor(n.type);
-    nodeTip.innerHTML='<div class="nt-name"><span class="nt-dot" style="background:'+col+'"></span>'+esc(n.name)+'</div>'+
-      '<div class="nt-meta"><span>'+esc(tp)+'</span><span>· упом. <b>'+fmt(n.mentions)+'</b></span><span>· связей <b>'+fmt(Math.round(n.degree))+'</b></span></div>';
+  var nodeTipTimer=null,nodeTipId=null;
+  function positionNodeTip(clientX,clientY){
     var r=canvas.getBoundingClientRect();
     var x=clientX-r.left, y=clientY-r.top;
     x=Math.max(80,Math.min(r.width-80,x));
     y=Math.max(40,y);
     nodeTip.style.left=x+'px';
     nodeTip.style.top=(y-12)+'px';
+  }
+  function renderNodeTip(n,clientX,clientY){
+    if(!n||!nodeTip)return;
+    var tp=wikiTypeLabel(n.type);
+    var col=wikiTypeColor(n.type);
+    /* на мелком масштабе карточка крошечная — подсказка в одну строку,
+       вблизи показываем полную сводку */
+    var compact=graphState.zoom<0.78;
+    nodeTip.classList.toggle('compact',compact);
+    nodeTip.innerHTML=compact
+      ? '<div class="nt-name"><span class="nt-dot" style="background:'+col+'"></span>'+esc(n.name)+'<span class="nt-type">'+esc(tp)+'</span></div>'
+      : '<div class="nt-name"><span class="nt-dot" style="background:'+col+'"></span>'+esc(n.name)+'</div>'+
+        '<div class="nt-meta"><span>'+esc(tp)+'</span><span>· упом. <b>'+fmt(n.mentions)+'</b></span><span>· связей <b>'+fmt(Math.round(n.degree))+'</b></span></div>';
+    positionNodeTip(clientX,clientY);
     nodeTip.classList.add('on');
   }
-  function hideNodeTip(){if(nodeTip)nodeTip.classList.remove('on')}
+  function hideNodeTip(){
+    if(nodeTipTimer){clearTimeout(nodeTipTimer);nodeTipTimer=null}
+    nodeTipId=null;
+    if(nodeTip)nodeTip.classList.remove('on');
+  }
+  graphTipHide=hideNodeTip;
+  /* подсказка не «выпрыгивает» при каждом проносе мыши — ждёт паузу */
+  function hoverNodeTip(n,clientX,clientY){
+    if(!nodeTip)return;
+    if(nodeTipId===n.id){
+      if(nodeTip.classList.contains('on'))positionNodeTip(clientX,clientY);
+      return;
+    }
+    nodeTipId=n.id;
+    if(nodeTipTimer)clearTimeout(nodeTipTimer);
+    nodeTipTimer=setTimeout(function(){
+      nodeTipTimer=null;
+      if(nodeTipId===n.id)renderNodeTip(n,clientX,clientY);
+    },180);
+  }
 
   svg.addEventListener('pointerdown',function(e){
-    /* новый жест — гасим непросроченное отложенное открытие статьи */
+    /* новый жест — гасим непросроченное отложенное открытие статьи
+       и прячем подсказку узла */
+    hideNodeTip();
     if(graphOpenTimer){clearTimeout(graphOpenTimer);graphOpenTimer=null}
     pointers[e.pointerId]={x:e.clientX,y:e.clientY};
     var ids=Object.keys(pointers);
@@ -830,10 +1251,12 @@ $('#gpWeight').addEventListener('change',function(){
       return;
     }
     if(pinch)return;
-    var c=e.target.closest?e.target.closest('circle.gnode'):null;
+    var c=e.target.closest?e.target.closest('.gnode'):null;
     if(!c){
       panning=true;px=e.clientX;py=e.clientY;
       startPanX=graphState.panX;startPanY=graphState.panY;
+      panHist.length=0;
+      graphViewSync();
       canvas.classList.add('panning');
       try{svg.setPointerCapture(e.pointerId)}catch(err){}
       e.preventDefault();
@@ -842,6 +1265,9 @@ $('#gpWeight').addEventListener('change',function(){
     var id=c.getAttribute('data-id');
     var n=findNode(id);
     if(!n)return;
+    /* узел схвачен — мгновенно доводим камеру и переезд, чтобы не спорили */
+    cancelGraphTween();
+    graphViewSync();
     drag=n;moved=false;startX=e.clientX;startY=e.clientY;
     canvas.classList.add('dragging');
     try{svg.setPointerCapture(e.pointerId)}catch(err){}
@@ -861,20 +1287,25 @@ $('#gpWeight').addEventListener('change',function(){
       graphState.zoom=newZoom;
       graphState.panX=(mx-rect.left)-kk*((pinch.mx-rect.left)-pinch.panX0);
       graphState.panY=(my-rect.top)-kk*((pinch.my-rect.top)-pinch.panY0);
+      graphViewSync();
       applyGraphTransform();
       return;
     }
     if(panning){
       graphState.panX=startPanX+(e.clientX-px);
       graphState.panY=startPanY+(e.clientY-py);
+      graphViewSync();
+      var nowP=performance.now();
+      panHist.push({t:nowP,x:graphState.panX,y:graphState.panY});
+      if(panHist.length>5)panHist.shift();
       applyGraphTransform();
       return;
     }
     if(!drag){
-      var c=e.target.closest?e.target.closest('circle.gnode'):null;
+      var c=e.target.closest?e.target.closest('.gnode'):null;
       if(c){
         var n=findNode(c.getAttribute('data-id'));
-        if(n)showNodeTip(n,e.clientX,e.clientY);
+        if(n)hoverNodeTip(n,e.clientX,e.clientY);
       } else hideNodeTip();
       return;
     }
@@ -905,6 +1336,7 @@ $('#gpWeight').addEventListener('change',function(){
         var p=pointers[remain[0]];
         panning=true;px=p.x;py=p.y;
         startPanX=graphState.panX;startPanY=graphState.panY;
+        panHist.length=0;
         canvas.classList.add('panning');
       }
       return;
@@ -912,6 +1344,21 @@ $('#gpWeight').addEventListener('change',function(){
     if(panning){
       panning=false;
       canvas.classList.remove('panning');
+      hideNodeTip();
+      /* инерция: отпустили на ходу — камера ещё немного скользит */
+      if(panHist.length>1&&!graphReduced()){
+        var a0=panHist[0],a1=panHist[panHist.length-1];
+        var dt0=Math.max(1,a1.t-a0.t);
+        var vx=(a1.x-a0.x)/dt0,vy=(a1.y-a0.y)/dt0;
+        var sp=Math.sqrt(vx*vx+vy*vy);
+        if(sp>0.25){
+          var cap=1.5;
+          if(sp>cap){vx*=cap/sp;vy*=cap/sp}
+          graphView.vx=vx;graphView.vy=vy;
+          graphViewKick();
+        }
+      }
+      panHist.length=0;
       return;
     }
     if(!drag)return;
@@ -930,6 +1377,7 @@ $('#gpWeight').addEventListener('change',function(){
       if(isDbl){
         graphState.lastClickId=null;graphState.lastClickTime=0;
         graphState.focusId=(graphState.focusId===id)?null:id;
+        graphState.dimAnim=true;
         paintGraph();renderGraphRank();
       }else{
         graphState.lastClickId=id;graphState.lastClickTime=now;
@@ -956,31 +1404,27 @@ $('#gpWeight').addEventListener('change',function(){
   svg.addEventListener('dblclick',function(e){
     /* фокус по второму клику обрабатывается в pointerup по таймингу —
        здесь только фон: двойной клик по пустому месту сбрасывает фокус */
-    if(e.target.closest&&e.target.closest('circle.gnode'))return;
+    if(e.target.closest&&e.target.closest('.gnode'))return;
     clearTimeout(graphOpenTimer);graphOpenTimer=null;
-    if(graphState.focusId){graphState.focusId=null;paintGraph();renderGraphRank();}
+    if(graphState.focusId){graphState.focusId=null;graphState.dimAnim=true;paintGraph();renderGraphRank();}
   });
 
   canvas.addEventListener('wheel',function(e){
     if(!graphState.data)return;
     e.preventDefault();
+    hideNodeTip();
+    var dy=e.deltaY;
+    if(e.deltaMode===1)dy*=33;             /* строки/страницы → пиксели */
+    dy=Math.max(-500,Math.min(500,dy));
     var rect=svg.getBoundingClientRect();
     var mx=e.clientX-rect.left,my=e.clientY-rect.top;
-    var oldZoom=graphState.zoom;
-    var k=e.deltaY<0?1.15:1/1.15;
-    var newZoom=Math.max(0.35,Math.min(3.2,oldZoom*k));
-    if(newZoom===oldZoom)return;
-    var kk=newZoom/oldZoom;
-    graphState.panX=mx-kk*(mx-graphState.panX);
-    graphState.panY=my-kk*(my-graphState.panY);
-    graphState.zoom=newZoom;
-    applyGraphTransform();
+    /* экспонента мягче линейного шага: тачпады и колёса ведут себя ровно */
+    graphWheelZoom(mx,my,Math.exp(-dy*0.0017));
   },{passive:false});
 
   $('#gpZoomIn').addEventListener('click',function(){zoomBy(1.25)});
   $('#gpZoomOut').addEventListener('click',function(){zoomBy(1/1.25)});
   $('#gpFit').addEventListener('click',function(){
-    graphState.zoom=1;graphState.panX=0;graphState.panY=0;
     graphState.focusId=null;
     graphState.pinned={};
     graphState.posCache={};

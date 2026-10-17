@@ -80,7 +80,7 @@
 #toast.on{opacity:1;visibility:visible;transform:translateX(-50%)}
 @media print{
   body{background:#fff;color:#000;overflow:visible;-webkit-print-color-adjust:exact}
-  body::after,body::before,#topbar,#statusbar,aside,#scroller,#selbar,#synbar,#blockmenu,#zenpill,#micPill,#veil,#wikiPanel,#spResults,#wikiViewModal,#wikiModal,#dayModal,#edRz,#bookView,.stats-panel,#markTip,#marksRail,#authScreen,#accMenu{display:none!important}
+  body::after,body::before,#topbar,#statusbar,aside,#scroller,#selbar,#synbar,#blockmenu,#zenpill,#micPill,#muPill,#veil,#wikiPanel,#spResults,#wikiViewModal,#wikiModal,#dayModal,#musicModal,#edRz,#bookView,.stats-panel,#markTip,#marksRail,#authScreen,#accMenu{display:none!important}
   .cover{box-shadow:none;break-inside:avoid}
   .lib-body{padding:20px}
   .shelf{gap:14px}

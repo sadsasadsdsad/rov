@@ -132,8 +132,33 @@ function openWikiView(id){
   }
   $('#wvEdit').onclick=function(){closeWikiView();setTimeout(function(){openWikiModal(id)},200)};
   $('#wikiViewModal').classList.add('on');
+  /* без карточек (.wv-col) — прокрутка страницы отключена: «когда карточек
+     нет то и прокрутка работать не должна» (цитаты-список .wv-single —
+     не карточки, листать нечего) */
+  var inner=document.querySelector('.wv-inner');
+  inner.classList.toggle('no-scroll',!box.querySelectorAll('.wv-col').length);
+  /* новая статья — всегда с верха: сбрасываем прокрутку и отложенную цель
+     колеса, иначе остаётся позиция предыдущей статьи */
+  swCancel(inner);
+  inner.scrollTop=0;
+  requestAnimationFrame(fitWvRel);
 }
-function closeWikiView(){$('#wikiViewModal').classList.remove('on')}
+/* слой связей — на всю высоту прокручиваемой страницы модалки (пилюли
+   распределены по всей статье, а не по первому экрану); на узком экране
+   (#wvRel статичный) высота сбрасывается в auto */
+function fitWvRel(){
+  var rb=$('#wvRel'),inner=rb&&rb.parentNode;
+  if(!rb||!inner)return;
+  rb.style.height=(getComputedStyle(rb).position==='absolute')?(inner.scrollHeight+'px'):'';
+}
+window.addEventListener('resize',function(){
+  if($('#wikiViewModal').classList.contains('on'))fitWvRel();
+});
+function closeWikiView(){
+  var inner=document.querySelector('.wv-inner');
+  if(inner)swCancel(inner);          /* закрыли — анимация колеса не должна доезжать */
+  $('#wikiViewModal').classList.remove('on');
+}
 $('#wvClose').addEventListener('click',closeWikiView);
 $('#wvCloseBtn').addEventListener('click',closeWikiView);
 $('#wikiViewModal').addEventListener('click',function(e){if(e.target===this)closeWikiView()});
@@ -141,4 +166,52 @@ function bindFade(el){
   var upd=function(){el.classList.toggle('f-top',el.scrollTop>4);el.classList.toggle('f-bot',el.scrollTop+el.clientHeight<el.scrollHeight-4)};
   el.addEventListener('scroll',upd,{passive:true});upd();return upd;
 }
+/* ── Плавная прокрутка колесом (просьба: «сделай всё плавнее») ─────────────
+   Колесо/пальцевой жест НЕ скроллит нативно: цель = текущая позиция + дельта,
+   rAF-лерп догоняет её за ~0.18 кадра. Скроллится ближайший скроллable по
+   направлению: сначала карточка цитат, у её предела — страница модалки. */
+var swTrack=[],swRaf=0;
+function swStep(){
+  swRaf=0;
+  for(var i=0;i<swTrack.length;i++){
+    var t=swTrack[i],d=t.target-t.el.scrollTop;
+    if(Math.abs(d)<0.5){t.el.scrollTop=t.target;swTrack.splice(i,1);i--;continue}
+    t.el.scrollTop+=d*0.18;
+  }
+  if(swTrack.length)swRaf=requestAnimationFrame(swStep);
+}
+/* отменить отложенную прокрутку элемента (смена/закрытие статьи) */
+function swCancel(el){
+  for(var i=swTrack.length-1;i>=0;i--)if(swTrack[i].el===el)swTrack.splice(i,1);
+}
+function swTo(el,target){
+  var t=null;
+  for(var i=0;i<swTrack.length;i++)if(swTrack[i].el===el){t=swTrack[i];break}
+  if(!t){t={el:el,target:target};swTrack.push(t)}else t.target=target;
+  if(!swRaf)swRaf=requestAnimationFrame(swStep);
+}
+function swPos(el){
+  for(var i=0;i<swTrack.length;i++)if(swTrack[i].el===el)return swTrack[i].target;
+  return el.scrollTop;
+}
+$('#wikiViewModal').addEventListener('wheel',function(e){
+  if(e.ctrlKey||e.defaultPrevented)return;
+  var dy=e.deltaY;
+  if(!dy)return;
+  if(e.deltaMode===1)dy*=16;
+  else if(e.deltaMode===2)dy*=this.clientHeight*0.9;
+  var el=e.target;
+  while(el&&el!==this){
+    if(el.scrollHeight>el.clientHeight+1&&getComputedStyle(el).overflowY!=='hidden'){
+      var max=el.scrollHeight-el.clientHeight;
+      var cur=swPos(el);
+      if((dy>0&&cur<max-0.5)||(dy<0&&cur>0.5)){
+        e.preventDefault();
+        swTo(el,Math.max(0,Math.min(max,cur+dy)));
+        return;
+      }
+    }
+    el=el.parentElement;
+  }
+},{passive:false});
 

@@ -45,6 +45,7 @@
   body.reader #blockmenu,
   body.reader #zenpill,
   body.reader #micPill,
+  body.reader #muPill,
   body.reader #spResults,
   body.reader #exportMenu,
   body.reader #wikiPanel{display:none!important}

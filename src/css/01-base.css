@@ -113,3 +113,22 @@ input::placeholder,textarea::placeholder{color:var(--ink3)}
 
 h1{text-wrap:balance}
 .bv-stats,.lib-stats,#totalWords,.ch .wc{font-variant-numeric:tabular-nums}
+
+/* Смена больших экранов (полка → книга → редактор) — мягкая проявка.
+   Только opacity: не создаёт containing block для position:fixed внутри
+   и дёшево для отрисовки; анимация сама перезапускается, когда элемент
+   перестаёт быть [hidden] */
+#library:not([hidden]),#bookView:not([hidden]),#workspace:not([hidden]){animation:viewFadeIn .34s cubic-bezier(.2,.7,.2,1) both}
+@keyframes viewFadeIn{from{opacity:0}to{opacity:1}}
+
+/* Системная настройка «уменьшить движение»: движения почти нет — экраны
+   и панели получают мгновенные состояния вместо анимаций */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms!important;
+    animation-delay:0ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;
+    transition-delay:0ms!important;
+  }
+}

@@ -8,13 +8,14 @@
               порядок подключения = порядок каскада оригинала;
     <body>  — библиотека (+ вкладки «Мои книги»/«Общие книги»), карточка
               книги (+ блок «Доступ»), рабочая область, модалки, авторизация;
-    перед </body> — 22 последовательных классических <script src="js/NN-*.js">
+    перед </body> — 23 последовательных классических <script src="js/NN-*.js">
               (строгий режим в каждом, подключаются строго по номеру):
               01-ядро … 15-редактор, 16-аккаунты, 17-boot, 18-voice,
               19-mobile-reader — читалка ≤880px, 20-sync — серверная
               синхронизация, 21-shared — чужие книги (только чтение),
               доступ и hash-роут #/read/, 22-assistant — ИИ-ассистент
-              (чат по книге, исправление/улучшение выделения).
+              (чат по книге, исправление/улучшение выделения),
+              23-music — окно музыки (бесконечная мелодия, Web Audio).
 
   Добавлено относительно src: #btnVoice/#micPill (голосовой ввод),
   <div id="veil"> перенесён внутрь #workspace, js/18-voice.js,
@@ -100,9 +101,6 @@
   <header class="lib-top">
     <div class="brand"><span class="dia"></span><b>ЧЕРНОВИК</b><small>для книг</small></div>
     <div class="lib-actions">
-      <button class="ibtn ai-tb ai-open" id="aiFabLib" type="button" title="Спросить ИИ" aria-label="Спросить ИИ" aria-expanded="false" aria-controls="aiPanel">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg>
-      </button>
       <button class="acc-btn" type="button" title="Аккаунт" aria-label="Меню аккаунта" aria-haspopup="menu" aria-expanded="false"><span class="ava">?</span><span class="nm"></span></button>
       <button class="ibtn" id="btnBackup" title="Резервная копия: скачать все книги">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
@@ -271,6 +269,9 @@
         <button class="ibtn" id="btnVoice" title="Диктовка голосом · Ctrl+Alt+R" aria-pressed="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9.3" y="3" width="5.4" height="11" rx="2.7"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/></svg>
         </button>
+        <button class="ibtn ms-open" id="btnMusic" type="button" title="Музыка — бесконечная мелодия" aria-label="Музыка" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17.5V5.2l10-2v12.3"/><ellipse cx="6.5" cy="17.5" rx="2.5" ry="2.2"/><ellipse cx="16.5" cy="15.5" rx="2.5" ry="2.2"/></svg>
+        </button>
         <button class="ibtn" id="btnZen" title="Режим фокуса">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>
         </button>
@@ -337,20 +338,11 @@
 
   <div class="wp-pane" id="paneGraph" hidden>
     <div class="gp-bar">
-      <button class="gp-mode on" data-mode="radial">Радиальная</button>
+      <button class="gp-mode on" data-mode="tree">Ноды</button>
+      <button class="gp-mode" data-mode="radial">Радиальная</button>
       <button class="gp-mode" data-mode="circle">Круг</button>
       <button class="gp-mode" data-mode="force">Силы</button>
-      <span class="gp-sp"></span>
-      <button class="gp-toggle" id="gpLabels">подписи</button>
-      <button class="gp-toggle" id="gpPeople">только персонажи</button>
-      <button class="sibtn" id="gpRebuild" title="Пересобрать схему">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.6"/><path d="M20 5v6h-6"/></svg>
-      </button>
-      <button class="sibtn" id="gpExport" title="Скачать схему SVG">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
-      </button>
-    </div>
-    <div class="gp-sliders">
+      <!-- слайдеры живут в тулбаре: карта получает почти всю высоту окна -->
       <label class="gp-slider" title="Сколько шагов от главного узла показывать">
         <span>Глубина</span>
         <input type="range" id="gpDepth" min="1" max="4" step="1" value="2">
@@ -361,6 +353,17 @@
         <input type="range" id="gpWeight" min="1" max="10" step="1" value="1">
         <span class="gp-val" id="gpWeightVal">1</span>
       </label>
+      <span class="gp-sp"></span>
+      <button class="gp-toggle" id="gpLabels">подписи</button>
+      <button class="gp-toggle" id="gpPeople">только персонажи</button>
+      <button class="gp-toggle on" id="gpOrphans" title="Статьи, которые в тексте ни с кем рядом не встречались">без связей</button>
+      <button class="gp-toggle" id="gpRankBtn" aria-pressed="false" title="Структура книги">структура</button>
+      <button class="sibtn" id="gpRebuild" title="Пересобрать схему">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.6"/><path d="M20 5v6h-6"/></svg>
+      </button>
+      <button class="sibtn" id="gpExport" title="Скачать схему SVG">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+      </button>
     </div>
     <div class="gp-typebar" id="gpTypes"></div>
     <div class="wp-body" id="gpBody">
@@ -616,6 +619,51 @@
   </div>
 </div>
 
+<div id="musicModal" role="dialog" aria-modal="true" aria-labelledby="msTitle">
+  <div class="ms-card">
+    <div class="ms-head">
+      <span class="wv-dia"></span>
+      <b id="msTitle">Музыка</b>
+      <i class="ms-sub">бесконечные мелодии — спокойные, без слов</i>
+      <span class="ms-rule" aria-hidden="true"></span>
+      <button class="sibtn" id="msClose" title="Свернуть (музыка продолжит играть)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="ms-body">
+      <div class="ms-field" id="msField" role="listbox" aria-label="Выбор мелодии"></div>
+    </div>
+    <div class="ms-bottom">
+      <button class="ms-play" id="msPlay" type="button" aria-pressed="false" title="Играть">
+        <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.4v13.2c0 .8.9 1.3 1.6.9l10.2-6.6c.6-.4.6-1.4 0-1.8L9.6 4.5c-.7-.4-1.6.1-1.6.9z"/></svg>
+        <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><rect x="7" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.2"/></svg>
+      </button>
+      <label class="ms-vol">
+        <span class="lbl">Громкость</span>
+        <span class="ms-scale">
+          <input id="msVol" type="range" min="0" max="100" value="55" aria-label="Громкость">
+          <span class="ms-ticks" aria-hidden="true"></span>
+        </span>
+      </label>
+      <div class="ms-now" aria-live="polite">
+        <b id="msNow">Музыка</b>
+        <i id="msNowMood">бесконечные мелодии</i>
+      </div>
+    </div>
+    <div class="ms-foot">
+      <span class="ms-hint">панель можно свернуть — мелодия не остановится</span>
+      <button class="m-btn" id="msStop">ОСТАНОВИТЬ</button>
+    </div>
+  </div>
+</div>
+
+<div id="muPill" role="button" tabindex="0" aria-label="Музыка играет — открыть окно музыки">
+  <span class="mu-dia" aria-hidden="true"></span>
+  <b class="mu-name" id="muPillName">Музыка</b>
+  <button class="mu-pp" id="muPillBtn" type="button" title="Пауза" aria-label="Пауза">
+    <svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.2"/></svg>
+    <svg class="ic-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none"><path d="M8 5.4v13.2c0 .8.9 1.3 1.6.9l10.2-6.6c.6-.4.6-1.4 0-1.8L9.6 4.5c-.7-.4-1.6.1-1.6.9z"/></svg>
+  </button>
+</div>
+
 <div id="selbar">
   <div class="sb-row">
     <button data-cmd="bold" title="Жирный · Ctrl+B"><b>Ж</b></button>
@@ -670,5 +718,6 @@
 <script src="js/20-sync.js?v=27"></script>
 <script src="js/21-shared.js?v=27"></script>
 <script src="js/22-assistant.js?v=27"></script>
+<script src="js/23-music.js?v=27"></script>
 </body>
 </html>
