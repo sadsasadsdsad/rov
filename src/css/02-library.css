@@ -32,6 +32,9 @@
 .chart-svg .ser-line{fill:none;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round;opacity:0;animation:chartDrawIn .6s ease forwards;transition:opacity .15s,stroke-width .15s}
 .chart-svg .ser-line.is-active{stroke-width:2.2}
 .chart-svg .ser-line.is-dim{opacity:.18!important}
+/* заливка под линией — очень лёгкая: области не спорят с линиями */
+.chart-svg .ser-area{fill-opacity:.05;stroke:none;opacity:0;animation:chartDrawIn .6s ease forwards;transition:fill-opacity .15s}
+.chart-svg .ser-area.is-active{fill-opacity:.085}
 @keyframes chartDrawIn{from{opacity:0}to{opacity:1}}
 .chart-crosshair{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:0;pointer-events:none;transform:translateX(-.5px);transition:opacity .12s}
 .chart-crosshair.on{opacity:.7}
@@ -164,7 +167,7 @@ body.zen #marksRail{opacity:0!important;visibility:hidden!important}
 .lib-foot .path{display:inline-block;margin-top:8px;font-size:9px;letter-spacing:.12em;color:var(--ink3);text-transform:none;font-family:var(--f-ui)}
 .lib-foot .path code{background:var(--hover);border:1px solid var(--line2);border-radius:4px;padding:1px 6px;color:var(--ink2)}
 #restoreInput{display:none}
-.cover{position:relative;display:flex;flex-direction:column;text-align:left;background:var(--card);border:1px solid var(--line2);border-radius:3px var(--r-lg) var(--r-lg) 3px;overflow:hidden;padding:20px 18px 16px 28px;min-height:258px;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .3s;content-visibility:auto;contain-intrinsic-size:auto 258px}
+.cover{position:relative;display:flex;flex-direction:column;text-align:left;background:var(--card);border:1px solid var(--line2);border-radius:3px var(--r-lg) var(--r-lg) 3px;overflow:hidden;padding:16px 18px 15px 28px;min-height:246px;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s,border-color .3s;content-visibility:auto;contain-intrinsic-size:auto 246px}
 .cover::before{content:"";position:absolute;left:0;top:0;bottom:0;width:7px;background:linear-gradient(90deg,rgba(0,0,0,.22),transparent 45%),var(--c,var(--accent));transition:width .3s}
 .cover::after{content:"";position:absolute;left:12px;top:9px;bottom:9px;width:1px;background:var(--line2)}
 .cover:hover{transform:translateY(-4px);box-shadow:0 18px 38px -18px rgba(25,23,18,.45),var(--shadow-sm)}
@@ -172,21 +175,31 @@ body.zen #marksRail{opacity:0!important;visibility:hidden!important}
 .cover .cv-title{transition:color .25s}
 .cover:hover .cv-title{color:var(--accent)}
 .cover.boot{animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
-.cv-top{display:flex;align-items:center;justify-content:space-between;position:relative}
+.cv-top{display:flex;align-items:center;gap:8px;position:relative}
+/* объём книги — в правом верхнем углу: верх карточки не пустует, а при
+   наведении на его место выезжают инструменты (кнопки переименовать/удалить) */
+.cv-words{margin-left:auto;font-family:var(--f-ui);font-size:9.5px;color:var(--ink3);letter-spacing:.02em;white-space:nowrap;transition:opacity .18s}
+.cover:hover .cv-words,.cover:focus-within .cv-words{opacity:0}
 .cv-dia{width:9px;height:9px;background:var(--c,var(--accent));transform:rotate(45deg)}
-.cv-tools{display:flex;gap:4px;opacity:0;transition:opacity .2s}
+.cv-tools{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;gap:4px;opacity:0;transition:opacity .2s}
 .cover:hover .cv-tools,.cover:focus-within .cv-tools{opacity:1}
 .cv-tools button{width:24px;height:24px;padding:0;display:grid;place-items:center;color:var(--ink3);background:transparent;border:0;transition:color .15s;line-height:1}
 .cv-tools button:hover{color:var(--accent)}
 .cv-tools svg{width:13px;height:13px;display:block}
-.cv-title{font-weight:600;font-size:19px;line-height:1.32;margin-top:15px;position:relative;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance}
+.cv-title{font-weight:600;font-size:19px;line-height:1.32;margin-top:12px;position:relative;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance}
 .cv-author{display:block;font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-top:7px;position:relative;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cv-author[hidden]{display:none}
-.cv-rule{width:26px;height:2px;background:var(--c,var(--accent));margin-top:12px;margin-bottom:13px;position:relative}
-.cv-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-family:var(--f-ui);font-size:9.5px;color:var(--ink2);letter-spacing:.02em;position:relative;margin-top:auto;padding-top:14px}
-.cv-meta>span,.cv-time>span{white-space:nowrap}
+.cv-rule{width:26px;height:2px;background:var(--c,var(--accent));margin-top:10px;margin-bottom:12px;position:relative}
+/* первая строка рукописи на обложке: пустовавшая середина карточки
+   заполняется живым текстом книги (до трёх строк, с многоточием) */
+.cv-exc{font-family:var(--f-serif);font-style:italic;font-size:12.5px;line-height:1.62;color:var(--ink3);margin-top:2px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;position:relative;transition:color .25s}
+.cover:hover .cv-exc{color:var(--ink2)}
+
 .cv-dot{width:3px;height:3px;background:var(--ink3);transform:rotate(45deg);flex:0 0 auto}
-.cv-time{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-family:var(--f-ui);font-size:9px;color:var(--ink3);margin-top:7px;position:relative}
+/* нижняя строка обложки: структура и возраст рукописи; держится у нижнего
+   края и отделена пунктиром — низ и верх карточки уравновешены */
+.cv-time{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-family:var(--f-ui);font-size:9px;color:var(--ink3);margin-top:auto;padding-top:12px;border-top:1px dashed var(--line2);position:relative}
+.cv-time>span{white-space:nowrap}
 .cover.new{border:1.5px dashed var(--line);background:transparent;box-shadow:none;align-items:center;justify-content:center;gap:8px;color:var(--ink3)}
 .cover.new::before,.cover.new::after{display:none}
 .cover.new:hover{border-color:var(--accent);color:var(--accent);background:var(--sel)}

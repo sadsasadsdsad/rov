@@ -84,6 +84,7 @@ function renderStats(){
   }
   var avg=Math.round(monthAll/N);
   $('#statsToday').textContent=fmt(todayAll);
+  $('#statsTodayUnit').textContent=plural(todayAll,'слово','слова','слов');
   $('#statsWeek').textContent=fmt(weekAll);
   $('#stats30').textContent=fmt(monthAll);
   $('#statsAvg').textContent=fmt(avg);
@@ -106,13 +107,22 @@ function renderStats(){
     }
     var d='M '+pts[0].x.toFixed(2)+' '+pts[0].y.toFixed(2);
     for(var i=1;i<pts.length;i++)d+=' L '+pts[i].x.toFixed(2)+' '+pts[i].y.toFixed(2);
+    /* мягкая заливка под линией: панель статистики читается «областями»,
+       а не одинокими нитками; включается/скрывается вместе с линией */
+    var baseY=(padTop+plotH).toFixed(2);
+    var area=document.createElementNS('http://www.w3.org/2000/svg','path');
+    area.setAttribute('class','ser-area'+(ser.book.id===state.activeBookId?' is-active':''));
+    area.setAttribute('d',d+' L '+W.toFixed(2)+' '+baseY+' L 0 '+baseY+' Z');
+    area.setAttribute('fill',color);
+    ser.areaEl=area;
+    svgLines.appendChild(area);
     var line=document.createElementNS('http://www.w3.org/2000/svg','path');
     line.setAttribute('class','ser-line'+(ser.book.id===state.activeBookId?' is-active':''));
     line.setAttribute('d',d);line.setAttribute('stroke',color);
     ser.lineEl=line;ser.color=color;
     ser.W=W;ser.H=H;ser.padTop=padTop;ser.plotH=plotH;
     svgLines.appendChild(line);
-    if(ser.hidden)line.style.display='none';
+    if(ser.hidden){line.style.display='none';area.style.display='none'}
   });
   if(legend){
     legend.innerHTML='';
@@ -130,6 +140,7 @@ function renderStats(){
           chartHidden[ser.book.id]=ser.hidden;   /* помним выбор до следующей перерисовки */
           item.classList.toggle('off',ser.hidden);
           if(ser.lineEl)ser.lineEl.style.display=ser.hidden?'none':'';
+          if(ser.areaEl)ser.areaEl.style.display=ser.hidden?'none':'';
         });
         legend.appendChild(item);
       });

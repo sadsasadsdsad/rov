@@ -20,6 +20,8 @@
   /* ===== библиотека: только полка, без статистики и мишуры ===== */
   .stats-panel{display:none}
   .cv-tools{display:none}
+  /* кнопок нет — объём книги виден всегда */
+  .cover:hover .cv-words,.cover:focus-within .cv-words{opacity:1}
   .cover.new{display:none}
   .lib-foot .path{display:none}
   .lib-body{padding:26px 18px 56px}

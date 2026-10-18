@@ -265,9 +265,15 @@ var sharedReq=0;
 function setLibTab(t){
   libTab=(t==='shared')?'shared':'mine';
   var tabs=$('#libTabs');
-  if(tabs)tabs.querySelectorAll('button').forEach(function(b){
-    b.classList.toggle('on',(b.getAttribute('data-t')||'')===libTab);
-  });
+  if(tabs){
+    /* data-tab двигает подложку-сегмент (см. .lib-tabs в 11-access.css) */
+    tabs.setAttribute('data-tab',libTab);
+    tabs.querySelectorAll('button').forEach(function(b){
+      var on=(b.getAttribute('data-t')||'')===libTab;
+      b.classList.toggle('on',on);
+      b.setAttribute('aria-pressed',on?'true':'false');
+    });
+  }
   var box=$('#sharedBox'),shelf=$('#shelf');
   if(box)box.hidden=(libTab!=='shared');
   if(shelf)shelf.hidden=(libTab==='shared');
@@ -291,15 +297,20 @@ function discoverShared(q){
         return;
       }
       box.innerHTML='';
-      list.forEach(function(it){
+      list.forEach(function(it,ix){
         var c=document.createElement('div');
         c.className='shared-card';
+        c.style.setProperty('--i',ix);   /* лёгкий шаг появления карточек */
         c.setAttribute('role','button');
         c.setAttribute('tabindex','0');
+        var dia=document.createElement('span');dia.className='cv-dia';
         var st=document.createElement('div');st.className='st';st.textContent=it.title||'';
         var sa=document.createElement('div');sa.className='sa';sa.textContent=it.author||'';
+        var sf=document.createElement('div');sf.className='sf';
         var sd=document.createElement('div');sd.className='sd';sd.textContent=timeAgo(it.updated)||'';
-        c.appendChild(st);c.appendChild(sa);c.appendChild(sd);
+        var so=document.createElement('span');so.className='so';so.textContent='открыть →';
+        sf.appendChild(sd);sf.appendChild(so);
+        c.appendChild(dia);c.appendChild(st);c.appendChild(sa);c.appendChild(sf);
         var open=function(){openSharedBook(it.id,null)};
         c.addEventListener('click',open);
         c.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});

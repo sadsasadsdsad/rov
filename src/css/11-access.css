@@ -8,65 +8,96 @@
  * Зависимости: 01-base (токены), подключается после 10-shared.
  * ========================================================================== */
 
-/* ===== вкладки библиотеки: «Мои книги» / «Общие книги» ===== */
+/* ===== вкладки библиотеки: «Мои книги» / «Общие книги» =====
+   один «сегмент»: две равные половины, подложка сама переезжает под
+   активную вкладку (#libTabs[data-tab], ставит setLibTab в 21-shared.js) */
 .lib-tabs{
-  display:flex;gap:6px;margin-top:28px;
+  position:relative;display:grid;grid-template-columns:1fr 1fr;
+  width:max-content;max-width:100%;margin-top:28px;padding:3px;
+  background:var(--card);border:1px solid var(--line2);border-radius:999px;
+  box-shadow:var(--shadow-sm);
 }
+.lib-tabs::before{
+  content:'';position:absolute;top:3px;bottom:3px;left:3px;
+  width:calc(50% - 3px);border-radius:999px;background:var(--sel);
+  transition:transform .3s cubic-bezier(.2,.7,.2,1);
+}
+.lib-tabs[data-tab="shared"]::before{transform:translateX(100%)}
 .lib-tabs button{
+  position:relative;z-index:1;
   font-family:var(--f-ui);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--ink2);background:transparent;border:1px solid var(--line2);
-  border-radius:var(--r-sm);padding:8px 14px;cursor:pointer;
-  transition:color .2s,border-color .2s,background .2s;
+  color:var(--ink2);background:transparent;border:0;
+  border-radius:999px;padding:8px 16px;cursor:pointer;
+  transition:color .25s;
 }
-.lib-tabs button:hover{color:var(--ink);border-color:var(--line)}
-.lib-tabs button.on{
-  color:var(--accent);border-color:var(--accent);
-  background:var(--sel);
-}
+.lib-tabs button:hover{color:var(--ink)}
+.lib-tabs button.on{color:var(--accent)}
+.lib-tabs button:focus-visible{outline-offset:2px;border-radius:999px}
 /* .shelf{display:grid} перебивает UA-[hidden] — прячем вручную */
 .shelf[hidden]{display:none!important}
 
 /* ===== каталог: поиск + список ===== */
 .shared-box{margin-top:20px}
 .shared-box[hidden]{display:none!important}
+.shared-box:not([hidden]){animation:viewFadeIn .3s ease both}
 #sharedSearch{
   width:100%;max-width:520px;display:block;
   font-family:var(--f-ui);font-size:13px;color:var(--ink);
   background:var(--card);border:1px solid var(--line2);
-  border-radius:var(--r-md);padding:11px 14px;outline:none;
+  border-radius:var(--r-md);padding:12px 16px;outline:none;
   transition:border-color .2s,box-shadow .2s;
 }
-#sharedSearch:focus{border-color:var(--accent)}
+#sharedSearch:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
 #sharedSearch::placeholder{color:var(--ink3)}
 .shared-list{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
   gap:14px;margin-top:18px;
 }
 .shared-empty{
-  grid-column:1/-1;
+  grid-column:1/-1;text-align:center;
   font-family:var(--f-ui);font-size:11px;letter-spacing:.08em;
-  color:var(--ink3);padding:26px 4px;
+  color:var(--ink3);padding:44px 16px;
+  border:1px dashed var(--line2);border-radius:var(--r-md);
 }
+.shared-empty::before{content:'◆';display:block;font-size:13px;color:var(--accent);opacity:.45;margin-bottom:12px}
+/* карточка общей книги — родня обложкам полки: корешок слева, ромб,
+   засечное название, внизу за пунктиром — возраст и «открыть» */
 .shared-card{
-  display:flex;flex-direction:column;gap:8px;text-align:left;
-  background:var(--card);border:1px solid var(--line2);
-  border-radius:var(--r-md);padding:16px 18px;cursor:pointer;
-  box-shadow:var(--shadow-sm);
+  position:relative;display:flex;flex-direction:column;gap:7px;text-align:left;
+  min-height:148px;padding:15px 18px 12px;
+  background:var(--card);border:1px solid var(--line2);border-left:3px solid var(--sel);
+  border-radius:3px var(--r-md) var(--r-md) 3px;
+  cursor:pointer;box-shadow:var(--shadow-sm);
   transition:transform .25s cubic-bezier(.2,.7,.2,1),border-color .25s,box-shadow .25s;
+  animation:scIn .5s cubic-bezier(.2,.7,.2,1) both;
+  animation-delay:calc(var(--i,0)*30ms);
 }
-.shared-card:hover{transform:translateY(-3px);border-color:var(--line);box-shadow:var(--shadow)}
+@keyframes scIn{from{opacity:0;translate:0 8px}to{opacity:1;translate:0 0}}
+.shared-card:hover{transform:translateY(-3px);border-color:var(--line);border-left-color:var(--accent);box-shadow:var(--shadow)}
+.shared-card:hover .st{color:var(--accent)}
 .shared-card .st{
-  font-family:var(--f-serif);font-size:17px;font-weight:600;
-  color:var(--ink);line-height:1.3;
+  font-family:var(--f-serif);font-size:18px;font-weight:600;
+  color:var(--ink);line-height:1.3;margin-top:4px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .shared-card .sa{
-  font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;color:var(--ink2);
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink3);
 }
 .shared-card .sa:empty{display:none}
+.shared-card .sf{
+  margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding-top:10px;border-top:1px dashed var(--line2);
+}
 .shared-card .sd{
   font-family:var(--f-ui);font-size:9px;letter-spacing:.14em;
   text-transform:uppercase;color:var(--ink3);
 }
+.shared-card .so{
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink3);transition:color .2s,translate .2s;
+}
+.shared-card:hover .so,.shared-card:focus-visible .so{color:var(--accent);translate:2px 0}
 .shared-card .st:empty::after{content:"Без названия";color:var(--ink3)}
 
 /* ===== блок «Доступ» в обзоре книги ===== */
@@ -131,7 +162,7 @@ body.ro .bv-access{display:none!important}
 /* ===== узкие экраны ===== */
 @media (max-width:880px){
   .lib-tabs{margin-top:20px}
-  .lib-tabs button{font-size:10px;padding:7px 11px}
+  .lib-tabs button{font-size:10px;padding:7px 13px}
   .shared-list{grid-template-columns:1fr}
   .bv-access{flex-direction:column;align-items:flex-start}
   .share-row{width:100%;flex:1 1 auto}

@@ -76,11 +76,10 @@ input::placeholder,textarea::placeholder{color:var(--ink3)}
 /* редактор: обводка всей области выглядит громоздко (Chrome рисует её и по
    клику на contenteditable) — фокус виден по курсору и цвету каретки */
 #editor{caret-color:var(--accent)}
-::-webkit-scrollbar{width:9px;height:9px}
-::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px;border:2px solid transparent;background-clip:content-box}
-*{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-.wm-card::-webkit-scrollbar,.sp-col-body::-webkit-scrollbar,.wv-col .col-body::-webkit-scrollbar,#wvQuotes::-webkit-scrollbar,.bv-card .bv-ex::-webkit-scrollbar,.sb-chips::-webkit-scrollbar{width:5px;height:5px}
-.wm-card::-webkit-scrollbar-thumb,.sp-col-body::-webkit-scrollbar-thumb,.wv-col .col-body::-webkit-scrollbar-thumb,#wvQuotes::-webkit-scrollbar-thumb,.bv-card .bv-ex::-webkit-scrollbar-thumb,.sb-chips::-webkit-scrollbar-thumb{background:var(--line);border:none;border-radius:5px}
+/* скроллбары спрятаны по всему сайту: прокрутка колесом, тачем и клавишами
+   работает, а полосы не режут композицию */
+*{scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{width:0;height:0;display:none}
 .fadebox{--ft:16px;--fb:16px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--ft),#000 calc(100% - var(--fb)),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 var(--ft),#000 calc(100% - var(--fb)),transparent 100%)}
 .fadebox:not(.f-top){--ft:0px}
 .fadebox:not(.f-bot){--fb:0px}

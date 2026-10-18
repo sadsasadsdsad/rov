@@ -127,7 +127,7 @@
       <div class="stats-head">
         <div>
           <div class="lbl lbl-acc">Написано сегодня</div>
-          <div class="stats-big"><b id="statsToday">0</b><span>слов</span></div>
+          <div class="stats-big"><b id="statsToday">0</b><span id="statsTodayUnit">слов</span></div>
         </div>
         <div class="stats-totals">
           <div><span class="lbl">За неделю</span><b id="statsWeek">0</b></div>
@@ -160,9 +160,9 @@
       </div>
       <div class="chart-legend" id="statsLegend"></div>
     </div>
-    <div class="lib-tabs" id="libTabs">
-      <button type="button" class="on" data-t="mine">Мои книги</button>
-      <button type="button" data-t="shared">Общие книги</button>
+    <div class="lib-tabs" id="libTabs" data-tab="mine" role="group" aria-label="Разделы библиотеки">
+      <button type="button" class="on" data-t="mine" aria-pressed="true">Мои книги</button>
+      <button type="button" data-t="shared" aria-pressed="false">Общие книги</button>
     </div>
     <div class="shared-box" id="sharedBox" hidden>
       <input id="sharedSearch" type="search" placeholder="Поиск по названию или автору" aria-label="Поиск по общим книгам" autocomplete="off">

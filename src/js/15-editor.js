@@ -1191,6 +1191,17 @@ $('#bvBack').addEventListener('click',function(){
 });
 $('#bvOpen').addEventListener('click',function(){enterEditor(null)});
 
+/* первая живая строка книги — для обложки: первый абзац первой видимой
+   главы; «Памятка» и глава «Заметки» пропускаются */
+function bookExcerpt(b){
+  var chs=visibleChapters(b);
+  for(var i=0;i<chs.length;i++){
+    var p=tmp(chs[i].html).querySelector('p');
+    var t=p?p.textContent.replace(/\s+/g,' ').trim():'';
+    if(t)return t;
+  }
+  return '';
+}
 function renderLibrary(){
   shelf.innerHTML='';
   var sorted=state.books.slice().sort(function(a,b){return (b.updated||0)-(a.updated||0)});
@@ -1202,15 +1213,17 @@ function renderLibrary(){
     el.style.setProperty('--c',b.color||COLORS[0]);
     el.style.animationDelay=(Math.min(i,7)*50)+'ms';
     el.innerHTML=
-      '<span class="cv-top"><span class="cv-dia"></span><span class="cv-vis" hidden></span><span class="cv-tools">'+
+      '<span class="cv-top"><span class="cv-dia"></span><span class="cv-vis" hidden></span><span class="cv-words"></span><span class="cv-tools">'+
       '<button class="cv-ren" title="Переименовать"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3"/></svg></button>'+
       '<button class="cv-del" title="Удалить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span></span>'+
       '<span class="cv-title"></span>'+
       '<span class="cv-author"></span>'+
       '<span class="cv-rule"></span>'+
-      '<span class="cv-meta"></span>'+
+      '<span class="cv-exc"></span>'+
       '<span class="cv-time"></span>';
     el.querySelector('.cv-title').textContent=b.title||'Без названия';
+    var exc=bookExcerpt(b),excEl=el.querySelector('.cv-exc');
+    if(exc)excEl.textContent=exc;else excEl.hidden=true;
     var author=(typeof b.author==='string'&&b.author.trim())?b.author.trim():((currentUser&&(currentUser.name||currentUser.login))||'');
     var av=el.querySelector('.cv-author');
     av.textContent=author;
@@ -1222,15 +1235,16 @@ function renderLibrary(){
     var visN=visList.length;
     var curIdx=0;
     for(var vi=0;vi<visList.length;vi++){if(visList[vi].id===b.current){curIdx=vi+1;break}}
-    el.querySelector('.cv-meta').innerHTML=
-      '<span>'+visN+' '+plural(visN,'глава','главы','глав')+'</span>'+
-      '<span class="cv-dot"></span>'+
-      '<span>'+fmt(w)+' '+plural(w,'слово','слова','слов')+'</span>';
+    /* объём книги — в правый верхний угол обложки (при наведении его
+       сменяют инструменты; см. .cv-words/.cv-tools в 02-library.css) */
+    el.querySelector('.cv-words').textContent=fmt(w)+' '+plural(w,'слово','слова','слов');
     var timeTxt=b.updated?('изменено '+timeAgo(b.updated)):'';
     var prog=(curIdx>1&&visN>1)?('гл. '+curIdx+' из '+visN):'';
-    el.querySelector('.cv-time').innerHTML=prog?
-      '<span>'+prog+'</span><span class="cv-dot"></span><span>'+esc(timeTxt)+'</span>':
-      '<span>'+esc(timeTxt)+'</span>';
+    /* нижняя строка: сколько глав, где остановка, когда писали */
+    var foot='<span>'+visN+' '+plural(visN,'глава','главы','глав')+'</span>';
+    if(prog)foot+='<span class="cv-dot"></span><span>'+prog+'</span>';
+    if(timeTxt)foot+='<span class="cv-dot"></span><span>'+esc(timeTxt)+'</span>';
+    el.querySelector('.cv-time').innerHTML=foot;
     el.addEventListener('click',function(){openBookOverview(b.id)});
     el.addEventListener('keydown',function(e){if(e.key==='Enter')openBookOverview(b.id)});
     el.querySelector('.cv-ren').addEventListener('click',function(e){
