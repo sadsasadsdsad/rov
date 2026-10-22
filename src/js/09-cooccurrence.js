@@ -100,17 +100,66 @@ function rangeFromOffset(off,len){
   try{r.setStart(sN,sO);r.setEnd(eN,eO)}catch(e){return null}
   return r;
 }
+/* Обёртка куска диапазона в подсветку. ВАЖНО: вызывать только для
+   диапазона ВНУТРИ одного блока — тогда extractContents не клонирует
+   блочные элементы и разметка не ломается. */
+function flashWrap(rr,spans){
+  var sp=mk('span');sp.className='hit-flash';
+  try{sp.appendChild(rr.extractContents());rr.insertNode(sp)}catch(e){return false}
+  spans.push(sp);
+  return true;
+}
+/* Блок редактора (прямой ребёнок #editor), внутри которого лежит узел */
+function flashBlockOf(node){
+  if(!editor||!node)return null;
+  var el=node.nodeType===1?node:node.parentNode;
+  while(el&&el.parentNode!==editor)el=el.parentNode;
+  return (el&&el.parentNode===editor)?el:null;
+}
+/* Подсветка диапазона [off,off+len] без порчи разметки.
+   Раньше диапазон резался одним куском: если он начинался в заголовке и
+   заканчивался в следующем абзаце, extractContents выдёргивал куски из
+   ДВУХ блоков, insertNode вкладывал клоны <h1>/<p> в span, а уборка
+   заменяла всё плоским текстом — заголовок оставался пустым, текст
+   вываливался наружу, абзац терял первые буквы (просьба: «поставил метку
+   на заголовок — после перехода он перестаёт быть заголовком»).
+   Теперь диапазон режется ПО БЛОКАМ: каждый блок получает свою подсветку,
+   блочные теги не трогаются. */
 function flashRange(off,len,ms){
   var r=rangeFromOffset(off,len);
   if(!r)return false;
-  var sp=mk('span');sp.className='hit-flash';
-  try{sp.appendChild(r.extractContents());r.insertNode(sp)}catch(e){return false}
-  sp.scrollIntoView({block:'center',behavior:(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)?'auto':'smooth'});
-  setTimeout(function(){
-    if(sp.parentNode){
-      sp.replaceWith(document.createTextNode(sp.textContent));
-      editor.normalize();
+  var spans=[];
+  var b1=flashBlockOf(r.startContainer),b2=flashBlockOf(r.endContainer);
+  if(!b1||!b2||b1===b2){
+    flashWrap(r,spans);
+  }else{
+    var list=[],el=b1,guard=0;
+    while(el&&guard++<400){list.push(el);if(el===b2)break;el=el.nextSibling}
+    if(list[list.length-1]!==b2){list=[b1];b2=null}
+    for(var i=0;i<list.length;i++){
+      var b=list[i],rr=document.createRange();
+      try{
+        rr.selectNodeContents(b);
+        if(b===b1)rr.setStart(r.startContainer,r.startOffset);
+        if(b2&&b===b2)rr.setEnd(r.endContainer,r.endOffset);
+      }catch(e){continue}
+      flashWrap(rr,spans);
     }
+  }
+  if(!spans.length)return false;
+  try{
+    spans[0].scrollIntoView({block:'center',behavior:(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)?'auto':'smooth'});
+  }catch(e){}
+  setTimeout(function(){
+    /* снимаем подсветку РАЗВОРАЧИВАНИЕМ: текст и инлайн-разметка остаются
+       на месте (замена на textContent теряла <em>, ссылки и <br>) */
+    for(var i=0;i<spans.length;i++){
+      var sp=spans[i];
+      if(!sp.parentNode)continue;
+      while(sp.firstChild)sp.parentNode.insertBefore(sp.firstChild,sp);
+      sp.parentNode.removeChild(sp);
+    }
+    if(editor)editor.normalize();
   },ms||2000);
   return true;
 }

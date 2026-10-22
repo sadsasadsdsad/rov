@@ -98,6 +98,18 @@ function require_user(): array
     return $u;
 }
 
+/** Администратор каталога: логин или имя из списка cfg('admins') (через запятую). */
+function is_admin(?array $u): bool
+{
+    if (!$u) return false;
+    $raw = (string)(cfg()['admins'] ?? '');
+    $list = array_values(array_filter(array_map('trim', explode(',', $raw)), static function ($v) {
+        return $v !== '';
+    }));
+    if (!$list) return false;
+    return in_array((string)$u['login'], $list, true) || in_array((string)$u['name'], $list, true);
+}
+
 function ts(): int
 {
     return (int)floor(microtime(true) * 1000);

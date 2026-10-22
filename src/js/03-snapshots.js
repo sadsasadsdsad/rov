@@ -171,7 +171,7 @@ function openDayModal(key){
   var clsCls=deltaTotal>0?'pos':deltaTotal<0?'neg':'';
   $('#dmMeta').innerHTML='Всего: <b>'+fmt(totalPrev)+'</b> → <b>'+fmt(totalSnap)+'</b> '+plural(totalSnap,'слово','слова','слов')+' · <span class="'+clsCls+'">'+sign+fmt(Math.abs(deltaTotal))+'</span>';
 
-  $('#dmNote').innerHTML='Снапшоты хранятся в <b>localStorage</b> по ключу <code>chernovik.snapshots.v1</code>, сами книги — по ключу <code>chernovik.v2</code>. Очистите данные браузера — история пропадёт. Для надёжности — резервные копии кнопкой «скачать» в правом верхнем углу.';
+  $('#dmNote').innerHTML='Снапшоты хранятся в браузере: откатиться можно к любому дню истории. Очистка данных браузера удалит и книги, и историю.';
 
   $('#dmRestore').onclick=function(){closeDayModal();restoreFromSnapshot(key)};
   $('#dayModal').classList.add('on');

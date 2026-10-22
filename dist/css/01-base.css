@@ -21,10 +21,10 @@
   --neg:#3f7a52;
   --shadow:0 14px 34px rgba(25,23,18,.16);
   --shadow-sm:0 1px 2px rgba(25,23,18,.06),0 8px 20px -14px rgba(25,23,18,.35);
-  --card-glass:rgba(251,250,245,.82);
+  --card-glass:#fbfaf5;                      /* плотная бумага: блюра нет */
   --panel-glass:rgba(237,234,223,.93);
   --veil-glass:rgba(244,242,236,.5);
-  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:18px;
+  --r-xs:2px; --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:18px; --r-pill:99px;
   --side-w:272px; --wiki-w:390px; --ed-w:660px;
   --f-serif:'Literata',Georgia,'Times New Roman',serif;
   --f-ui:'JetBrains Mono',ui-monospace,Menlo,monospace;
@@ -40,7 +40,7 @@
   --neg:#5da678;
   --shadow:0 16px 40px rgba(0,0,0,.55);
   --shadow-sm:0 1px 2px rgba(0,0,0,.4),0 10px 24px -14px rgba(0,0,0,.6);
-  --card-glass:rgba(32,29,24,.82);
+  --card-glass:#221e19;                      /* плотная бумага: блюра нет */
   --panel-glass:rgba(19,17,16,.92);
   --veil-glass:rgba(10,9,7,.52);
 }
@@ -55,7 +55,7 @@
   --neg:#3f6b40;
   --shadow:0 14px 34px rgba(58,48,36,.18);
   --shadow-sm:0 1px 2px rgba(58,48,36,.08),0 8px 20px -14px rgba(58,48,36,.35);
-  --card-glass:rgba(248,238,219,.85);
+  --card-glass:#f8eedb;                      /* плотная бумага: блюра нет */
   --panel-glass:rgba(235,220,194,.94);
   --veil-glass:rgba(242,230,207,.55);
 }
@@ -71,7 +71,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-
 /* плейсхолдер по умолчанию — третичные чернила (иначе серый Chromium-дефолт
    даёт 3.6–4.4:1 и проваливает контраст во всех темах) */
 input::placeholder,textarea::placeholder{color:var(--ink3)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--r-xs)}
 .cover:focus-visible,.bv-card:focus-visible,.wk-card:focus-visible,.ch:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 /* редактор: обводка всей области выглядит громоздко (Chrome рисует её и по
    клику на contenteditable) — фокус виден по курсору и цвету каретки */
@@ -101,10 +101,10 @@ input::placeholder,textarea::placeholder{color:var(--ink3)}
 .sibtn{width:26px;height:26px;display:grid;place-items:center;color:var(--ink3);transition:color .15s;flex:0 0 auto;border:0;background:transparent;padding:0}
 .sibtn:hover{color:var(--accent)}
 .sibtn svg{width:14px;height:14px;display:block}
-.hit-flash{color:var(--accent);background:var(--sel);border-radius:3px;padding:0 2px;box-shadow:0 0 0 2px var(--sel);transition:color .35s,background .35s,box-shadow .35s}
+.hit-flash{color:var(--accent);background:var(--sel);border-radius:var(--r-xs);padding:0 2px;box-shadow:0 0 0 2px var(--sel);transition:color .35s,background .35s,box-shadow .35s}
 
 /* пропустить навигацию — только при фокусе с клавиатуры */
-.skip-link{position:fixed;top:10px;left:10px;z-index:900;padding:10px 16px;background:var(--card);border:1px solid var(--accent);border-radius:10px;box-shadow:var(--shadow);font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;color:var(--ink);text-decoration:none;transform:translateY(-260%);transition:transform .16s}
+.skip-link{position:fixed;top:10px;left:10px;z-index:900;padding:10px 16px;background:var(--card);border:1px solid var(--accent);border-radius:var(--r-md);box-shadow:var(--shadow);font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;color:var(--ink);text-decoration:none;transform:translateY(-260%);transition:transform .16s}
 .skip-link:focus{transform:none}
 
 /* прокрутка внутри модалок, панелей и карточек не должна уводить страницу */

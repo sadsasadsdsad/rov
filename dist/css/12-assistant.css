@@ -26,7 +26,6 @@
  *   z-index: панель 100 (как #wikiPanel), модальный результат 110
  *   (как #dayModal), у старой плавающей пилюли — 96 (у #micPill).
  * ========================================================================== */
-
 /* ── Кнопки ИИ (.ai-open): обычная иконка в шапках + запреты ─────────── */
 /* Иконка ИИ визуально не отличается от соседних .ibtn — без подложки-пилюли
    и точки связи (по желанию пользователя); статус связи показывает только
@@ -37,11 +36,10 @@
 .ai-open.busy{pointer-events:none;opacity:.6}
 body.reader .ai-open,body.zen .ai-open{display:none}
 @media print{.ai-open{display:none}}
-
 /* ── Старый вариант: плавающая пилюля (для устаревшей разметки в кэше) ─ */
 #aiFab:not(.ai-tb){
   position:fixed;right:16px;bottom:18px;z-index:96;
-  height:44px;padding:0 16px;border-radius:22px;
+  height:44px;padding:0 16px;border-radius:var(--r-xl);
   display:flex;align-items:center;gap:10px;
   background:var(--ink);border:1px solid var(--ink);color:var(--bg);
   box-shadow:0 18px 40px -18px rgba(0,0,0,.5),0 4px 12px -5px rgba(0,0,0,.28);
@@ -53,7 +51,6 @@ body.reader .ai-open,body.zen .ai-open{display:none}
 #aiFab:not(.ai-tb) svg{width:17px;height:17px;flex:0 0 auto;color:var(--accent);transition:transform .25s}
 #aiFab:not(.ai-tb):hover svg{transform:rotate(14deg) scale(1.06)}
 #aiFab:not(.ai-tb) .t{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
-
 /* ── Панель чата — та же конструкция, что у #wikiPanel ───────────────── */
 #aiPanel{
   position:fixed;right:16px;bottom:18px;z-index:100;
@@ -61,7 +58,6 @@ body.reader .ai-open,body.zen .ai-open{display:none}
   display:flex;flex-direction:column;
   background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-lg);
   box-shadow:0 24px 48px -24px rgba(0,0,0,.55),0 4px 12px -6px rgba(0,0,0,.2);
-  backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);
   opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px) scale(.98);
   transform-origin:100% 100%;
   transition:opacity .18s,transform .18s,visibility .18s;
@@ -69,7 +65,6 @@ body.reader .ai-open,body.zen .ai-open{display:none}
 }
 #aiPanel.on{opacity:1;visibility:visible;pointer-events:auto;transform:none}
 @media print{#aiPanel{display:none}}
-
 /* ── Чат как раздел Энциклопедии (#paneAi): без своего фикс-бокса ──────
    карточку панели даёт сам #wikiPanel; чат растягивается на её место.
    Видимость НЕ переопределяем: её даёт класс .on (его держит
@@ -81,20 +76,17 @@ body.reader .ai-open,body.zen .ai-open{display:none}
   width:auto;height:auto;
   flex:1 1 auto;min-height:0;
   background:none;border:0;border-radius:0;box-shadow:none;
-  backdrop-filter:none;-webkit-backdrop-filter:none;
 }
 /* колонка ленты, чипсов и поля — не шире ~860px, по центру широкой панели */
 #paneAi .ai-msgs,#paneAi .ai-chips,#paneAi .ai-foot{
   width:100%;max-width:860px;margin-left:auto;margin-right:auto;
 }
-
 /* искра AI_SPARK: базовый размер (шапка результата, пустое состояние) */
 .ai-spark svg{width:16px;height:16px}
 /* крошечная точка связи — в строке охвата, без надписей */
 .ai-dot{width:6px;height:6px;border-radius:50%;background:var(--ink3);flex:0 0 auto}
 .ai-dot.ok{background:var(--neg)}
 .ai-dot.err{background:var(--accent)}
-
 /* Строка охвата — один ряд под шапкой вики (как .wp-tabs у #wikiPanel):
    селектор контекста + подпись книги/главы, справа — статус связи
    и кнопки «очистить»/«настройки» */
@@ -130,16 +122,15 @@ body.reader .ai-open,body.zen .ai-open{display:none}
 #aiScopeMenu .bm-item.act{background:var(--sel);color:var(--accent)}
 /* меню охвата — та же физика, что #exportMenu (08-responsive-auth.css);
    z-index выше панели (100), иначе уходит под неё */
-#aiScopeMenu{position:fixed;z-index:120;width:250px;background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);padding:6px;opacity:0;visibility:hidden;transform:translateY(6px) scale(.98);pointer-events:none;transition:opacity .16s,visibility .16s,transform .16s}
+#aiScopeMenu{position:fixed;z-index:120;width:250px;background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:6px;opacity:0;visibility:hidden;transform:translateY(6px) scale(.98);pointer-events:none;transition:opacity .16s,visibility .16s,transform .16s}
 #aiScopeMenu.on{opacity:1;visibility:visible;transform:none;pointer-events:auto}
 #aiScopeMenu .bm-item{text-align:left;width:100%;font-family:var(--f-ui);font-size:11px;letter-spacing:.02em;color:var(--ink2)}
 #aiScopeMenu .bm-item .t{font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
 /* ── Лента: обёртка .ai-feed + кнопка «к последнему сообщению» ──────── */
 .ai-feed{position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
 .ai-jump{
   position:absolute;right:12px;bottom:12px;z-index:2;
-  width:30px;height:30px;border-radius:8px;
+  width:30px;height:30px;border-radius:var(--r-md);
   display:grid;place-items:center;cursor:pointer;color:var(--ink2);
   background:var(--card);border:1px solid var(--line);
   opacity:0;transform:translateY(6px);pointer-events:none;
@@ -149,11 +140,10 @@ body.reader .ai-open,body.zen .ai-open{display:none}
 .ai-jump.on{opacity:1;transform:none;pointer-events:auto}
 .ai-jump:hover{border-color:var(--accent);color:var(--accent)}
 .ai-jump:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
 /* ── Сообщения ─────────────────────────────────────────────────────── */
 .ai-msgs{flex:1;overflow-y:auto;padding:14px 12px 12px;display:flex;flex-direction:column;gap:10px;scrollbar-width:thin}
 .ai-msgs::-webkit-scrollbar{width:5px}
-.ai-msgs::-webkit-scrollbar-thumb{background:var(--line);border:none;border-radius:5px}
+.ai-msgs::-webkit-scrollbar-thumb{background:var(--line);border:none;border-radius:var(--r-sm)}
 /* Без анимации появления: лента пересобирается на каждый чанк стрима —
    анимация на .ai-msg мигала бы всеми сообщениями при каждой пересборке */
 .ai-msg{
@@ -178,7 +168,7 @@ body.reader .ai-open,body.zen .ai-open{display:none}
 /* ── Чип цитаты: ссылка на конкретное место в тексте (оформление .hit-flash) ── */
 .ai-cite{
   display:inline;font:inherit;cursor:pointer;text-align:left;
-  padding:0 3px;margin:0 1px;border-radius:4px;
+  padding:0 3px;margin:0 1px;border-radius:var(--r-xs);
   background:var(--sel);border:0;
   color:var(--accent);white-space:normal;
   transition:box-shadow .14s;
@@ -228,12 +218,11 @@ details.ai-think[open] summary::after{content:'▾'}
   color:var(--accent);cursor:pointer;
 }
 .ai-err .retry:hover{text-decoration:underline}
-
 /* ── Быстрые вопросы — тот же паттерн, что .sb-chips button (04-editor.css) ── */
 .ai-chips{display:flex;flex-wrap:wrap;gap:5px;padding:0 12px 9px}
 .ai-chips button{
   font-family:var(--f-serif);font-size:12.5px;line-height:1;padding:5px 10px;
-  border-radius:7px;background:var(--card);border:1px solid var(--line2);color:var(--ink2);
+  border-radius:var(--r-sm);background:var(--card);border:1px solid var(--line2);color:var(--ink2);
   cursor:pointer;transition:border-color .12s,color .12s,background .12s,transform .1s;
 }
 .ai-chips button:hover{border-color:var(--accent);color:var(--accent);background:var(--sel);transform:translateY(-1px)}
@@ -244,7 +233,7 @@ details.ai-think[open] summary::after{content:'▾'}
    перехода — затухание, потому что оверлей живёт ~2с и исчезает сам */
 .ai-flash-host{position:fixed;inset:0;pointer-events:none;z-index:130}
 .ai-flash{
-  position:absolute;border-radius:4px;
+  position:absolute;border-radius:var(--r-xs);
   background:var(--sel);
   box-shadow:0 0 0 3px var(--sel);
   animation:aiFlash 2.2s ease forwards;
@@ -256,7 +245,6 @@ details.ai-think[open] summary::after{content:'▾'}
   100%{opacity:0}
 }
 @media print{.ai-flash-host{display:none}}
-
 /* ── Поле ввода — паттерн .m-field textarea (05-modals-notes.css) ───── */
 .ai-foot{border-top:1px solid var(--line2);padding:10px 12px;display:flex;gap:8px;align-items:flex-end}
 .ai-foot textarea{
@@ -281,11 +269,10 @@ details.ai-think[open] summary::after{content:'▾'}
 .ai-send[disabled]{opacity:.5;cursor:not-allowed;pointer-events:none}
 .ai-send svg{width:16px;height:16px}
 .ai-send.busy{background:var(--accent);border-color:var(--accent);color:var(--bg)}
-
 /* ── Настройки — общая модалка (⚙ в панели и на странице) ──────────── */
 #aiSetModal{
   position:fixed;inset:0;z-index:110;
-  background:var(--veil-glass);backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);
+  background:var(--veil-glass);
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s,visibility .18s;
   display:flex;align-items:center;justify-content:center;padding:20px;
 }
@@ -301,7 +288,7 @@ details.ai-think[open] summary::after{content:'▾'}
 .ai-set-body label{display:flex;flex-direction:column;gap:4px}
 .ai-set-body .lbl{font-family:var(--f-ui);font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3)}
 .ai-set-body input,.ai-set-body select{
-  font-family:var(--f-ui);font-size:12px;padding:7px 9px;border-radius:8px;
+  font-family:var(--f-ui);font-size:12px;padding:7px 9px;border-radius:var(--r-md);
   border:1px solid var(--line);background:transparent;color:var(--ink);
 }
 .ai-set-body input:focus,.ai-set-body select:focus{outline:none;border-color:var(--accent)}
@@ -309,12 +296,11 @@ details.ai-think[open] summary::after{content:'▾'}
 .ai-set-body .ai-link{font-family:var(--f-ui);font-size:10.5px;color:var(--ink3);text-decoration:none;letter-spacing:.04em}
 .ai-set-body .ai-link:hover{color:var(--accent);text-decoration:underline}
 .ai-hint{font-family:var(--f-ui);font-size:10px;line-height:1.6;color:var(--ink3);margin:0}
-.ai-hint code{font-size:10px;background:var(--hover);padding:1px 4px;border-radius:4px}
-
+.ai-hint code{font-size:10px;background:var(--hover);padding:1px 4px;border-radius:var(--r-xs)}
 /* ── Модальный результат (домашний паттерн как #dayModal) ─────────── */
 #aiResModal{
   position:fixed;inset:0;z-index:110;
-  background:var(--veil-glass);backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);
+  background:var(--veil-glass);
   opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s,visibility .18s;
   display:flex;align-items:center;justify-content:center;padding:20px;
 }
@@ -347,11 +333,10 @@ details.ai-think[open] summary::after{content:'▾'}
 .ai-res-foot{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--line2);flex-wrap:wrap}
 .ai-res-foot .sp{flex:1}
 .ai-res-note{font-family:var(--f-ui);font-size:10px;color:var(--ink3)}
-
 /* ── Кнопки ИИ в панели выделения (#selbar) ────────────────────────── */
 .sb-ai{display:flex;gap:2px;margin-left:5px;padding-left:5px;border-left:1px solid var(--line2)}
 .sb-ai button{
-  min-width:34px;height:28px;padding:0 7px;border-radius:8px;
+  min-width:34px;height:28px;padding:0 7px;border-radius:var(--r-md);
   font-family:var(--f-ui);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
   color:var(--ink2);display:grid;place-items:center;transition:background .12s,color .12s;
 }

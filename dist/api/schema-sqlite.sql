@@ -50,3 +50,15 @@ CREATE TABLE IF NOT EXISTS login_attempts(
 );
 CREATE INDEX IF NOT EXISTS idx_att_login ON login_attempts(login, ts);
 CREATE INDEX IF NOT EXISTS idx_att_ts ON login_attempts(ts);
+-- журнал: статьи разработчиков, пишет только админ (см. news.php)
+CREATE TABLE IF NOT EXISTS news_articles(
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT '',
+  tag TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'published',
+  author TEXT NOT NULL DEFAULT '',
+  created INTEGER NOT NULL,
+  updated INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_news_updated ON news_articles(updated);

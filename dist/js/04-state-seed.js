@@ -33,9 +33,7 @@ function pamatkaHtml(){
   '<h2>Быстрый ввод</h2>'+
   '<p><strong>/</strong> в начале строки — меню блоков. <strong>#</strong> или <strong>##</strong> + пробел — заголовок. Три дефиса <strong>---</strong> — разделитель.</p>'+
   '<h2>Режим фокуса</h2>'+
-  '<p>Кнопка с мишенью: интерфейс гаснет. Выход — <strong>Esc</strong>.</p>'+
-  '<h2>Где хранятся данные</h2>'+
-  '<p>Всё лежит в <strong>localStorage</strong> этого браузера. Книги — <code>chernovik.v2</code>, снапшоты — <code>chernovik.snapshots.v1</code>. Резервные копии — кнопки со стрелками в шапке библиотеки.</p>';
+  '<p>Кнопка с мишенью: интерфейс гаснет. Выход — <strong>Esc</strong>.</p>';
 }
 function notesChapterHtml(){
   return '<h1>Заметки</h1>'+

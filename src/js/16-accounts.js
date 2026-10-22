@@ -519,6 +519,9 @@ document.querySelectorAll('.auth-tab').forEach(function(t){
 document.querySelectorAll('.acc-btn').forEach(function(b){
   b.addEventListener('click',function(e){
     e.stopPropagation();
+    /* Меню настроек (Motion Slide Menu, 26-settings.js): профиль, тема,
+       модалки, сила блюра. #accMenu остался как запасной вариант. */
+    if(typeof smToggle==='function'){smToggle(b);return}
     var m=$('#accMenu');
     if(m.classList.contains('on'))closeAccMenu();else openAccMenu(b);
   });

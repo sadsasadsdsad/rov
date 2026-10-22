@@ -4,18 +4,20 @@
   веб-редактор рукописей). Полный обзор структуры — в README.md рядом.
 
   Структура файла:
-    <head>  — мета-теги, шрифты и 12 <link href="css/NN-*.css">;
+    <head>  — мета-теги, шрифты и 13 <link href="css/NN-*.css">;
               порядок подключения = порядок каскада оригинала;
     <body>  — библиотека (+ вкладки «Мои книги»/«Общие книги»), карточка
               книги (+ блок «Доступ»), рабочая область, модалки, авторизация;
-    перед </body> — 23 последовательных классических <script src="js/NN-*.js">
+    перед </body> — 25 последовательных классических <script src="js/NN-*.js">
               (строгий режим в каждом, подключаются строго по номеру):
               01-ядро … 15-редактор, 16-аккаунты, 17-boot, 18-voice,
               19-mobile-reader — читалка ≤880px, 20-sync — серверная
               синхронизация, 21-shared — чужие книги (только чтение),
               доступ и hash-роут #/read/, 22-assistant — ИИ-ассистент
               (чат по книге, исправление/улучшение выделения),
-              23-music — окно музыки (бесконечная мелодия, Web Audio).
+              23-music — окно музыки (бесконечная мелодия, Web Audio),
+              24-import — импорт книг (FB2/EPUB/PDF/MOBI/HTML/RTF/TXT),
+              25-ui — плавающая подсказка и переключатель темы.
 
   Добавлено относительно src: #btnVoice/#micPill (голосовой ввод),
   <div id="veil"> перенесён внутрь #workspace, js/18-voice.js,
@@ -46,6 +48,8 @@
 <link rel="stylesheet" href="css/10-shared.css?v=27">
 <link rel="stylesheet" href="css/11-access.css?v=27">
 <link rel="stylesheet" href="css/12-assistant.css?v=27">
+<link rel="stylesheet" href="css/13-ui.css?v=27">
+<link rel="stylesheet" href="css/14-news.css?v=27">
 </head>
 <body>
 
@@ -101,14 +105,18 @@
   <header class="lib-top">
     <div class="brand"><span class="dia"></span><b>ЧЕРНОВИК</b><small>для книг</small></div>
     <div class="lib-actions">
-      <button class="acc-btn" type="button" title="Аккаунт" aria-label="Меню аккаунта" aria-haspopup="menu" aria-expanded="false"><span class="ava">?</span><span class="nm"></span></button>
-      <button class="ibtn" id="btnBackup" title="Резервная копия: скачать все книги">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
-      </button>
-      <button class="ibtn" id="btnRestore" title="Резервная копия: загрузить из файла">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13V4m0 0 3.5 3.5M12 4 8.5 7.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
-      </button>
-      <button class="ibtn btn-theme" title="Тема">
+      <button class="acc-btn" type="button" title="Настройки" data-ftip="Настройки и профиль" data-ftip-sub="тема · модалки · блюр" aria-label="Меню настроек и профиля" aria-haspopup="menu" aria-expanded="false"><span class="ava">?</span><span class="nm"></span></button>
+      <!-- Кнопки бэкапа переехали в меню настроек (#slideMenu) — обработчики
+           висят на id (15-editor.js), поэтому сами кнопки сохранены здесь -->
+      <div id="accLegacy" hidden>
+        <button class="ibtn" id="btnBackup" title="Резервная копия: скачать все книги">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+        </button>
+        <button class="ibtn" id="btnRestore" title="Резервная копия: загрузить из файла">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 13V4m0 0 3.5 3.5M12 4 8.5 7.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+        </button>
+      </div>
+      <button class="ibtn btn-theme" title="Тема" data-ftip="Сменить тему" data-ftip-sub="день · сепия · ночь">
         <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
         <svg class="ic-sepia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 6.7C10.6 5.3 8.6 4.7 4.5 4.7v13c4.1 0 6.1.6 7.5 2 1.4-1.4 3.4-2 7.5-2v-13c-4.1 0-6.1.6-7.5 2z"/><path d="M12 6.7v13"/></svg>
         <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5Z"/></svg>
@@ -123,6 +131,7 @@
       </div>
       <div class="lib-stats" id="libStats"></div>
     </div>
+    <div class="stats-row">
     <div class="stats-panel">
       <div class="stats-head">
         <div>
@@ -140,56 +149,84 @@
         <div class="chart-plot" id="statsPlot">
           <svg class="chart-svg" id="statsSvg" aria-hidden="true">
             <g id="statsLines"></g>
+            <g id="statsPeak"></g>
           </svg>
           <div class="chart-crosshair" id="statsCrosshair"></div>
           <div class="chart-dots" id="statsDots"></div>
           <div class="chart-hit" id="statsHit"></div>
           <div class="chart-tip" id="statsTip"></div>
         </div>
+        <div class="chart-axis" id="statsAxis"></div>
       </div>
-      <div class="chart-axis"><span>30 дней</span><span>15 дней</span><span>сегодня</span></div>
-      <div class="git-head">
-        <span class="lbl">История · клик по дню — открыть все изменения</span>
-        <span class="git-hint" id="gitHint"></span>
-      </div>
-      <div class="chart-heat" id="statsHeat"></div>
-      <div class="git-legend">
-        <span class="sc"><i class="p"></i>прирост</span>
-        <span class="sc"><i class="n"></i>убыль</span>
-        <span class="sc"><i class="s"></i>без изменений</span>
-      </div>
+      <div class="chart-days" id="statsDays" role="group" aria-label="Дни: квадрат — один день, клик — история дня"></div>
       <div class="chart-legend" id="statsLegend"></div>
     </div>
-    <div class="lib-tabs" id="libTabs" data-tab="mine" role="group" aria-label="Разделы библиотеки">
-      <button type="button" class="on" data-t="mine" aria-pressed="true">Мои книги</button>
-      <button type="button" data-t="shared" aria-pressed="false">Общие книги</button>
+    <div class="chg-panel">
+      <div class="stats-head">
+        <div>
+          <div class="lbl lbl-acc">Что нового</div>
+          <div class="stats-big"><b>v0.02</b><span>последние обновления</span></div>
+        </div>
+        <button type="button" class="np-open" id="npOpen" data-ftip="Журнал" data-ftip-sub="обновления и статьи">Журнал <span aria-hidden="true">→</span></button>
+      </div>
+      <ol class="chg-list" id="chgScroll" aria-label="Что нового в Черновике">
+        <li><div class="chg-row"><span class="chg-v">0.02</span><div><div class="chg-t">Импорт книг</div>
+          <p>FB2, EPUB, PDF, MOBI, HTML, RTF и TXT — главы, автор и памятка собираются сами.</p></div></div></li>
+        <li><div class="chg-row"><span class="chg-v">0.02</span><div><div class="chg-t">Общий доступ</div>
+          <p>Книгу можно открыть по ссылке или показать в общих книгах.</p></div></div></li>
+        <li><div class="chg-row"><span class="chg-v">0.01</span><div><div class="chg-t">Энциклопедия книги</div>
+          <p>Герои, глоссарий, статьи мира и связи между словами текста.</p></div></div></li>
+        <li><div class="chg-row"><span class="chg-v">0.01</span><div><div class="chg-t">Карта и история</div>
+          <p>Схема книги, метки, заметки и все изменения — по дням.</p></div></div></li>
+        <li><div class="chg-row"><span class="chg-v">0.01</span><div><div class="chg-t">Первый выпуск</div>
+          <p>Редактор с главами, резервные копии и хранение данных в браузере.</p></div></div></li>
+      </ol>
+      <div class="chg-foot">обновляется вместе с версией</div>
+    </div>
     </div>
     <div class="shared-box" id="sharedBox" hidden>
       <input id="sharedSearch" type="search" placeholder="Поиск по названию или автору" aria-label="Поиск по общим книгам" autocomplete="off">
+      <div class="shared-filters" id="sharedFilters">
+        <div class="sf-rows">
+          <div class="sf-row" role="group" aria-label="Период обновления">
+            <button type="button" class="sf-chip on" data-p="all" aria-pressed="true">всё время</button>
+            <button type="button" class="sf-chip" data-p="month" aria-pressed="false">месяц</button>
+            <button type="button" class="sf-chip" data-p="week" aria-pressed="false">неделя</button>
+          </div>
+          <div class="sf-row" role="group" aria-label="Чьи книги">
+            <button type="button" class="sf-chip on" data-s="all" aria-pressed="true">все</button>
+            <button type="button" class="sf-chip" data-s="mine" aria-pressed="false">мои</button>
+            <button type="button" class="sf-chip" data-s="other" aria-pressed="false">чужие</button>
+          </div>
+        </div>
+        <label class="sf-sort">порядок
+          <select id="sharedSort" aria-label="Порядок книг в каталоге">
+            <option value="date">по дате</option>
+            <option value="title">по названию</option>
+            <option value="author">по автору</option>
+          </select>
+        </label>
+      </div>
       <div class="shared-list" id="sharedList"></div>
     </div>
     <div class="shelf" id="shelf"></div>
-    <div class="lib-foot">
-      все рукописи хранятся локально · делайте резервные копии
-      <span class="path">Данные в <code>localStorage</code>: книги — <code>chernovik.v2</code>, снапшоты — <code>chernovik.snapshots.v1</code></span>
-    </div>
   </div>
 </section>
 
 <section id="bookView" aria-label="Просмотр книги" hidden>
   <header class="bv-top">
     <div class="left">
-      <button class="ibtn" id="bvBack" title="К списку книг">
+      <button class="ibtn" id="bvBack" title="К списку книг" data-ftip="К списку книг">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 4.5 8 12l7.5 7.5"/></svg>
       </button>
       <div class="brand"><span class="dia"></span><b>ЧЕРНОВИК</b><small>обзор книги</small></div>
     </div>
     <div class="lib-actions">
-      <button class="acc-btn" type="button" title="Аккаунт" aria-label="Меню аккаунта" aria-haspopup="menu" aria-expanded="false"><span class="ava">?</span><span class="nm"></span></button>
-      <button class="ibtn" id="bvOpen" title="Открыть в редакторе">
+      <button class="acc-btn" type="button" title="Настройки" aria-label="Меню настроек и профиля" aria-haspopup="menu" aria-expanded="false"><span class="ava">?</span><span class="nm"></span></button>
+      <button class="ibtn" id="bvOpen" title="Открыть в редакторе" data-ftip="Открыть в редакторе">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 6.2C10 4.5 7.3 3.8 4 3.8v14c3.3 0 6 .7 8 2.4 2-1.7 4.7-2.4 8-2.4v-14c-3.3 0-6 .7-8 2.4Z"/><path d="M12 6.2v14"/></svg>
       </button>
-      <button class="ibtn btn-theme" title="Тема">
+      <button class="ibtn btn-theme" title="Тема" data-ftip="Сменить тему" data-ftip-sub="день · сепия · ночь">
         <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
         <svg class="ic-sepia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 6.7C10.6 5.3 8.6 4.7 4.5 4.7v13c4.1 0 6.1.6 7.5 2 1.4-1.4 3.4-2 7.5-2v-13c-4.1 0-6.1.6-7.5 2z"/><path d="M12 6.7v13"/></svg>
         <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5Z"/></svg>
@@ -236,10 +273,10 @@
   <div id="main">
     <header id="topbar">
       <div class="tb-left">
-        <button class="ibtn" id="btnShelf" title="К списку книг">
+        <button class="ibtn" id="btnShelf" title="К списку книг" data-ftip="К списку книг">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4.5 4h4v16h-4zM10.5 4h4v16h-4zM16.6 5.4l3.9 1.1-4.1 13.9-3.9-1.1z"/></svg>
         </button>
-        <button class="ibtn" id="btnSide" title="Скрыть панель глав">
+        <button class="ibtn" id="btnSide" title="Скрыть панель глав" data-ftip="Панель глав" data-ftip-sub="показать · скрыть">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
         </button>
         <div class="crumb"><b id="crumbBook"></b><span class="cd"></span><span id="crumbCh"></span><span class="ro-badge" id="roBadge" hidden>чтение</span></div>
@@ -256,37 +293,37 @@
       </div>
       <div class="tb-right">
         <div class="tb-grp" role="group" aria-label="Заметки и метки">
-          <button class="ibtn" id="btnNote" title="Вставить заметку · Ctrl+Alt+N">
+          <button class="ibtn" id="btnNote" title="Вставить заметку · Ctrl+Alt+N" data-ftip="Вставить заметку" data-ftip-sub="Ctrl+Alt+N">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16.5 4.5a1.8 1.8 0 0 1 2.6 0l.4.4a1.8 1.8 0 0 1 0 2.6L8 19l-4 1Z"/><path d="M14 7l3 3"/></svg>
           </button>
-          <button class="ibtn" id="btnBookmark" title="Поставить метку · Ctrl+Alt+M">
+          <button class="ibtn" id="btnBookmark" title="Поставить метку · Ctrl+Alt+M" data-ftip="Поставить метку" data-ftip-sub="Ctrl+Alt+M">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-3.6L6 20V5a1 1 0 0 1 1-1Z"/></svg>
           </button>
         </div>
-        <button class="ibtn ai-tb ai-open" id="aiFab" type="button" title="Спросить ИИ" aria-label="Спросить ИИ" aria-expanded="false" aria-controls="aiPanel">
+        <button class="ibtn ai-tb ai-open" id="aiFab" type="button" title="Спросить ИИ" data-ftip="Спросить ИИ" aria-label="Спросить ИИ" aria-expanded="false" aria-controls="aiPanel">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3Q13.4 10.6 21 12Q13.4 13.4 12 21Q10.6 13.4 3 12Q10.6 10.6 12 3Z"/></svg>
         </button>
-        <button class="ibtn" id="btnVoice" title="Диктовка голосом · Ctrl+Alt+R" aria-pressed="false">
+        <button class="ibtn" id="btnVoice" title="Диктовка голосом · Ctrl+Alt+R" data-ftip="Диктовка голосом" data-ftip-sub="Ctrl+Alt+R" aria-pressed="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9.3" y="3" width="5.4" height="11" rx="2.7"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v3"/></svg>
         </button>
-        <button class="ibtn ms-open" id="btnMusic" type="button" title="Музыка — бесконечная мелодия" aria-label="Музыка" aria-haspopup="dialog">
+        <button class="ibtn ms-open" id="btnMusic" type="button" title="Музыка — бесконечная мелодия" data-ftip="Музыка" data-ftip-sub="бесконечная мелодия" aria-label="Музыка" aria-haspopup="dialog">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17.5V5.2l10-2v12.3"/><ellipse cx="6.5" cy="17.5" rx="2.5" ry="2.2"/><ellipse cx="16.5" cy="15.5" rx="2.5" ry="2.2"/></svg>
         </button>
-        <button class="ibtn" id="btnZen" title="Режим фокуса">
+        <button class="ibtn" id="btnZen" title="Режим фокуса" data-ftip="Режим фокуса" data-ftip-sub="без интерфейса">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>
         </button>
-        <button class="ibtn" id="btnWiki" title="Энциклопедия мира">
+        <button class="ibtn" id="btnWiki" title="Энциклопедия мира" data-ftip="Энциклопедия" data-ftip-sub="мир и герои">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.6 2.3 3.9 5.1 3.9 8.5s-1.3 6.2-3.9 8.5c-2.6-2.3-3.9-5.1-3.9-8.5s1.3-6.2 3.9-8.5z"/></svg>
         </button>
-        <button class="ibtn btn-theme" title="Тема">
+        <button class="ibtn btn-theme" title="Тема" data-ftip="Сменить тему" data-ftip-sub="день · сепия · ночь">
           <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>
           <svg class="ic-sepia" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 6.7C10.6 5.3 8.6 4.7 4.5 4.7v13c4.1 0 6.1.6 7.5 2 1.4-1.4 3.4-2 7.5-2v-13c-4.1 0-6.1.6-7.5 2z"/><path d="M12 6.7v13"/></svg>
         <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" style="display:none"><path d="M20 13.5A8 8 0 0 1 10.5 4 8 8 0 1 0 20 13.5Z"/></svg>
         </button>
-        <button class="ibtn" id="btnExport" title="Скачать рукопись · TXT / MD / HTML">
+        <button class="ibtn" id="btnExport" title="Скачать рукопись · TXT / MD / HTML" data-ftip="Скачать рукопись" data-ftip-sub="TXT · MD · HTML">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
         </button>
-        <button class="acc-btn" type="button" title="Аккаунт" aria-label="Меню аккаунта" aria-haspopup="menu" aria-expanded="false"><span class="ava">?</span><span class="nm"></span></button>
+        <button class="acc-btn" type="button" title="Настройки" data-ftip="Настройки и профиль" data-ftip-sub="тема · модалки · блюр" aria-label="Меню настроек и профиля" aria-haspopup="menu" aria-expanded="false"><span class="ava">?</span><span class="nm"></span></button>
       </div>
     </header>
     <div id="scroller">
@@ -693,6 +730,66 @@
 <div id="exportMenu" role="menu" aria-label="Экспорт рукописи"></div>
 <div id="aiScopeMenu" role="menu" aria-label="Охват контекста запроса"></div>
 <div id="accMenu" role="menu" aria-label="Аккаунт"></div>
+<!-- Motion Slide Menu (unlumen) — меню настроек и профиля: уровни
+     рендерит 26-settings.js (корень → Профиль / Настройки / бэкап),
+     панель выезжает под нажатой аккаунт-кнопкой -->
+<div id="slideMenu" role="menu" aria-label="Настройки и профиль" data-depth="0">
+  <div class="sm-head">
+    <button type="button" class="sm-back" aria-label="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 5 8 12l6.5 7"/></svg></button>
+    <span class="sm-title"></span>
+  </div>
+  <div class="sm-body"></div>
+</div>
+<!-- Страница «Журнал» — обновления сайта и статьи разработчиков:
+     записи обновлений клонируются из панели «Что нового» (один источник),
+     статьи приходят с api/news.php; редактор (27-news.js) показывается
+     только админу — is_admin на сервере, профиль «123» -->
+<!-- таббар — на уровне body: #library.view-in (анимация, fill:both) создаёт
+     stacking context, и лежащий внутри таббар (z 60) оказывался бы ниже
+     полноэкранного журнала (55). Всё позиционирование — fixed, всё
+     обращения по id (#libTabs) — порядок в DOM не важен -->
+<div class="tabbar" id="libTabs" data-tab="mine" role="group" aria-label="Разделы библиотеки">
+  <span class="tabbar-ind" aria-hidden="true"></span>
+  <button type="button" class="tabbar-b on" data-t="mine" aria-pressed="true" aria-label="Мои книги" data-ftip="Мои книги"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.8C10.6 5.4 8.6 4.8 6.5 4.8H3v13.4h3.5c2.1 0 4 .6 5.5 1.9 1.5-1.3 3.4-1.9 5.5-1.9H21V4.8h-3.5c-2.1 0-4.1.6-5.5 2z"/><path d="M12 6.8v13.3"/></svg></button>
+  <button type="button" class="tabbar-b" data-t="shared" aria-pressed="false" aria-label="Общие книги" data-ftip="Общие книги"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="4" height="15" rx="1"/><rect x="9.5" y="4.5" width="4" height="15" rx="1"/><path d="M16.4 6l3.6 1-2.6 12.6-3.6-1z"/></svg></button>
+  <button type="button" class="tabbar-b tabbar-news" data-news="1" aria-pressed="false" aria-label="Журнал — обновления и статьи" data-ftip="Журнал" data-ftip-sub="обновления и статьи"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M8 9h6M8 13h8M8 17h5"/></svg></button>
+  <span class="tabbar-lbl" id="tabbarLbl" aria-hidden="true"></span>
+</div>
+<section id="newsPage" aria-label="Журнал — обновления и статьи" hidden>
+  <header class="np-top">
+    <button type="button" class="ibtn np-back" id="npBack" title="Назад" data-ftip="Назад" data-ftip-sub="вернуться в библиотеку" aria-label="Назад в библиотеку">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m0 0 6-6m-6 6 6 6"/></svg>
+    </button>
+    <div class="brand"><span class="dia"></span><b>ЖУРНАЛ</b><small>обновления и статьи</small></div>
+    <span class="sp"></span>
+    <button type="button" class="m-btn np-new" id="npNew" hidden>НОВАЯ СТАТЬЯ</button>
+  </header>
+  <div class="np-tabs" role="tablist" aria-label="Разделы журнала">
+    <button type="button" class="np-tab on" id="npTabUpd" role="tab" aria-selected="true" data-nt="updates">Обновления</button>
+    <button type="button" class="np-tab" id="npTabArt" role="tab" aria-selected="false" data-nt="articles">Статьи разработчиков</button>
+  </div>
+  <div class="np-body" id="npBody">
+    <ol class="np-list" id="npUpdates" aria-label="Обновления сайта"></ol>
+    <div class="np-list np-cards" id="npArticles" aria-label="Статьи разработчиков" hidden></div>
+    <p class="np-empty" id="npEmpty" hidden><b>пока пусто</b>Статьи появятся здесь — их пишет разработчик</p>
+    <article class="np-read" id="npRead" hidden aria-label="Статья"></article>
+    <div class="np-edit" id="npEdit" hidden>
+      <div class="np-f"><label for="npFTitle">Заголовок</label>
+        <input id="npFTitle" type="text" maxlength="140" placeholder="О чём статья" autocomplete="off"></div>
+      <div class="np-f"><label for="npFTag">Рубрика</label>
+        <input id="npFTag" type="text" maxlength="30" placeholder="например: Вёрстка" autocomplete="off"></div>
+      <div class="np-f"><label for="npFBody">Текст — пустая строка начинает новый абзац</label>
+        <textarea id="npFBody" rows="12" placeholder="Пишите как есть, без разметки"></textarea></div>
+      <label class="np-f-chk"><input id="npFStatus" type="checkbox"><span>Черновик — виден только админу</span></label>
+      <div class="np-acts">
+        <button type="button" class="m-btn" id="npFCancel">Отмена</button>
+        <button type="button" class="m-btn danger" id="npFDelete" hidden>Удалить</button>
+        <span class="sp"></span>
+        <button type="button" class="m-btn primary" id="npFSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
+</section>
 <div id="toast" role="status"></div>
 <div id="printBook" aria-hidden="true"></div>
 
@@ -719,5 +816,9 @@
 <script src="js/21-shared.js?v=27"></script>
 <script src="js/22-assistant.js?v=27"></script>
 <script src="js/23-music.js?v=27"></script>
+<script src="js/24-import.js?v=27"></script>
+<script src="js/25-ui.js?v=27"></script>
+<script src="js/26-settings.js?v=27"></script>
+<script src="js/27-news.js?v=27"></script>
 </body>
 </html>

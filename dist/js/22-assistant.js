@@ -1468,7 +1468,7 @@ function aiCheckHtmlVer(){
     bar.setAttribute('role','status');
     bar.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99999;'+
       'display:flex;gap:12px;align-items:center;background:var(--panel,#22242c);color:var(--ink,#f5f5f7);'+
-      'border:1px solid var(--line,#3c3f4b);border-radius:var(--r-md,12px);padding:10px 14px;'+
+      'border:1px solid var(--line,#3c3f4b);border-radius:var(--r-md,10px);padding:10px 14px;'+
       'font:14px/1.4 var(--f-ui,-apple-system,system-ui,sans-serif);box-shadow:var(--shadow,0 10px 34px rgba(0,0,0,.4))';
     var txt=document.createElement('span');
     txt.textContent='Сайт обновился, а страница в кэше устарела'+
@@ -1476,7 +1476,7 @@ function aiCheckHtmlVer(){
     var btn=document.createElement('button');
     btn.type='button';
     btn.textContent='Обновить';
-    btn.style.cssText='background:var(--accent,#6c8cff);color:var(--bg,#161411);border:0;border-radius:var(--r-sm,8px);'+
+    btn.style.cssText='background:var(--accent,#6c8cff);color:var(--bg,#161411);border:0;border-radius:var(--r-sm,6px);'+
       'padding:7px 14px;font:600 13px/1 var(--f-ui,-apple-system,system-ui,sans-serif);letter-spacing:.04em;cursor:pointer';
     btn.addEventListener('click',function(){location.reload()});
     var x=document.createElement('button');

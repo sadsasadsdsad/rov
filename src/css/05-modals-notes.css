@@ -10,7 +10,7 @@
 .wv-dia{width:10px;height:10px;background:var(--accent);transform:rotate(45deg);flex:0 0 auto}
 .wv-type{font-family:var(--f-ui);font-size:9px;letter-spacing:.22em;text-transform:uppercase;flex:0 0 auto;opacity:.9}
 .wv-foot{display:flex;justify-content:center;align-items:center;gap:10px;padding:14px 0 4px;flex:0 0 auto}
-.m-btn{border:1px solid var(--line);border-radius:8px;padding:8px 13px;font-family:var(--f-ui);font-size:10px;letter-spacing:.08em;color:var(--ink2);transition:border-color .15s,color .15s,background .15s;background:transparent}
+.m-btn{border:1px solid var(--line);border-radius:var(--r-md);padding:8px 13px;font-family:var(--f-ui);font-size:10px;letter-spacing:.08em;color:var(--ink2);transition:border-color .15s,color .15s,background .15s;background:transparent}
 /* disabled должен выглядеть отключённым (раньше — неотличим от рабочего) */
 .m-btn[disabled],.m-btn:disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
 .m-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -22,8 +22,8 @@
 .hc-tl.empty{height:auto;margin:6px 0 2px;font-size:10px;color:var(--ink3);font-style:italic}
 .hc-tl.empty::before{display:none}
 .hc-tick{position:absolute;top:50%;transform:translate(-50%,-50%);width:6px;height:6px}
-.hc-tick i{position:absolute;inset:0;background:var(--accent);transform:rotate(45deg);border-radius:1px}
-.hc-tick em{position:absolute;left:50%;transform:translateX(-50%);font-style:normal;font-family:var(--f-ui);font-size:8px;color:var(--ink3);white-space:nowrap;letter-spacing:.04em;background:var(--card);border:1px solid var(--line2);padding:2px 7px;border-radius:99px;font-weight:500}
+.hc-tick i{position:absolute;inset:0;background:var(--accent);transform:rotate(45deg);border-radius:var(--r-xs)}
+.hc-tick em{position:absolute;left:50%;transform:translateX(-50%);font-style:normal;font-family:var(--f-ui);font-size:8px;color:var(--ink3);white-space:nowrap;letter-spacing:.04em;background:var(--card);border:1px solid var(--line2);padding:2px 7px;border-radius:var(--r-pill);font-weight:500}
 .hc-tick.top em{bottom:calc(100% + 5px)}
 .hc-tick.bottom em{top:calc(100% + 5px)}
 .hc-tl.dense .hc-tick em{display:none}
@@ -35,7 +35,7 @@
 .hc-count{font-family:var(--f-ui);font-size:8.5px;color:var(--ink3);margin-top:4px;letter-spacing:.03em}
 .wp-sug-label{font-family:var(--f-ui);font-size:8.5px;letter-spacing:.16em;color:var(--ink3);margin:12px 0 6px;text-transform:uppercase;line-height:1.6}
 .m-forms{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px}
-.m-forms span{font-family:var(--f-ui);font-size:9px;color:var(--ink2);border:1px solid var(--line2);border-radius:99px;padding:3px 8px}
+.m-forms span{font-family:var(--f-ui);font-size:9px;color:var(--ink2);border:1px solid var(--line2);border-radius:var(--r-pill);padding:3px 8px}
 .wm-qs{display:flex;flex-direction:column;gap:6px}
 .wm-more{font-family:var(--f-ui);font-size:8.5px;color:var(--ink3);text-align:center;margin-top:9px;letter-spacing:.14em;text-transform:uppercase}
 /* энциклопедия открывается на весь экран (просьба: «энц и её разделы —
@@ -43,7 +43,7 @@
    геометрия фиксирована inset:0.
    Открытие: подъём + прозрачность без масштаба — текст не «мылится»,
    а will-change держит полноэкранный размытый слой на композиторе */
-#wikiPanel{position:fixed;inset:0;background:var(--card-glass);border:0;border-radius:0;box-shadow:none;backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);z-index:90;transform:translateY(12px);transform-origin:50% 0;opacity:0;visibility:hidden;will-change:transform,opacity;transition:transform .4s cubic-bezier(.2,.75,.2,1),opacity .28s,visibility .4s;display:flex;flex-direction:column;overflow:hidden}
+#wikiPanel{position:fixed;inset:0;background:var(--card-glass);border:0;border-radius:0;box-shadow:none;z-index:90;transform:translateY(12px);transform-origin:50% 0;opacity:0;visibility:hidden;will-change:transform,opacity;transition:transform .4s cubic-bezier(.2,.75,.2,1),opacity .28s,visibility .4s;display:flex;flex-direction:column;overflow:hidden}
 #wikiPanel.on{transform:none;opacity:1;visibility:visible}
 /* маленький режим (кнопка #wpFull): главный бокс без закругления и тени —
    упирается в верхнюю линию (хидер, 54px) и нижнюю линию (строка статуса,
@@ -59,7 +59,6 @@
   border-left:1px solid var(--line2);
   border-radius:0;
   box-shadow:none;
-  backdrop-filter:none;-webkit-backdrop-filter:none;
 }
 /* 4 вкладки в узкой полосе — табы без min-width и уже, кегль прежний */
 #wikiPanel.win .wp-tab{min-width:0;padding:7px 10px}
@@ -90,7 +89,7 @@
 }
 .wp-tabs-indicator{
   position:absolute;top:8px;bottom:10px;left:0;
-  border-radius:8px;background:var(--sel);border:1px solid var(--accent);
+  border-radius:var(--r-md);background:var(--sel);border:1px solid var(--accent);
   pointer-events:none;z-index:0;
   transition:transform .5s cubic-bezier(.22,.8,.24,1),width .5s cubic-bezier(.22,.8,.24,1),opacity .25s;
   opacity:0;will-change:transform,width;
@@ -99,7 +98,7 @@
 .wp-tab{
   flex:0 1 auto;
   min-width:88px;max-width:170px;
-  position:relative;z-index:1;padding:7px 14px;border-radius:8px;
+  position:relative;z-index:1;padding:7px 14px;border-radius:var(--r-md);
   font-family:var(--f-ui);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
   color:var(--ink3);transition:color .25s;
   background:transparent;border:0;white-space:nowrap;
@@ -118,7 +117,7 @@
 #wpSearch:focus{border-color:var(--accent)}
 #wpSearch::placeholder{color:var(--ink3);font-family:var(--f-ui);font-style:normal;letter-spacing:.02em}
 .wp-filters{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;padding:0 16px 11px;border-bottom:1px dashed var(--line2);flex:0 0 auto}
-.wp-f{position:relative;border:1px solid var(--line2);border-radius:99px;padding:4px 10px 4px 20px;font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;color:var(--ink3);transition:border-color .15s,color .15s,background .15s;text-transform:uppercase;background:transparent}
+.wp-f{position:relative;border:1px solid var(--line2);border-radius:var(--r-pill);padding:4px 10px 4px 20px;font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;color:var(--ink3);transition:border-color .15s,color .15s,background .15s;text-transform:uppercase;background:transparent}
 .wp-f::before{content:"";position:absolute;left:8px;top:50%;margin-top:-2.5px;width:5px;height:5px;transform:rotate(45deg);background:var(--tc,var(--ink3));opacity:.85;transition:background .15s}
 .wp-f:hover{border-color:var(--accent);color:var(--accent)}
 .wp-f.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
@@ -132,14 +131,14 @@
 .wp-glabel{font-family:var(--f-ui);font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink3);display:flex;align-items:baseline;gap:7px;padding-bottom:6px;margin-bottom:8px;border-bottom:1px dashed var(--line2)}
 .wp-glabel .wp-gn{color:var(--accent);letter-spacing:.06em}
 .wg-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px}
-.wk-card{background:transparent;border:1px dashed var(--line);border-radius:9px;padding:8px 11px;cursor:pointer;transition:border-color .15s,background .15s;position:relative;content-visibility:auto;contain-intrinsic-size:auto 72px}
+.wk-card{background:transparent;border:1px dashed var(--line);border-radius:var(--r-md);padding:8px 11px;cursor:pointer;transition:border-color .15s,background .15s;position:relative;content-visibility:auto;contain-intrinsic-size:auto 72px}
 .wk-card:hover{border-color:var(--accent);background:var(--hover)}
 .wk-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .wk-open{display:flex;align-items:center;gap:7px;flex:1;min-width:0;overflow:hidden;text-align:left}
 .wk-dia{width:7px;height:7px;transform:rotate(45deg);flex:0 0 auto;background:var(--ink3)}
 .wk-name{font-weight:600;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
 .wk-card[data-type="person"] .wk-name{color:var(--accent)}
-.wk-type{font-family:var(--f-ui);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);border-radius:99px;padding:2px 7px;flex:0 0 auto}
+.wk-type{font-family:var(--f-ui);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);border-radius:var(--r-pill);padding:2px 7px;flex:0 0 auto}
 .wk-del{width:18px;height:18px;display:grid;place-items:center;color:var(--ink3);font-size:13px;line-height:1;opacity:0;transition:opacity .15s,color .15s;flex:0 0 auto;background:transparent;border:0}
 .wk-card:hover .wk-del,.wk-card:focus-within .wk-del{opacity:1}
 .wk-del:hover{color:var(--accent)}
@@ -150,10 +149,10 @@
 .wp-empty{font-family:var(--f-ui);font-size:10.5px;color:var(--ink3);font-style:italic;padding:16px 8px;line-height:1.6;text-align:center}
 .wp-empty b{color:var(--ink2);font-style:normal;font-weight:500}
 .np-bar{display:flex;gap:8px;align-items:center;padding:14px 26px 10px;flex:0 0 auto;max-width:1280px;margin:0 auto;width:100%}
-#npSearch{flex:1;background:transparent;border:1px solid var(--line2);border-radius:8px;padding:9px 13px;font-family:var(--f-ui);font-size:12px;color:var(--ink);outline:none;transition:border-color .15s;min-width:0}
+#npSearch{flex:1;background:transparent;border:1px solid var(--line2);border-radius:var(--r-md);padding:9px 13px;font-family:var(--f-ui);font-size:12px;color:var(--ink);outline:none;transition:border-color .15s;min-width:0}
 #npSearch:focus{border-color:var(--accent)}
 #npSearch::placeholder{color:var(--ink3);font-family:var(--f-ui);letter-spacing:.02em}
-.note-card{border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:9px;padding:9px 11px;background:var(--card);transition:border-color .16s,background .16s;cursor:pointer}
+.note-card{border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:var(--r-md);padding:9px 11px;background:var(--card);transition:border-color .16s,background .16s;cursor:pointer}
 .note-card:hover{border-color:var(--accent)}
 .note-head{display:flex;align-items:center;gap:6px;font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin-bottom:5px;overflow:hidden}
 .note-head b{color:var(--accent);font-weight:500;white-space:nowrap}
@@ -162,28 +161,28 @@
 .note-card.open .note-txt,.note-card:focus-within .note-txt{max-height:none}
 .note-acts{display:flex;gap:6px;margin-top:8px;opacity:0;transition:opacity .15s;flex-wrap:wrap}
 .note-card:hover .note-acts,.note-card.open .note-acts,.note-card:focus-within .note-acts{opacity:1}
-.note-btn{font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);border-radius:6px;padding:3px 8px;background:transparent;transition:color .15s,border-color .15s}
+.note-btn{font-family:var(--f-ui);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);border:1px solid var(--line2);border-radius:var(--r-sm);padding:3px 8px;background:transparent;transition:color .15s,border-color .15s}
 .note-btn:hover{color:var(--accent);border-color:var(--accent)}
-
 /* ── Окно музыки (#musicModal) — бесконечные мелодии ──────────────────────
    ПАНЕЛЬ-ДРОПДАУН: выезжает ИЗ-ПОД ХИДЕРА как его продолжение, НЕ на весь
    экран и СОЖМА ПО ГОРИЗОНТАЛИ: узкая (≤720px) и по центру — висит под
    шапкой закладкой со скруглённым низом и боковыми линиями; тот же фон
    var(--bg). Скрывается translateY(-100%) под хедер (z-index:11 < 12).
    Внутри: шапка-строка (как в хидере: ромб + заголовок + подпись +
-   линейка + ✕), затем список #msField НА ВСЮ ШИРИНУ (сетка В ДВА
-   РЯДА, карточки сжаты), ТРАНСПОРТНАЯ СТРОКА (.ms-bottom): круг play
-   40px с красной волосяной рамкой СЛЕВА от слайдера громкости с
+   линейка + ✕), затем ТРЕК-ЛИСТ #msField НА ВСЮ ШИРИНУ — оглавление
+   в один ряд: номер (01…31), эквалайзер, название и настроение
+   справа; строки разделены волосяными линиями, активная строка
+   залита акцентом. ТРАНСПОРТНАЯ СТРОКА (.ms-bottom): круг play
+   40px — КРАСНЫЙ, с белой иконкой, СЛЕВА от слайдера громкости с
    НАСЕЧКАМИ (.ms-scale/.ms-ticks), СПРАВА — название текущей
    мелодии (#msNow); внизу подсказка и ОСТАНОВИТЬ.
-   Эквалайзера-полосок БОЛЬШЕ НЕТ (просьба: «убери полоски и
-   перенеси круг к громкости слева»).
+   Полоски эквалайзера видны только у активной строки.
    Список: маска-растворение низа, плавная прокрутка.
-   .playing — «играет»: круг «дышит», капсула танцует.
+   .playing — «играет»: круг «дышит», полоски танцуют.
    #muPill — МИНИМАЛЬНЫЙ плеер-индикатор при СВЁРНУТОЙ панели. */
-#musicModal{position:fixed;top:54px;left:50%;width:min(720px,calc(100vw - 28px));z-index:11;display:block;background:var(--bg);border:1px solid var(--line2);border-top:0;border-radius:0 0 18px 18px;box-shadow:0 20px 36px -24px rgba(0,0,0,.34);height:min(330px,calc(100vh - 74px));transform:translate(-50%,-100%);visibility:hidden;pointer-events:none;transition:transform .34s cubic-bezier(.2,.75,.2,1),visibility .34s}
+#musicModal{position:fixed;top:54px;left:50%;width:min(720px,calc(100vw - 28px));z-index:11;display:block;background:var(--bg);border:1px solid var(--line2);border-top:0;border-radius:0 0 var(--r-xl) var(--r-xl);box-shadow:0 20px 36px -24px rgba(0,0,0,.34);height:min(330px,calc(100vh - 74px));transform:translate(-50%,-100%);visibility:hidden;pointer-events:none;transition:transform .34s cubic-bezier(.2,.75,.2,1),height .3s cubic-bezier(.2,.75,.2,1),visibility .34s}
 #musicModal.on{transform:translate(-50%,0);visibility:visible;pointer-events:auto}
-.ms-card{position:absolute;inset:0;width:auto;height:auto;max-height:none;background:none;border:0;border-radius:0;box-shadow:none;padding:0;display:flex;flex-direction:column;transform:none;transition:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+.ms-card{position:absolute;inset:0;width:auto;height:auto;max-height:none;background:none;border:0;border-radius:0;box-shadow:none;padding:0;display:flex;flex-direction:column;transform:none;transition:none;}
 /* шапка панели — строка в стиле хидера */
 .ms-head{display:flex;align-items:center;gap:10px;flex:0 0 auto;padding:9px 14px;border-bottom:1px solid var(--line2)}
 .ms-head b{display:flex;align-items:center;gap:9px;flex:0 0 auto;font-size:14px;font-weight:600;letter-spacing:.01em}
@@ -197,9 +196,9 @@
 /* ТРАНСПОРТНАЯ СТРОКА: круг play/pause СЛЕВА от громкости, справа —
    название текущей мелодии; эквалайзера-полосок больше НЕТ */
 .ms-bottom{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:10px 14px 0}
-/* круг: белый, с КРАСНОЙ волосяной рамкой — в тон капсулам списка */
-.ms-play{position:relative;width:40px;height:40px;border-radius:50%;border:1px solid var(--accent);background:#fff;color:var(--accent);display:grid;place-items:center;cursor:pointer;transition:background .15s,transform .12s;flex:0 0 auto}
-.ms-play:hover{background:var(--sel)}
+/* круг: красная заливка с белой иконкой — главная кнопка транспорта */
+.ms-play{position:relative;width:40px;height:40px;border-radius:50%;border:1px solid var(--accent);background:var(--accent);color:#fff;display:grid;place-items:center;cursor:pointer;transition:background .15s,transform .12s;flex:0 0 auto}
+.ms-play:hover{background:color-mix(in oklch,var(--accent) 84%,#000)}
 .ms-play:active{transform:scale(.94)}
 .ms-play svg{width:15px;height:15px}
 .ms-play .ic-play{margin-left:1px}
@@ -211,27 +210,26 @@
 .ms-now b{display:block;font-family:var(--f-ui);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ms-now i{display:block;margin-top:3px;font-style:normal;font-size:9px;letter-spacing:.03em;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @keyframes msBounce{from{transform:scaleY(.12)}to{transform:scaleY(1)}}
-/* список мелодий — ДВА РЯДА (сетка из 2 колонок), карточки СЖАТЫ;
-   низ списка КРАСИВО растворяется (маска-градиент), прокрутка плавная */
-.ms-field{flex:1 1 auto;min-width:0;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:5px 8px;pointer-events:auto;scrollbar-width:none;padding-bottom:8px;-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 44px),transparent)}
+/* трек-лист мелодий — ОГЛАВЛЕНИЕ В ОДИН РЯД: номер, эквалайзер,
+   название и настроение справа; строки разделены волосяными
+   линиями, активная строка залита акцентом; низ списка КРАСИВО
+   растворяется (маска-градиент), прокрутка плавная */
+.ms-field{flex:1 1 auto;min-width:0;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;display:grid;grid-template-columns:1fr;align-content:start;gap:0;pointer-events:auto;scrollbar-width:none;padding-bottom:8px;-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 44px),transparent)}
 .ms-field::-webkit-scrollbar{width:0;height:0}
 .ms-field.end{-webkit-mask-image:none;mask-image:none}   /* дошли до низа — без растворения */
-.ms-item{position:static;pointer-events:auto;display:flex;align-items:center;gap:6px;width:100%;min-width:0;border:1px solid var(--accent);border-radius:8px;background:#fff;color:var(--ink);padding:4px 7px;cursor:pointer;font-family:var(--f-ui);font-size:11px;transition:background .15s,color .15s,border-color .15s}
+.ms-item{position:static;pointer-events:auto;display:flex;align-items:center;gap:10px;width:100%;min-width:0;border:0;border-bottom:1px dashed var(--line2);border-radius:var(--r-sm);background:transparent;color:var(--ink);padding:5px 8px;cursor:pointer;font-family:var(--f-ui);font-size:12px;text-align:left;transition:background .15s,color .15s}
 .ms-item:hover{background:var(--sel)}
-.ms-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ms-item:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ms-num{flex:0 0 auto;width:20px;font-size:9.5px;letter-spacing:.08em;color:var(--ink3);text-align:right;font-variant-numeric:tabular-nums}
 .ms-item b{font-weight:600;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
-.ms-mood{font-size:9px;letter-spacing:.02em;opacity:.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 auto;text-align:right;padding-left:6px;border-left:1px solid var(--line2)}
-.ms-item.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-.ms-item.on .ms-mood{opacity:.85;border-left-color:rgba(255,255,255,.45)}
-/* тёмная тема: тёмное стекло со светлым текстом и красной рамкой */
-[data-theme=dark] .ms-item{background:rgba(34,30,25,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--ink);border-color:rgba(255,106,82,.75)}
-[data-theme=dark] .ms-item:hover{background:rgba(44,39,32,.94)}
-[data-theme=dark] .ms-item .ms-mood{border-left-color:rgba(233,228,214,.22)}
-[data-theme=dark] .ms-item.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-[data-theme=dark] .ms-item.on .ms-eq i{background:#fff}
-/* иконка-эквалайзер: 3 толстые полоски, выровнены по низу и между собой */
-.ms-eq{display:flex;align-items:flex-end;justify-content:center;gap:3px;height:13px;flex:0 0 auto;width:17px}
-.ms-eq i{width:4px;height:100%;border-radius:2px;background:var(--accent);transform:scaleY(.6);transform-origin:bottom}
+.ms-mood{font-size:9px;letter-spacing:.06em;text-transform:uppercase;opacity:.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 0 auto;margin-left:auto;padding-left:10px}
+.ms-item.on{background:var(--accent);color:#fff;border-bottom-color:transparent}
+.ms-item.on .ms-num{color:rgba(255,255,255,.72)}
+.ms-item.on .ms-mood{opacity:.85}
+/* иконка-эквалайзер: 3 толстые полоски — только у активной строки */
+.ms-eq{display:none;align-items:flex-end;justify-content:center;gap:3px;height:13px;flex:0 0 auto;width:17px}
+.ms-item.on .ms-eq{display:flex}
+.ms-eq i{width:4px;height:100%;border-radius:var(--r-xs);background:var(--accent);transform:scaleY(.6);transform-origin:bottom}
 .ms-item.on .ms-eq i{background:#fff}
 #musicModal.playing .ms-item.on .ms-eq i{animation:msBounce .8s ease-in-out infinite alternate}
 #musicModal.playing .ms-item.on .ms-eq i:nth-child(2){animation-duration:1.05s}
@@ -246,47 +244,45 @@
 .ms-ticks{position:absolute;left:7px;right:7px;top:50%;margin-top:2px;height:7px;pointer-events:none;background:repeating-linear-gradient(90deg,var(--ink3) 0 1px,transparent 1px 10%) 0 0/100% 7px no-repeat,repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px 2.5%) 0 0/100% 4px no-repeat}
 .ms-ticks::after{content:'';position:absolute;top:0;right:0;width:1px;height:7px;background:var(--ink3)}
 .ms-vol input[type=range]{-webkit-appearance:none;appearance:none;position:relative;z-index:1;width:100%;min-width:0;height:16px;background:transparent;cursor:pointer}
-.ms-vol input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:99px;background:linear-gradient(90deg,var(--accent) 0 var(--p,55%),var(--line) var(--p,55%) 100%)}
+.ms-vol input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:var(--r-pill);background:linear-gradient(90deg,var(--accent) 0 var(--p,55%),var(--line) var(--p,55%) 100%)}
 .ms-vol input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-5.5px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
-.ms-vol input[type=range]::-moz-range-track{height:3px;border-radius:99px;background:var(--line)}
-.ms-vol input[type=range]::-moz-range-progress{height:3px;border-radius:99px;background:var(--accent)}
+.ms-vol input[type=range]::-moz-range-track{height:3px;border-radius:var(--r-pill);background:var(--line)}
+.ms-vol input[type=range]::-moz-range-progress{height:3px;border-radius:var(--r-pill);background:var(--accent)}
 .ms-vol input[type=range]::-moz-range-thumb{width:12px;height:12px;border:2px solid var(--bg);border-radius:50%;background:var(--accent)}
-.ms-vol input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:4px}
+.ms-vol input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:var(--r-xs)}
 .ms-foot{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:14px;margin:0;padding:8px 14px 12px;pointer-events:auto}
 .ms-hint{font-size:10.5px;line-height:1.5;color:var(--ink3);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ms-foot .m-btn:hover{background:var(--sel)}
 /* узкий экран: панель выше (почти до низа), список мелодий — на всю ширину */
 @media (max-width:640px){
-  #musicModal{top:54px;width:calc(100vw - 16px);height:min(560px,calc(100vh - 68px));border-radius:0 0 14px 14px}
+  #musicModal{top:54px;width:calc(100vw - 16px);height:min(560px,calc(100vh - 68px));border-radius:0 0 var(--r-lg) var(--r-lg)}
   .ms-sub{display:none}
   .ms-rule{min-width:8px}
   .ms-body{padding:10px 12px 0}
-  .ms-field{align-items:center}
   .ms-item{position:static;max-width:100%}
   /* узкая колонка: настроение убираем, чтобы имя мелодии читалось целиком */
   .ms-mood{display:none}
-  .ms-item b{flex:1 1 auto;text-align:center}
+  .ms-item b{flex:1 1 auto}
   .ms-bottom{padding:8px 12px 0;gap:10px}
-  /* места мало: подпись слайвера и название мелодии убираем —
-     имя и так подсвечено красной капсулой в списке */
+  /* места мало: подпись слайдера и название мелодии убираем —
+     имя и так подсвечено в списке */
   .ms-vol .lbl{display:none}
   .ms-now{display:none}
   .ms-foot{padding:6px 12px 10px}
 }
-
 /* ── Мини-плеер #muPill — «вывод» при свёрнутой панели ─────────────────────
    СТИЛИЗОВАН как капсула в духе проекта: бумажное стекло, волосяная
    рамка и мягкая тень, КРАСНЫЙ РОМБ-ЗНАК (как в шапке), название
    мелодии капсом и круглая кнопка play/pause. Видна ТОЛЬКО пока музыка
    играет и панель свёрнута; клик по капсуле — вернуть окно, кнопка —
    пауза; на полке библиотеки окно не открывается (только пауза). */
-#muPill{position:fixed;left:16px;bottom:18px;z-index:96;display:flex;align-items:center;gap:9px;padding:5px 6px 5px 11px;background:var(--card-glass);border:1px solid var(--line);border-radius:99px;box-shadow:var(--shadow-sm);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);color:var(--ink);font-family:var(--f-ui);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(10px) scale(.97);transition:opacity .28s,transform .28s cubic-bezier(.2,.75,.2,1),visibility .28s,border-color .2s;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none}
+#muPill{position:fixed;left:16px;bottom:18px;z-index:96;display:flex;align-items:center;gap:9px;padding:5px 6px 5px 11px;background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-pill);box-shadow:var(--shadow-sm);color:var(--ink);font-family:var(--f-ui);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(10px) scale(.97);transition:opacity .28s,transform .28s cubic-bezier(.2,.75,.2,1),visibility .28s,border-color .2s;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none}
 #muPill.on{opacity:1;visibility:visible;pointer-events:auto;transform:none}
 #muPill:hover{transform:translateY(-2px);border-color:var(--accent)}
 #muPill:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 /* знак — красный ромб, как в шапке; панель видна только пока играет,
    поэтому едва заметное «дыхание» ромба = индикатор «сейчас играет» */
-#muPill .mu-dia{width:7px;height:7px;flex:0 0 auto;background:var(--accent);transform:rotate(45deg);border-radius:1px;animation:muDia 2.6s ease-in-out infinite alternate}
+#muPill .mu-dia{width:7px;height:7px;flex:0 0 auto;background:var(--accent);transform:rotate(45deg);border-radius:var(--r-xs);animation:muDia 2.6s ease-in-out infinite alternate}
 @keyframes muDia{from{opacity:1}to{opacity:.4}}
 #muPill .mu-name{max-width:200px;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);padding-right:3px}
 #muPill .mu-pp{width:26px;height:26px;flex:0 0 auto;border-radius:50%;border:1px solid var(--accent);background:var(--accent);color:#fff;display:grid;place-items:center;cursor:pointer;transition:background .15s,transform .12s,color .15s}
@@ -297,4 +293,3 @@
 [data-theme=dark] #muPill .mu-pp{color:#161411}
 @media (max-width:560px){#muPill{left:10px;bottom:74px;gap:7px;padding:4px 5px 4px 9px}#muPill .mu-name{max-width:130px;font-size:9.5px}#muPill .mu-pp{width:24px;height:24px}}
 @media (prefers-reduced-motion:reduce){#musicModal.playing .ms-play,#musicModal.playing .ms-item.on .ms-eq i,#muPill .mu-dia{animation:none;transform:none}}
-

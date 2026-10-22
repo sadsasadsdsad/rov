@@ -8,12 +8,12 @@
  * Порядок: после 05; разметка тулбара — 12-graph.js.
  * ========================================================================== */
 /* ====== ГРАФ — улучшенная версия ====== */
-.gp-bar{display:flex;gap:6px;align-items:center;padding:8px 12px;flex:0 0 auto;flex-wrap:wrap;border-bottom:1px dashed var(--line2);background:var(--card-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);position:relative;z-index:2}
-.gp-mode{font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);border-radius:99px;padding:4px 9px;color:var(--ink3);transition:color .16s,border-color .16s,background .16s;background:transparent;white-space:nowrap}
+.gp-bar{display:flex;gap:6px;align-items:center;padding:8px 12px;flex:0 0 auto;flex-wrap:wrap;border-bottom:1px dashed var(--line2);background:var(--card-glass);position:relative;z-index:2}
+.gp-mode{font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);border-radius:var(--r-pill);padding:4px 9px;color:var(--ink3);transition:color .16s,border-color .16s,background .16s;background:transparent;white-space:nowrap}
 .gp-mode:hover{color:var(--ink);border-color:var(--line)}
 .gp-mode.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
 .gp-sp{flex:1;min-width:2px}
-.gp-toggle{font-family:var(--f-ui);font-size:9px;letter-spacing:.08em;text-transform:uppercase;border:1px dashed var(--line2);border-radius:99px;padding:4px 9px;color:var(--ink3);transition:color .16s,border-color .16s,background .16s;background:transparent;white-space:nowrap}
+.gp-toggle{font-family:var(--f-ui);font-size:9px;letter-spacing:.08em;text-transform:uppercase;border:1px dashed var(--line2);border-radius:var(--r-pill);padding:4px 9px;color:var(--ink3);transition:color .16s,border-color .16s,background .16s;background:transparent;white-space:nowrap}
 .gp-toggle:hover{border-color:var(--accent);color:var(--accent)}
 .gp-toggle.on{border-style:solid;border-color:var(--accent);color:var(--accent);background:var(--sel)}
 /* слайдеры живут прямо в тулбаре — отдельного ряда больше нет: карта
@@ -23,7 +23,7 @@
 .gp-slider .gp-val{color:var(--accent);min-width:26px;text-align:right;font-weight:500;letter-spacing:.02em}
 .gp-typebar{display:flex;gap:5px;padding:0 12px 6px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;border-bottom:1px dashed var(--line2);flex:0 0 auto}
 .gp-typebar::-webkit-scrollbar{display:none}
-.gp-tchip{position:relative;border:1px solid var(--line2);border-radius:99px;padding:3px 9px 3px 18px;font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;color:var(--ink3);transition:color .15s,border-color .15s,opacity .15s;text-transform:uppercase;background:transparent}
+.gp-tchip{position:relative;border:1px solid var(--line2);border-radius:var(--r-pill);padding:3px 9px 3px 18px;font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;color:var(--ink3);transition:color .15s,border-color .15s,opacity .15s;text-transform:uppercase;background:transparent}
 .gp-tchip::before{content:"";position:absolute;left:8px;top:50%;margin-top:-2.5px;width:5px;height:5px;transform:rotate(45deg);background:var(--tc,var(--ink3));opacity:.85}
 .gp-tchip:hover{color:var(--ink)}
 .gp-tchip.off{opacity:.42;text-decoration:line-through}
@@ -54,7 +54,8 @@
 #graphSvg .gnode{cursor:pointer}
 #graphSvg .gnode .gn-bg{fill:var(--card);stroke:var(--line2);stroke-width:1;transition:stroke .18s,filter .25s}
 #graphSvg .gnode:hover .gn-bg{stroke:var(--line);filter:drop-shadow(0 8px 18px rgba(25,23,18,.2))}
-#graphSvg .gnode.is-main .gn-bg{stroke:var(--accent);stroke-width:1.5}
+#graphSvg .gnode.is-main .gn-bg{stroke:var(--accent);stroke-width:1.5;filter:drop-shadow(0 4px 10px rgba(25,23,18,.13))}
+#graphSvg .gnode.is-main:hover .gn-bg{filter:drop-shadow(0 10px 22px rgba(25,23,18,.22))}
 #graphSvg .gnode.pinned .gn-bg{stroke-dasharray:4 4}
 #graphSvg .gn-halo{fill:none;stroke:var(--accent);stroke-width:1.2;stroke-dasharray:3 4;opacity:.7;transition:opacity .22s}
 #graphSvg .gn-pinring{stroke:var(--ink3);stroke-dasharray:2 3;opacity:.55}
@@ -73,10 +74,13 @@
   cursor:pointer;
 }
 #graphSvg path.glink:hover{stroke:var(--accent)!important;opacity:1!important}
+/* наведение на карточку подсвечивает её нити (.gnbr ставит 12-graph.js) */
+#graphSvg path.glink.gnbr{stroke:var(--accent);opacity:.95;stroke-width:2}
+#graphSvg.focused path.glink.gnbr{opacity:1!important}
 #graphSvg .gp-ring{fill:none;stroke:var(--line2);stroke-dasharray:2 5;opacity:.5;transition:opacity .22s}
-#graphSvg .gp-ring-label{font-family:var(--f-ui);font-size:9px;fill:var(--ink3);letter-spacing:.14em;text-transform:uppercase;opacity:.6;stroke:none;paint-order:initial;pointer-events:none;transition:opacity .22s}
+#graphSvg .gp-ring-label{font-family:var(--f-ui);font-size:9px;fill:var(--ink3);letter-spacing:.14em;text-transform:uppercase;opacity:.6;stroke:var(--card);stroke-width:3px;paint-order:stroke;pointer-events:none;transition:opacity .22s}
 /* подпись колонки одиночек в дереве («без связей · N») */
-#graphSvg .gn-cap{font-family:var(--f-ui);font-size:9px;fill:var(--ink3);letter-spacing:.14em;text-transform:uppercase;opacity:.6;stroke:none;paint-order:initial;pointer-events:none;transition:opacity .22s}
+#graphSvg .gn-cap{font-family:var(--f-ui);font-size:9px;fill:var(--ink3);letter-spacing:.14em;text-transform:uppercase;opacity:.6;stroke:var(--card);stroke-width:3px;paint-order:stroke;pointer-events:none;transition:opacity .22s}
 #graphSvg.focused .gn-cap{opacity:0!important}
 #graphSvg.focused .gp-ring,
 #graphSvg.focused .gp-ring-label{opacity:0!important}
@@ -113,10 +117,10 @@
   text-transform:uppercase;color:var(--ink3);
   pointer-events:none;line-height:1.55;
 }
-.gp-tip{position:absolute;top:8px;left:12px;background:var(--card-glass);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-family:var(--f-ui);font-size:10px;color:var(--ink2);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s;pointer-events:none;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.gp-tip{position:absolute;top:8px;left:12px;background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-md);padding:5px 10px;font-family:var(--f-ui);font-size:10px;color:var(--ink2);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s;pointer-events:none;}
 .gp-tip.on{opacity:1;visibility:visible}
 .gp-tip b{color:var(--accent);font-weight:500}
-.gp-node-tip{position:absolute;background:var(--card-glass);border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-family:var(--f-ui);font-size:10.5px;color:var(--ink);pointer-events:none;z-index:6;box-shadow:var(--shadow-sm);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);opacity:0;visibility:hidden;transition:opacity .14s,transform .14s,visibility .14s;max-width:240px;line-height:1.5;transform:translate(-50%,-100%)}
+.gp-node-tip{position:absolute;background:var(--card-glass);border:1px solid var(--line);border-radius:var(--r-md);padding:8px 11px;font-family:var(--f-ui);font-size:10.5px;color:var(--ink);pointer-events:none;z-index:6;box-shadow:var(--shadow-sm);opacity:0;visibility:hidden;transition:opacity .14s,transform .14s,visibility .14s;max-width:240px;line-height:1.5;transform:translate(-50%,-100%)}
 .gp-node-tip.on{opacity:1;visibility:visible}
 .gp-node-tip .nt-name{font-size:12.5px;font-weight:600;margin-bottom:4px;color:var(--ink);display:flex;align-items:center;gap:6px}
 .gp-node-tip .nt-dot{width:8px;height:8px;transform:rotate(45deg);display:inline-block}
@@ -127,7 +131,7 @@
 .gp-node-tip.compact .nt-name{font-size:11px;margin-bottom:0}
 .gp-node-tip .nt-type{margin-left:7px;font-size:9.5px;color:var(--ink3);font-weight:500}
 .gp-zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:4px;z-index:3}
-.gp-zoom button{width:28px;height:28px;display:grid;place-items:center;background:var(--card-glass);border:1px solid var(--line2);border-radius:7px;color:var(--ink2);transition:color .15s,border-color .15s,transform .14s ease;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.gp-zoom button{width:28px;height:28px;display:grid;place-items:center;background:var(--card-glass);border:1px solid var(--line2);border-radius:var(--r-sm);color:var(--ink2);transition:color .15s,border-color .15s,transform .14s ease;cursor:pointer;}
 .gp-zoom button:hover{color:var(--accent);border-color:var(--accent)}
 .gp-zoom button svg{width:14px;height:14px}
 
@@ -148,27 +152,27 @@
   overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
   background:var(--card-glass);border:1px solid var(--line2);border-radius:var(--r-lg);
   padding:12px 12px 10px;box-shadow:var(--shadow-sm);
-  backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);
+  
   z-index:5;opacity:0;visibility:hidden;transform:translateX(10px);pointer-events:none;
   transition:opacity .22s,transform .28s cubic-bezier(.2,.7,.2,1),visibility .28s;
 }
 .gp-rank::-webkit-scrollbar{display:none}
 .gp-rank.on{opacity:1;visibility:visible;transform:none;pointer-events:auto}
 .gp-h{margin-bottom:8px}
-.gp-main{display:flex;align-items:baseline;gap:9px;padding:10px 12px;border:1px solid var(--accent);border-radius:11px;background:var(--sel);margin-bottom:12px;flex-wrap:wrap}
+.gp-main{display:flex;align-items:baseline;gap:9px;padding:10px 12px;border:1px solid var(--accent);border-radius:var(--r-md);background:var(--sel);margin-bottom:12px;flex-wrap:wrap}
 .gp-main .gp-star{color:var(--accent);font-size:14px}
 .gp-main b{font-size:16px;font-weight:600;letter-spacing:-.01em}
 .gp-main-l{font-family:var(--f-ui);font-size:9px;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase}
 .gp-list{display:flex;flex-direction:column;gap:4px}
 /* строки-кнопки: полная ширина и выравнивание влево (button по умолчанию центрирует) */
-.gp-row{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:3px 2px;cursor:pointer;border-radius:6px;transition:background .15s;width:100%;text-align:left;font-family:var(--f-serif);line-height:1.35}
+.gp-row{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:3px 2px;cursor:pointer;border-radius:var(--r-sm);transition:background .15s;width:100%;text-align:left;font-family:var(--f-serif);line-height:1.35}
 .gp-row:hover{background:var(--hover)}
 .gp-row.is-main{font-weight:600}
 .gp-row.is-focus{background:var(--sel);border:1px solid var(--accent);padding:2px 1px}
 .gp-i{font-family:var(--f-ui);font-size:9px;color:var(--ink3);width:16px;flex:0 0 auto;text-align:right}
 .gp-name{flex:0 0 34%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}
-.gp-row .gp-bar{flex:1;height:6px;border-radius:3px;background:var(--line2);overflow:hidden;min-width:30px}
-.gp-row .gp-bar i{display:block;height:100%;border-radius:3px;background:var(--accent);transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.gp-row .gp-bar{flex:1;height:6px;border-radius:var(--r-xs);background:var(--line2);overflow:hidden;min-width:30px}
+.gp-row .gp-bar i{display:block;height:100%;border-radius:var(--r-xs);background:var(--accent);transition:width .5s cubic-bezier(.2,.7,.2,1)}
 .gp-v{font-family:var(--f-ui);font-size:9.5px;color:var(--ink3);width:38px;text-align:right;flex:0 0 auto;font-variant-numeric:tabular-nums}
 
 /* тач-устройства: чипы/кнопки тулбара до 24px+, тонкие подписи читаемее */
@@ -185,4 +189,4 @@
   .gp-bar{padding:8px 12px}
   .gp-typebar{padding:0 12px 10px}
 }
-
+

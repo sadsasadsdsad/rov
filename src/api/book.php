@@ -13,10 +13,14 @@ $id = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_GET['id'] ?? ''));
 if ($id === '' || strlen($id) > 40) json_err(400, 'bad id');   /* колонка id — VARCHAR(40) */
 
 if ($method === 'GET' || $method === 'HEAD') {
-    $row = db_one('SELECT content FROM books WHERE id = ? AND user_id = ?', [$id, $u['id']]);
+    $row = db_one('SELECT content, visibility FROM books WHERE id = ? AND user_id = ?', [$id, $u['id']]);
     if (!$row) json_err(404, 'book not found');
     $b = json_decode((string)$row['content'], true);
     if (!is_array($b)) json_err(500, 'corrupt book');
+    /* колонка visibility — истина в последней инстанции: модерация
+       (moderate.php) снимает публикацию, не переписывая content-блоб,
+       и в ответе не должно оставаться устаревшее значение */
+    $b['visibility'] = (string)$row['visibility'];
     json_out(['book' => $b]);
 }
 

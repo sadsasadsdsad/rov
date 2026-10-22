@@ -19,6 +19,15 @@
  *     мелодией, и у каждой 32-шаговой фразы своя сила (MU_DYN) — музыка
  *     говорит фразами, а не стоит ровной стеной. Фонового шума нет:
  *     ровный шумной фон читался как вентилятор (просьба «убери его»).
+ *     ЕЩЁ КРАСИВЕЕ (новая просьба): у мелодии ХОРУС — две тихие короткие
+ *     задержки, медленно «плывущие» и разведённые влево/вправо: звук
+ *     шире и мягче; пара расстроенных осцилляторов каждого голоса тоже
+ *     расходится по панораме (muPan) — мелодия и подложка объёмные;
+ *     у эха ВТОРОЙ ОТКЛИК по другую сторону (muDelayB, 2.5 шага), и оба
+ *     возврата чистятся highpass 300 — низ в отражениях не мажется,
+ *     отражения «гуляют» слева-справа; у нот ЖИВОЙ ТАЙМИНГ — начало
+ *     сдвигается на ±6 мс, сила — на ±6%: исполнение дышит, а не
+ *     стучит метрономом.
  *     Шкалы (мажор/минор/дориец/миксолидий/лидиец/фригийский/гармонический
  *     минор/пентатоники), темп (step), форма волны (wave), lowpass (lp),
  *     сила эха (echo), октавное удвоение (oct). Форма фраз:
@@ -43,15 +52,25 @@
  *   - «ПО ТЕКСТУ» — мелодия, которая СОБИРАЕТСЯ из всех остальных
  *     (просьба: «в по тексту собраны все песни и даже больше… включались
  *     когда нужно и смешивались»): анализ текста (стемы-словари: мрачные
- *     и светлые корни, слова-порывы и слова-покой + длина фраз,
- *     восклицания, КАПСЛОК) даёт тональность -1…+1 и энергию 0…1, и по
- *     ним БЛИЖАЙШИЕ треки дуют свою партию: первый — лад, форму фразы,
- *     темп, свет и эхо; «семя» (MU_SEEDS, материал сверх списка) — у
- *     мелодических форм фразы B и C, у остальных — ритм и шторки; второй
- *     — ритмическую маску либо бас, когда ритм отдало семя; ближайший с
- *     низом — бас; ближайший с перкуссией — шумовой пульс. Смена смеси —
+ *     и светлые корни, слова-порывы и слова-покой, нежность/эпос/мистика,
+ *     открытые и замкнутые образы + длина фраз, восклицания, КАПСЛОК,
+ *     рубленые тире и многоточия) даёт четыре шкалы — тональность -1…+1,
+ *     энергию 0…1, ТРЕВОГУ 0…1 и ПРОСТОР 0…1; по ним БЛИЖАЙШИЕ (по тону,
+ *     энергии и НЕРВУ рисунка) треки дуют свою партию: первый — лад,
+ *     форму фразы, темп, свет и эхо; «семя» (MU_SEEDS, материал сверх
+ *     списка) — у мелодических форм фразы B и C, у остальных — ритм и
+ *     шторки; второй — ритмическую маску либо бас, когда ритм отдало
+ *     семя; ближайший с низом — бас; ближайший с перкуссией — шумовой
+ *     пульс. Настроение держит и СВОИ ЗВУКОВЫЕ РУЧКИ (muTextApply): эхо —
+ *     голос пространства (простор и мистика — открыто, замкнуто — сухо),
+ *     свет — тональность и тревога, вес и длительность низа — мрачность
+ *     и эпос, громкость перкуссии — пульс суеты (полный покой щелчки
+ *     убирает), дрожь тремоло — тревога даже в тихом тексте, форшлаги и
+ *     рубленый ритм — суета, контраст фраз (_dynx) — суета и эпос,
+ *     воздух-искры — свет и загадочность. Смена смеси —
  *     только на границе фразы (музыкальный переход), подпись показывает,
- *     из каких песен всё собрано; в капсуле и в транспорте (#msNowMood);
+ *     из каких песен всё собрано (четыре краски настроения: тревога,
+ *     свет, простор, темп); в капсуле и в транспорте (#msNowMood);
  *   - НИЗ И ПЕРКУССИЯ — не только мелодические ноты (просьба: «сделай
  *     песни разнообразнее»): у каждого трека СВОЯ бас-линия (маска
  *     16 шагов + ходы по ступеням тоника-квинта-терция, октава ниже,
@@ -59,14 +78,15 @@
  *     ПЕРКУССИЯ (щелчки, пульс без ударной установки). Низ и перкуссия
  *     живут СВОИМИ масками, отдельно от мелодии, — слои независимы,
  *     поэтому треки звучат по-разному; подложки-аккордов по-прежнему НЕТ;
- *   - поле выбора (#msField): ДВА РЯДА — белые капсулы-мелодии сеткой
- *     2×N, карточки СЖАТЫ, с маленькими пробелами, без карточки-подложки;
- *     низ списка растворяется (маска), прокрутка плавная; капсула — красная
- *     рамка, иконка-эквалайзер, название + настроение;
+ *   - поле выбора (#msField): ТРЕК-ЛИСТ — оглавление в один ряд: номер
+ *     (01…31), эквалайзер, название и настроение справа; строки разделены
+ *     волосяными линиями, активная строка — красная заливка белым текстом,
+ *     полоски эквалайзера видны только у неё; низ списка растворяется
+ *     (маска), прокрутка плавная;
  *     muSelect(i) — клик (выбор в localStorage, переключение на лету);
- *   - ТРАНСПОРТНАЯ СТРОКА (.ms-bottom): белый круг #msPlay (40px) с
- *     КРАСНОЙ волосяной рамкой (в тон капсулам списка) СЛЕВА от слайдера
- *     громкости (у слайдера — НАСЕЧКИ .ms-ticks), СПРАВА — название
+ *   - ТРАНСПОРТНАЯ СТРОКА (.ms-bottom): КРАСНЫЙ круг #msPlay (40px, белая
+ *     иконка) СЛЕВА от слайдера громкости (у слайдера — НАСЕЧКИ
+ *     .ms-ticks), СПРАВА — название
  *     текущей мелодии и её настроение (#msNow/#msNowMood); при игре
  *     круг «дышит» (orbDance); эквалайзера-полосок больше НЕТ
  *     (просьба: «убери полоски и перенеси круг к громкости слева»);
@@ -79,7 +99,8 @@
  *     DelayNode), к ним добавляются гармония и искры (см. выше, шина
  *     muAir); аудиофайлов нет — мелодии бесконечны, без слов,
  *     работают офлайн.
- * Ключевое: openMusic, closeMusic, muPlay, muPause, muSelect, muSetVol.
+ * Ключевое: openMusic, closeMusic, muPlay, muPause, muSelect, muSetVol,
+ *   muRenderList (трек-лист окна музыки).
  * Зависимости: 01 ($, toast — через typeof). Подключается после всех (23).
  * ========================================================================== */
 "use strict";
@@ -362,6 +383,8 @@ var muPad=null,muPadLP=null;      /* синт-подложка (длинные �
 var muStr=null,muStrLP=null;      /* струнные (дыхание смычка, вибрато) */
 var muSub=null;                   /* суб-октава контрабаса (основание) */
 var muTrem=null;                  /* тремоло (дрожащие струны, напряжение) */
+var muChorus=null;                /* хорус мелодии (ширина, мягкий «шёлк») */
+var muDelayB=null;                /* второй отклик эха — по другую сторону */
 var muPlaying=false,muTimer=0,muNext=0,muStepN=0,muIdx=4;
 var muDir=1,muSeqN=0,muOstN=0,muLeap=false;    /* muLeap: после скачка — шаг назад */
 var muMotN=0,muFlN=0;                          /* счётчики: мотив-последование, арка flow */
@@ -381,23 +404,60 @@ function muEnsure(){
   var comp=muCtx.createDynamicsCompressor();
   muMaster.connect(comp); comp.connect(muCtx.destination);
   /* мягкие «эхо»: задержка с затухающим lowpass-петлёй — ДЛИННЫЙ хвост
-     (обратная связь .42, срез 2100): отражения слышны как «воздух» */
+     (обратная связь .42, срез 2100): отражения слышны как «воздух».
+     Возврат дополнительно чистится highpass 300 — низ в эхе не мажется */
   muDelay=muCtx.createDelay(2); muDelay.delayTime.value=0.54;
   var fb=muCtx.createGain(); fb.gain.value=0.42;
   var dlp=muCtx.createBiquadFilter(); dlp.type='lowpass'; dlp.frequency.value=2100;
-  muDelay.connect(dlp); dlp.connect(fb); fb.connect(muDelay);
+  var rhp=muCtx.createBiquadFilter(); rhp.type='highpass'; rhp.frequency.value=300;
+  muDelay.connect(dlp); dlp.connect(rhp); rhp.connect(fb); fb.connect(muDelay);
   muSend=muCtx.createGain(); muSend.gain.value=0.4;
   muSend.connect(muDelay);
-  /* возврат эха — ПАННО чуть вправо: мелодия в центре, отражения по
-     краю — звук объёмнее (если панорамы нет — как раньше, в центр) */
+  /* ВТОРОЙ ОТКЛИК: более долгая и тихая задержка по ДРУГУЮ сторону —
+     отражения гуляют слева-справа, звук объёмнее; своего шума у неё
+     нет, она звучит только от нот (как и первое эхо) */
+  muDelayB=muCtx.createDelay(2); muDelayB.delayTime.value=0.9;
+  var fb2=muCtx.createGain(); fb2.gain.value=0.34;
+  var dlp2=muCtx.createBiquadFilter(); dlp2.type='lowpass'; dlp2.frequency.value=1700;
+  var rhp2=muCtx.createBiquadFilter(); rhp2.type='highpass'; rhp2.frequency.value=280;
+  muDelayB.connect(dlp2); dlp2.connect(rhp2); rhp2.connect(fb2); fb2.connect(muDelayB);
+  muSend.connect(muDelayB);
+  /* возвраты эха — ПАННО по краям: мелодия в центре, отражения по
+     сторонам — звук объёмнее (если панорамы нет — оба в центр) */
   if(muCtx.createStereoPanner){
     var ep=muCtx.createStereoPanner(); ep.pan.value=0.3;
-    dlp.connect(ep); ep.connect(muMaster);
-  }else dlp.connect(muMaster);
+    rhp.connect(ep); ep.connect(muMaster);
+    var ep2=muCtx.createStereoPanner(); ep2.pan.value=-0.35;
+    rhp2.connect(ep2); ep2.connect(muMaster);
+  }else{rhp.connect(muMaster); rhp2.connect(muMaster);}
   /* шина мелодии: lowpass делает звук тёплым, без резкости */
   muMelo=muCtx.createGain(); muMelo.gain.value=0.95;
   muMeloLP=muCtx.createBiquadFilter(); muMeloLP.type='lowpass'; muMeloLP.frequency.value=2300;
   muMelo.connect(muMeloLP); muMeloLP.connect(muMaster); muMeloLP.connect(muSend);
+  /* ХОРУС МЕЛОДИИ: две тихие короткие задержки, медленно «плывущие» по
+     времени, разведены влево и вправо — мелодия шире и мягче («шёлк»).
+     Вход хоруса — тот же тёплый тембр (после lowpass), поэтому резкости
+     он не добавляет; звучит, как и всё здесь, только от нот */
+  muChorus=muCtx.createGain(); muChorus.gain.value=0.32;
+  var chA=muCtx.createDelay(0.1),chB=muCtx.createDelay(0.1);
+  chA.delayTime.value=0.011; chB.delayTime.value=0.016;
+  var chLA=muCtx.createOscillator(),chLB=muCtx.createOscillator();
+  chLA.frequency.value=0.33; chLB.frequency.value=0.21;
+  var chDA=muCtx.createGain(),chDB=muCtx.createGain();
+  chDA.gain.value=0.0016; chDB.gain.value=0.0022;
+  chLA.connect(chDA); chDA.connect(chA.delayTime);
+  chLB.connect(chDB); chDB.connect(chB.delayTime);
+  chLA.start(0); chLB.start(0);
+  muMeloLP.connect(muChorus);
+  muChorus.connect(chA); muChorus.connect(chB);
+  if(muCtx.createStereoPanner){
+    var chGA=muCtx.createGain(),chGB=muCtx.createGain();
+    chGA.gain.value=0.5; chGB.gain.value=0.5;
+    var chPA=muCtx.createStereoPanner(),chPB=muCtx.createStereoPanner();
+    chPA.pan.value=-0.5; chPB.pan.value=0.5;
+    chA.connect(chGA); chGA.connect(chPA); chPA.connect(muMaster);
+    chB.connect(chGB); chGB.connect(chPB); chPB.connect(muMaster);
+  }else{chA.connect(muMaster); chB.connect(muMaster);}
   /* яркая шина «воздуха»: искры-колокольчики идут БЕЗ lowpass —
      светятся поверх тёплой мелодии и уходят в то же эхо */
   muAir=muCtx.createGain(); muAir.gain.value=0.42;
@@ -464,22 +524,34 @@ function muApplyTone(){
   var tr=muTr(),t=muCtx.currentTime;
   muMeloLP.frequency.setTargetAtTime(tr.lp||2300,t,0.5);
   muSend.gain.setTargetAtTime(tr.echo!=null?tr.echo:0.4,t,0.5);
+  if(muAir)muAir.gain.setTargetAtTime(tr.air||0.42,t,0.5);   /* воздух — от настроения */
   /* эхо в ТАКТ темпу: 1.5 шага (лигированная восьмая) — отражения
-     ложатся в ритм и звучат музыкально, а не случайно */
+     ложатся в ритм и звучат музыкально, а не случайно; второй отклик —
+     в 2.5 шага: вместе они мягко «порхают» слева-справа */
   muDelay.delayTime.setTargetAtTime(Math.min(1.4,(tr.step||0.4)*1.5),t,0.4);
+  if(muDelayB)muDelayB.delayTime.setTargetAtTime(Math.min(1.6,(tr.step||0.4)*2.5),t,0.4);
 }
 
 /* --- «ПО ТЕКСТУ»: настроение главы → звук ---------------------------------
    Мелодия с флагом dyn живёт вместе с текстом. muTextMood() читает
    текущую главу (открытый редактор, иначе текущая глава, иначе вся
-   книга) и возвращает два числа:
+   книга) и возвращает ЧЕТЫРЕ шкалы:
      tone   — тональность настроения: -1 (мрачно) … +1 (светло),
-              по словарям МРАЧНЫХ и СВЕТЛЫХ корней;
+              по словарям МРАЧНЫХ и СВЕТЛЫХ корней; нежность, эпос
+              и мистика подправляют её в сторону света или глубины;
      energy — энергия: 0 (тихо, длинные фразы) … 1 (быстро, вскрики,
               КРИК заглавными) — по длине предложений, восклицаниям,
-              капслоку и словам-порывам против слов-покоя.
+              капслоку и словам-порывам против слов-покоя; рубленые
+              тире и многоточия с эпосом поднимают, мистика опускает;
+     tension— тревога: 0 (покой) … 1 (суета, ожидание) — слова-порывы
+              против слов-покоя плюс рубленость речи. Это ОТДЕЛЬНАЯ
+              шкала: тихий текст бывает тревожным, громкий — весёлым;
+     space  — простор: 0 (замкнуто: стены, подвалы) … 1 (открыто:
+              степи, моря, небеса) — ими рисуется эхо.
    По ним muTextRefresh() пересчитывает ЛАД И РЕГИСТР (шкалу), ТЕМП,
-   СВЕТ (lowpass), ЭХО и ПЛОТНОСТЬ: звук перекрашивается плавно
+   СВЕТ (lowpass), ЭХО, ПЛОТНОСТЬ и ручки muTextApply(): вес низа,
+   громкость перкуссии, дрожь тремоло, форшлаги, контраст фраз:
+   звук перекрашивается плавно
    (setTargetAtTime — без щелчков), а подпись настроения обновляется
    и в капсуле списка, и в транспорте (#msNowMood). Считаем раз в ~3с
    во время игры и по input в редакторе (см. хуки внизу файла). */
@@ -488,7 +560,7 @@ var MU_MT={
         'слёз','слез','крик','ненавист','холод','тень','ноч','темн','жутк','кошмар',
         'гибел','могил','мрачн','одиноч','пустын','груст','рыд','стон','плен','уныл',
         'безвыход','тлен','проклят','зловещ','стенан','отчаян','лют','злоб','мучен'],
-  bright:['свет','солнц','тепл','радост','смех','смея','счастл','любов','небес',
+  bright:['свет','солн','тепл','радост','смех','смея','счастл','любов','небес',
           'весна','улыб','звон','ярк','блеск','надежд','песн','радуг','благо',
           'торжест','восторг','нежн','добр','уют','свеж','чист','лазур','голуб',
           'зелён','зелен','легк','лёгк','безмятеж','сиян','праздн','ласков','друж',
@@ -498,7 +570,24 @@ var MU_MT={
          'рван','тороп','спеш','удар','буря','стремит','порыв','кипя','вскрик','столкн'],
   calm:['тих','медлен','покой','тишин','дремл','плавн','шелест','луна','вечер',
         'дремот','безмятеж','расслаб','спокой','ровн','дыш','туман','сумерк','звёзд',
-        'звезд','сон','затиш','вздох','леж','полеж','мурлы','нега']
+        'звезд','сон','затиш','вздох','леж','полеж','мурлы','нега'],
+  /* характеры образов: НЕЖНОСТЬ, ЭПОС и МИСТИКА — ими текст «красится»
+     даже без света и мрака (тон) и без суеты (энергия) */
+  love:['люб','нежн','ласк','объят','целу','мил','родн','верн','душе','серде',
+        'лебед','свадьб','клятв','тепло','мягч','нежен','обним','любим','любя'],
+  epic:['войн','битв','меч','стяг','княз','дружин','подвиг','слав','побед','рать',
+        'сраж','осад','штурм','крепост','герой','труб','боев','воевод','царств',
+        'трон','корон','знамя','полч','войско','сеча','знаменит','могуч'],
+  myst:['привид','призрак','чар','волш','маги','заколд','полноч','шепт','шепот','яв',
+        'мисти','чудес','загад','суевер','порч','судьб','рок','предзнам','голос',
+        'зов','ведьм','дух','мерц','свечение','кристалл','оберег','фата'],
+  /* ПРОСТОР: открытые образы против замкнутых — управляет эхом */
+  open:['степ','простор','горизонт','неб','мор','океан','берег','даль','далек',
+        'путь','троп','луг','закат','рассвет','крылат','парус','высот','полян',
+        'воздух','ширь','раздоль','ветер','облак','звёздн','звездн'],
+  closed:['стен','тюрем','подвал','замкн','потол','ячей','катакомб','лабиринт',
+          'чулан','будк','нор','пещер','ловуш','клетк','капкан','кровн','потай',
+          'заперт','темниц','камор','обложен','закут','комнат']
 };
 
 /* откуда брать текст: живой редактор (если он открыт), иначе текущая
@@ -541,26 +630,44 @@ function muTextMood(){
   var txt=muTextSrc().toLowerCase();
   var words=txt.match(/[а-яёa-z]{2,}/g)||[],n=words.length;
   var dk=muHits(txt,MU_MT.dark), br=muHits(txt,MU_MT.bright),
-      tn=muHits(txt,MU_MT.tense), cm=muHits(txt,MU_MT.calm);
-  /* тональность: светлые и мрачные корни; почти нет текста → почти нейтраль */
-  var tone=(br-dk)/(br+dk+2);
+      tn=muHits(txt,MU_MT.tense), cm=muHits(txt,MU_MT.calm),
+      lv=muHits(txt,MU_MT.love), ep=muHits(txt,MU_MT.epic),
+      my=muHits(txt,MU_MT.myst), op=muHits(txt,MU_MT.open),
+      cl=muHits(txt,MU_MT.closed);
+  /* тональность: светлые и мрачные корни; характер образов подправляет —
+     нежность к свету, эпос и мистика к глубине; почти нет текста → около нуля */
+  var tone=(br-dk)/(br+dk+2)+(lv-ep*0.6-my*0.5)/(br+dk+lv+ep+my+3);
   if(tone>1)tone=1; else if(tone<-1)tone=-1;
   if(n<12)tone*=0.3;
-  /* энергия: короткие фразы и восклицания и КРИК — вверх, слова-покой — вниз */
+  /* энергия: короткие фразы и восклицания и КРИК — вверх, слова-покой — вниз;
+     рубленый ритм (тире, многоточия) и эпос поднимают, мистика опускает */
   var sent=(txt.match(/[.!?…]+/g)||[]).length; if(!sent)sent=1;
   var avg=n/sent;
   var caps=(txt.match(/(?:^|[\s(«—–-])[А-ЯЁ]{3,}/g)||[]).length;
+  var frag=(txt.match(/[—–]/g)||[]).length+(txt.match(/…/g)||[]).length;
+  var f1=clamp(frag/(sent*1.4),0,1);              /* рубленость речи */
   var e1=1-clamp((avg-6)/16,0,1);                 /* длинные предложения → тише */
   var e2=clamp((txt.match(/!/g)||[]).length/sent/0.5,0,1);
   var e3=clamp(caps/(n||1)*16,0,1);               /* КРИК заглавными */
   var e4=(tn+1)/(tn+cm+2)-0.5;                    /* порывы против покоя: -0.5..0.5 */
-  var energy=0.18+0.32*e1+0.16*e2+0.2*e3+0.26*e4;
+  var energy=0.18+0.32*e1+0.16*e2+0.2*e3+0.26*e4+f1*0.12+(ep-my)*0.05;
   if(n<12)energy=Math.max(energy,0.34);            /* пустая глава — средне, не «тихо» */
   energy=clamp(energy,0.05,1);
-  var label=n<12?'почти без слов':
-    ((tone<=-0.33?'мрачно':(tone<0.33?'ровно':'светло'))+', '+
-     (energy>0.62?'быстро':(energy<0.34?'тихо':'в меру')));
-  return {tone:tone,energy:energy,label:label,words:n};
+  /* ТРЕВОГА — своя шкала, отдельная от энергии: тихий текст может быть
+     тревожным (ожидание, шёпот, дрожь), а громкий — просто весёлым */
+  var tension=clamp(0.5+(tn-cm)/(tn+cm+2)+f1*0.3+(e2-0.5)*0.25,0,1);
+  /* ПРОСТОР — открытые образы против замкнутых: голосом этой шкалы
+     будет эхо (см. muTextApply) */
+  var space=clamp(0.5+(op-cl)/(op+cl+2),0,1);
+  /* подпись настроения — четыре краски, видно, чем дышит глава */
+  var lw=[];
+  if(tension>0.6)lw.push('тревожно'); else if(tension<0.32)lw.push('покойно');
+  lw.push(tone<=-0.33?'мрачно':(tone<0.33?'ровно':'светло'));
+  if(space>0.62)lw.push('просторно'); else if(space<0.38)lw.push('замкнуто');
+  lw.push(energy>0.62?'быстро':(energy<0.34?'тихо':'в меру'));
+  var label=n<12?'почти без слов':lw.join(', ');
+  return {tone:tone,energy:energy,tension:tension,space:space,
+          myst:my>1,epic:ep>1,love:lv>1,label:label,words:n};
 }
 function muTextIx(){for(var i=0;i<MU_TRACKS.length;i++)if(MU_TRACKS[i].dyn)return i;return -1}
 
@@ -578,8 +685,9 @@ function muTextIx(){for(var i=0;i<MU_TRACKS.length;i++)if(MU_TRACKS[i].dyn)retur
      бас-линия, когда ритм отдало семя;
      ближайший с низом (если второй без баса) — бас-линия;
      ближайший с перкуссией — шумовой пульс.
-   Плюс лёгкая правка под сам текст: темп — к его энергии, свет —
-   к его тональности. Смена смеси происходит ТОЛЬКО на границе фразы,
+   Плюс правка под сам текст: темп — к энергии и тревоге, свет —
+   к тональности и нерву, эхо — к простору, низ — к мрачности и эпосу,
+   перкуссия — к пульсу суеты. Смена смеси происходит ТОЛЬКО на границе фразы,
    поэтому переход звучит как музыкальная смена, а не обрыв. */
 var MU_SEEDS=[
   {name:'Испанец',sc:MU_SC.Phr,pattern:'seq',
@@ -613,19 +721,33 @@ function muEnergyOf(tr){
   if((tr.dens||1.7)>1.85)e+=0.05;
   return clamp(e,0,1);
 }
-/* один раз при старте: у каждого трека и семени своя точка «тон × энергия» */
+/* характер рисунка: НЕРВ (0 покойно … 1 суетливо) — форма, темп,
+   форшлаги и перкуссия; тревожный текст ищет именно нервные треки */
+function muNervOf(tr){
+  var v=0.5;
+  if(tr.pattern==='zig'||tr.pattern==='ostinato')v+=0.2;
+  if(tr.orn)v+=0.1;
+  if((tr.step||0.42)<0.34)v+=0.15;
+  if(tr.perc)v+=0.1;
+  if(tr.pattern==='wave'||tr.pattern==='flow')v-=0.15;
+  if((tr.step||0.42)>0.5)v-=0.1;
+  return clamp(v,0,1);
+}
+/* один раз при старте: у каждого трека и семени своя точка «тон × энергия»
+   и свой нерв */
 function muTextScore(){
   var i;
-  for(i=0;i<MU_TRACKS.length;i++){var tr=MU_TRACKS[i];tr._t=muToneOf(tr.sc);tr._e=muEnergyOf(tr)}
-  for(i=0;i<MU_SEEDS.length;i++){var sd=MU_SEEDS[i];sd._t=muToneOf(sd.sc);sd._e=muEnergyOf(sd)}
+  for(i=0;i<MU_TRACKS.length;i++){var tr=MU_TRACKS[i];tr._t=muToneOf(tr.sc);tr._e=muEnergyOf(tr);tr._n=muNervOf(tr)}
+  for(i=0;i<MU_SEEDS.length;i++){var sd=MU_SEEDS[i];sd._t=muToneOf(sd.sc);sd._e=muEnergyOf(sd);sd._n=muNervOf(sd)}
 }
 /* кто ближе всего к настроению текста — от ближайшего и собираем */
-function muTextPick(t,e){
+function muTextPick(t,e,tn){
   var out=[];
   for(var i=0;i<MU_TRACKS.length;i++){
     var tr=MU_TRACKS[i];
     if(tr.dyn)continue;
-    out.push({tr:tr,d:Math.abs((tr._t||0)-t)+Math.abs((tr._e||0.5)-e)*0.85});
+    out.push({tr:tr,d:Math.abs((tr._t||0)-t)+Math.abs((tr._e||0.5)-e)*0.85+
+                     Math.abs((tr._n||0.5)-(tn==null?0.5:tn))*0.5});
   }
   out.sort(function(a,b){return a.d-b.d});
   return out;
@@ -648,6 +770,7 @@ var muTextNext=null,muTextKey='';   /* ждущий переход на гран
 function muTextApply(m){
   var ix=muTextIx(); if(ix<0)return;
   var tr=MU_TRACKS[ix], a=m.a, b=m.b, sd=m.seed, i,k;
+  var tn=(m.tension!=null?m.tension:0.5), sp=(m.space!=null?m.space:0.5);
   var K=['sc','pattern','seq','seqB','seqC','mot','shift','ost','wlen','zv','orn','oct',
          'wave','lp','echo','step','dens'];
   for(i=0;i<K.length;i++){k=K[i];tr[k]=a[k]}
@@ -670,8 +793,18 @@ function muTextApply(m){
   }
   if(bp){tr.bass=bp.bass;tr.bs=bp.bs;tr.bg=bp.bg;tr.bd=bp.bd;tr.bw=bp.bw;tr.bo=bp.bo}
   else{tr.bass=MU_BASS_4;tr.bs=[0,4,0,4];tr.bg=.85;tr.bd=3;tr.bw='triangle';tr.bo=2}
+  /* ВЕС НИЗА — от мрачности и эпичности: тёмный текст «проседает» вниз
+     и звучит дольше, светлый — легче отскакивает */
+  var bw=m.t<0?1+(-m.t)*0.3:1-m.t*0.2;
+  if(m.epic)bw+=0.12;
+  tr.bg=clamp(Math.round((tr.bg!=null?tr.bg:1)*bw*100)/100,0.5,1.5);
+  if(m.t<-0.3)tr.bd=clamp(Math.round(((tr.bd||3.4)+0.6)*10)/10,2.5,5);
   if(pp){tr.perc=pp.perc;tr.pg=pp.pg}
   else{tr.perc=MU_PERC_4;tr.pg=.5}
+  /* ПУЛЬС СУЕТЫ: тревога и энергия задают громкость щелчков; полный
+     покой (и нежный, мягкий текст) убирает перкуссию совсем */
+  tr.pg=clamp(Math.round(((tr.pg!=null?tr.pg:0.5)*(0.3+tn*1.1+m.e*0.5))*100)/100,0,1.3);
+  if((tn<0.34&&m.e<0.45)||(m.love&&m.e<0.5)){tr.perc=null;tr.pg=null}
   /* НОВЫЕ ИНСТРУМЕНТЫ: контрабас — от ближайшего трека с ним (если у
      второго есть — берём его); подложка, струнные, тремоло и суб-октава
      — от трека с наибольшей плотностью слоёв (он и так ближе всего к
@@ -706,10 +839,31 @@ function muTextApply(m){
      когда есть энергия), резвый — добавляем */
   if(m.e<0.3){tr.trem=null;tr.tw=null}
   if(m.e<0.22){tr.pad=null;tr.pw=null;tr.str=null;tr.sw=null}
-  /* лёгкая правка под сам текст: темп — к его энергии, свет — к тону */
-  tr.step=clamp(Math.round((tr.step-(m.e-0.5)*0.07)*100)/100,0.26,0.62);
-  tr.lp=clamp(Math.round((tr.lp||2300)+m.t*220),900,3800);
-  tr.dens=clamp(Math.round(((tr.dens||1.7)+(m.e-0.5)*0.3)*100)/100,1.3,2);
+  /* ДРОЖЬ ТРЕВОГИ: тихий, но тревожный текст всё равно дрожит —
+     тремоло возвращается, если оно есть у плотного трека-соседа */
+  if(tr.trem===null&&tn>0.58&&dense){tr.trem=dense.trem;tr.tw=dense.tw}
+  if(tr.tw)tr.tw=clamp(Math.round(((tr.tw||1)+(tn-0.5)*0.5)*100)/100,0.2,1.2);
+  /* правка под сам текст: темп — энергия и тревога, свет — тональность и
+     нерв (тревожный свет мутнее), плотность — энергия и тревога */
+  tr.step=clamp(Math.round((tr.step-(m.e-0.5)*0.07-(tn-0.5)*0.05)*100)/100,0.24,0.62);
+  tr.lp=clamp(Math.round((tr.lp||2300)+m.t*240-(tn-0.5)*300),850,3800);
+  tr.dens=clamp(Math.round(((tr.dens||1.7)+(m.e-0.5)*0.3+(tn-0.5)*0.15)*100)/100,1.3,2);
+  /* ЭХО — голос ПРОСТРАНСТВА текста: просторные и мистические образы
+     открыты и зовут, замкнутые — сухие и близкие; мрачное чуть эхает */
+  tr.echo=clamp(Math.round(((a.echo!=null?a.echo:0.4)+(sp-0.5)*0.32+(m.t<0?0.05:0)+(m.myst?0.08:0))*100)/100,0.12,0.78);
+  /* ВОЗДУХ — искры-колокольчики: свет и загадочность звучат ярче */
+  tr.air=clamp(Math.round(((m.t>0.25?0.52:0.42)+(m.myst?0.14:0)+(sp-0.5)*0.1)*100)/100,0.3,0.75);
+  /* ФОРШЛАГИ и ритм: суета добавляет суетливые форшлаги, полный покой —
+     убирает их и сглаживает быстрые шестнадцатые */
+  if(tn>0.58)tr.orn=true; else if(tn<0.32)tr.orn=false;
+  if(tr.rhy&&(m.e+tn)<0.75){
+    var r2=tr.rhy.slice(0);
+    for(i=0;i<r2.length;i++)if(r2[i]===2)r2[i]=1;
+    tr.rhy=r2;
+  }
+  /* КОНТРАСТ ФРАЗ: суета и эпос раскрывают динамику — тихие фразы тише,
+     яркие ярче (см. _dynx в muScheduleStep) */
+  tr._dynx=clamp(m.e*0.5+tn*0.5+(m.epic?0.15:0),0,1);
   tr.mood=m.label;
   /* счётчики мотива сбрасываем только когда ЭТА мелодия играет —
      иначе смена смеси на паузе сбила бы фазу у играющего трека */
@@ -725,14 +879,15 @@ function muTextApply(m){
 /* читаем текст, собираем из него настроение и подбираем свежую смесь */
 function muTextRefresh(){
   var ix=muTextIx(); if(ix<0)return;
-  var m=muTextMood(), t=m.tone, e=m.energy;
-  var cands=muTextPick(t,e);
+  var m=muTextMood(), t=m.tone, e=m.energy, tn=m.tension, sp=m.space;
+  var cands=muTextPick(t,e,tn);
   var a=cands[0].tr, b=cands.length>1?cands[1].tr:null;
   var seed=muSeedPick(t,e,a.pattern==='seq');     /* под форму фразы */
   if(b&&b.name===a.name)b=null;
   var names=a.name+(b?' + '+b.name:'')+(seed?' + '+seed.name:'');
   m.label=m.label+' · '+names;
-  var key=[names,e>0.62?'f':(e<0.34?'s':'m')].join('|');
+  var key=[names,e>0.62?'f':(e<0.34?'s':'m'),tn>0.6?'T':(tn<0.34?'q':'n'),
+           sp>0.62?'O':(sp<0.4?'C':'-')].join('|');
   /* подпись — сразу, в капсуле списка и в строке транспорта */
   var tr=MU_TRACKS[ix];
   tr.mood=m.label;
@@ -751,7 +906,8 @@ function muTextRefresh(){
   /* та же смесь, что и сейчас → не пересобираем (экономия: раз в ~3с
      музыка дёргает этот тик, и без проверки трек пересобирали бы зря) */
   if(key===muTextKey)return;
-  var mix={a:a,b:b,cands:cands,seed:seed,t:t,e:e,label:m.label,key:key};
+  var mix={a:a,b:b,cands:cands,seed:seed,t:t,e:e,tension:tn,space:sp,
+           myst:!!m.myst,epic:!!m.epic,love:!!m.love,label:m.label,key:key};
   if(muPlaying&&ix===muTrackN){muTextNext=mix;return}
   muTextApply(mix); muTextNext=null;
 }
@@ -762,6 +918,15 @@ function muTrack(o){
   o.onended=function(){
     for(var i=0;i<muLive.length;i++) if(muLive[i]===o){muLive.splice(i,1);break}
   };
+}
+
+/* панорама голоса: пара расстроенных осцилляторов расходится по сторонам
+   — звук шире и объёмнее; если браузер не умеет панораму, всё идёт как
+   раньше (в центр) */
+function muPan(x,v){
+  if(!muCtx.createStereoPanner)return x;
+  var pn=muCtx.createStereoPanner(); pn.pan.value=v;
+  x.connect(pn); return pn;
 }
 
 /* --- движение по шкале: характер мелодии --------------------------------- */
@@ -856,6 +1021,9 @@ function muSpark(f,t){
    соседняя нота перед главной (украшение сильной доли) */
 function muNotePlay(t,acc,orn){
   var tr=muTr(),sc=tr.sc;
+  /* ЖИВОЕ ИСПОЛНЕНИЕ: микро-сдвиг начала (±6 мс) — ноты приходят не
+     как метроном, фраза звучит сыгранной, а не набранной */
+  t+=(Math.random()-0.5)*0.012;
   muMoveIdx(tr);
   var f=sc[muIdx];
   if(acc==null)acc=0.7;
@@ -868,7 +1036,7 @@ function muNotePlay(t,acc,orn){
   else if(tr.pattern==='zig')  dur=1.6;
   else                         dur=2.6;              /* flow/seq/motif — мелодия */
   dur=dur*(0.55+acc*0.9);
-  var g0=0.06+acc*0.08;                              /* акцент = громкость доли */
+  var g0=(0.06+acc*0.08)*(0.94+Math.random()*0.12);  /* акцент + живая сила ноты */
   function one(freq,g,tt,dd,vib){
     /* гудение: два расстроенных осциллятора (биение 6 центов — живой
        гул) и тихая суб-октава как основание. Атака ЛИНЕЙНАЯ (мягкий
@@ -891,7 +1059,9 @@ function muNotePlay(t,acc,orn){
     gn3.gain.linearRampToValueAtTime(g*0.45,tt+0.09);
     gn3.gain.exponentialRampToValueAtTime(0.0001,tt+tail);
     o.connect(gn); o2.connect(gn2); o3.connect(gn3);
-    gn.connect(muMelo); gn2.connect(muMelo); gn3.connect(muMelo);
+    muPan(gn,-0.16).connect(muMelo);
+    muPan(gn2,0.16).connect(muMelo);
+    gn3.connect(muMelo);                            /* суб-октава — в центре */
     o.start(tt); o.stop(tt+tail+0.05); muTrack(o);
     o2.start(tt); o2.stop(tt+tail+0.05); muTrack(o2);
     o3.start(tt); o3.stop(tt+tail+0.05); muTrack(o3);
@@ -1034,7 +1204,8 @@ function muPadPlay(t,acc){
     gn2.gain.setValueAtTime(0.0001,tt);
     gn2.gain.linearRampToValueAtTime(g0*0.35,tt+0.24);
     gn2.gain.exponentialRampToValueAtTime(0.0001,tt+dd);
-    o.connect(gn); o2.connect(gn2); gn.connect(muPad); gn2.connect(muPad);
+    o.connect(gn); o2.connect(gn2);
+    muPan(gn,-0.22).connect(muPad); muPan(gn2,0.22).connect(muPad);
     o.start(tt); o.stop(tt+dd+0.05); muTrack(o);
     o2.start(tt); o2.stop(tt+dd+0.05); muTrack(o2);
   }
@@ -1129,6 +1300,8 @@ function muScheduleStep(t){
      а не стена нот; gate — «шторки» такта, rhy — ритмическая маска */
   var base=MU_PHRASE[muStepN%MU_PHRASE.length];
   var dyn=MU_DYN[(muStepN>>5)%MU_DYN.length];
+  var dx=tr._dynx||0;                    /* контраст фраз — от настроения текста */
+  if(dx>0.05)dyn=clamp(0.5+(dyn-0.5)*(1+dx*0.8),0.3,1.15);
   var g=tr.gate?tr.gate[muStepN%tr.gate.length]:1;
   var rv=tr.rhy?tr.rhy[muStepN%tr.rhy.length]:1;
   var p=base*tr.dens*g*(0.86+0.14*dyn);
@@ -1233,8 +1406,9 @@ function muSelect(i){
   if(muPlaying&&typeof toast==='function')toast('Мелодия: '+MU_TRACKS[i].name);
 }
 
-/* рендер списка: капсулы в порядке треков — порядок фиксированный,
-   без перемешивания (просьба «убери рандом»); список — СЕТКА В ДВА РЯДА */
+/* рендер списка: ТРЕК-ЛИСТ в порядке треков — порядок фиксированный,
+   без перемешивания (просьба «убери рандом»); строка — номер (01…31),
+   эквалайзер, название и настроение, как оглавление книги */
 function muRenderList(){
   var box=$('#msField'); if(!box)return;
   var h='';
@@ -1242,6 +1416,7 @@ function muRenderList(){
     var t=MU_TRACKS[ix],on=(ix===muTrackN);
     h+='<button type="button" class="ms-item'+(on?' on':'')+'" data-i="'+ix+'"'+
        ' title="'+t.mood+'" role="option" aria-selected="'+(on?'true':'false')+'">'+
+       '<span class="ms-num" aria-hidden="true">'+(ix<9?'0':'')+(ix+1)+'</span>'+
        '<span class="ms-eq" aria-hidden="true"><i></i><i></i><i></i></span>'+
        '<b>'+t.name+'</b><span class="ms-mood">'+t.mood+'</span></button>';
   }
@@ -1290,6 +1465,7 @@ function muUi(){
     if(b){
       b.setAttribute('aria-pressed',String(muPlaying));
       b.title=muPlaying?'Пауза':'Играть';
+      b.setAttribute('aria-label',b.title);
       var ip=document.querySelector('#msPlay .ic-play'),
           ipa=document.querySelector('#msPlay .ic-pause');
       if(ip)ip.style.display=muPlaying?'none':'';
@@ -1300,10 +1476,12 @@ function muUi(){
     if(nw)nw.textContent=tr.name;
     if(nw2)nw2.textContent=tr.mood||'';
   }
-  /* пилюля: видна только когда музыка ИГРАЕТ и окно закрыто */
+  /* пилюля: видна, когда играет наша мелодия, а окно музыки свёрнуто */
   var pill=$('#muPill');
   if(pill){
-    pill.classList.toggle('on',muPlaying&&!(m&&m.classList.contains('on')));
+    var mOpen=!!(m&&m.classList.contains('on'));
+    pill.classList.toggle('on',muPlaying&&!mOpen);
+    pill.setAttribute('aria-label','Музыка играет — открыть окно музыки');
     var nm=$('#muPillName'); if(nm)nm.textContent=tr.name;
     var pb=$('#muPillBtn');
     if(pb){

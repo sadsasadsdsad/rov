@@ -627,7 +627,7 @@ function renderList(animate){
       ch.marks.forEach(function(m){
         var mi=mk('div');
         mi.className='mark-item';
-        mi.innerHTML='<button type="button" class="mark-open"><span class="mark-lbl"></span></button><button type="button" class="mark-del" title="Удалить метку" aria-label="Удалить метку">×</button>';
+        mi.innerHTML='<button type="button" class="mark-open"><span class="mark-lbl"></span></button><button type="button" class="mark-del" title="Удалить метку" data-ftip="Удалить метку" aria-label="Удалить метку">×</button>';
         mi.querySelector('.mark-lbl').textContent=m.label;
         mi.addEventListener('click',function(e){e.stopPropagation();jumpToMark(ch.id,m.id)});
         mi.querySelector('.mark-del').addEventListener('click',function(e){
@@ -958,6 +958,8 @@ function renderMarksRail(){
     var cur=it.ch.id===b.current;
     dot.className='mr-dot'+(cur?' act':' other');
     dot.title=it.m.label+(cur?'':' · гл. '+(it.idx+1));
+    dot.setAttribute('data-ftip',it.m.label);            /* подпись в стиле uiTip */
+    if(!cur)dot.setAttribute('data-ftip-sub','гл. '+(it.idx+1));
     var d=mk('span');d.className='d';d.setAttribute('aria-hidden','true');dot.appendChild(d);
     var t=mk('span');t.className='t';t.textContent=it.m.label;dot.appendChild(t);
     dot.addEventListener('click',function(e){e.stopPropagation();jumpToMark(it.ch.id,it.m.id)});
@@ -1214,8 +1216,8 @@ function renderLibrary(){
     el.style.animationDelay=(Math.min(i,7)*50)+'ms';
     el.innerHTML=
       '<span class="cv-top"><span class="cv-dia"></span><span class="cv-vis" hidden></span><span class="cv-words"></span><span class="cv-tools">'+
-      '<button class="cv-ren" title="Переименовать"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3"/></svg></button>'+
-      '<button class="cv-del" title="Удалить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span></span>'+
+      '<button class="cv-ren" title="Переименовать" data-ftip="Переименовать"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3"/></svg></button>'+
+      '<button class="cv-del" title="Удалить" data-ftip="Удалить книгу"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span></span>'+
       '<span class="cv-title"></span>'+
       '<span class="cv-author"></span>'+
       '<span class="cv-rule"></span>'+
@@ -1274,6 +1276,8 @@ function renderLibrary(){
   nc.innerHTML='<span class="nc-dia"></span><span class="nc-t">Новая книга</span><span class="nc-h">начать рукопись</span>';
   nc.addEventListener('click',createBook);
   shelf.appendChild(nc);
+  /* 24-import.js: карточка «Импорт книги» рядом с «Новая книга» */
+  if(typeof impShelfCard==='function')impShelfCard(shelf,(sorted.length+1)*50);
   var n=state.books.length;
   $('#libStats').innerHTML=n
     ? fmt(n)+' '+plural(n,'книга','книги','книг')+'<br>'+fmt(total)+' '+plural(total,'слово','слова','слов')+' во всех рукописях'

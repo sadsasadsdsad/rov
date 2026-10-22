@@ -10,8 +10,10 @@
  *   - updateRoChrome() — бейдж «чтение» и строка статуса «Только чтение»;
  *   - renderBookAccess / setBookVisibility — блок «Доступ» в обзоре книги
  *     (закрыта/по ссылке/публичная + share-ссылка) при серверном режиме;
- *   - setLibTab / discoverShared — вкладка «Общие книги»: каталог публичных
- *     книг с поиском по названию и автору (api/discover.php);
+ *   - setLibTab / discoverShared / renderShared — вкладка «Общие книги»:
+ *     каталог публичных книг (api/discover.php) с поиском, панелью фильтров
+ *     (период, свои/чужие, порядок) и админ-действием «убрать из общих»
+ *     (api/moderate.php — только для админов каталога);
  *   - openSharedBook / routeReadHash — открытие чужой книги с сервера
  *     (api/read.php) по клику и по hash-ссылке #/read/<id>[/<token>].
  * Ключевое: openForeignBook, closeForeignBook, isForeign, renderBookAccess,
@@ -258,9 +260,26 @@ function copyShareLink(){
 
 /* ==========================================================================
  * Каталог «Общие книги» — вкладка в библиотеке
+ * Фильтры (период / свои-чужие / порядок) работают по последнему ответу
+ *   каталога — без перезапроса; поиск q уходит на сервер. Админ видит на
+ *   карточках кнопку «убрать из общих» — снимает публикацию (visibility
+ *   public → private), книга остаётся у владельца.
  * ========================================================================== */
 var libTab='mine';
 var sharedReq=0;
+var sharedAll=[];        /* последний ответ каталога — фильтры без перезапроса */
+var sharedAdmin=false;   /* админ каталога: можно снимать чужие книги */
+var sharedSort='date';   /* date | title | author */
+var sharedScope='all';   /* all | mine | other */
+var sharedPeriod='all';  /* all | month | week */
+var sharedQ='';          /* текущий поисковый запрос */
+
+/* подпись шапки на вкладке «Общие книги»: сколько книг и постоянная
+   строка раздела (обновляется и при поиске/фильтрах — по длине списка) */
+function sharedHead(n){
+  var st=$('#libStats');
+  if(st)st.innerHTML=fmt(n)+' '+plural(n,'книга','книги','книг')+'<br>Творчество без границ!';
+}
 
 function setLibTab(t){
   libTab=(t==='shared')?'shared':'mine';
@@ -274,6 +293,15 @@ function setLibTab(t){
       b.setAttribute('aria-pressed',on?'true':'false');
     });
   }
+  /* шапка живёт по-разному: на «Общие книги» — заголовок раздела и
+     подпись каталога, а панель статистики главной прячется (#library
+     data-tab — в 13-ui.css); обратно на «Мои книги» — пересборка
+     вернёт заголовок и счётчики рукописей */
+  var lib=$('#library'),t1=$('.lib-title');
+  if(lib)lib.setAttribute('data-tab',libTab);
+  if(t1)t1.textContent=(libTab==='shared')?'Общие книги':'Ваши книги';
+  if(libTab==='shared')sharedHead(sharedAll.length);
+  else if(typeof renderLibrary==='function')renderLibrary();
   var box=$('#sharedBox'),shelf=$('#shelf');
   if(box)box.hidden=(libTab!=='shared');
   if(shelf)shelf.hidden=(libTab==='shared');
@@ -285,42 +313,96 @@ function setLibTab(t){
 
 function discoverShared(q){
   var box=$('#sharedList');if(!box)return;
+  sharedQ=(q||'');
   var n=++sharedReq;
-  if(!q)box.innerHTML='<div class="shared-empty">загрузка…</div>';
-  fetch('api/discover.php'+(q?'?q='+encodeURIComponent(q):''),{credentials:'same-origin'})
+  if(!sharedQ)box.innerHTML='<div class="shared-empty">загрузка…</div>';
+  fetch('api/discover.php'+(sharedQ?'?q='+encodeURIComponent(sharedQ):''),{credentials:'same-origin'})
     .then(function(r){return r.json()})
     .then(function(d){
       if(n!==sharedReq)return;
-      var list=(d&&Array.isArray(d.books))?d.books:[];
-      if(!list.length){
-        box.innerHTML='<div class="shared-empty">'+(q?'ничего не найдено':'пока пусто — никто не публикует книги')+'</div>';
-        return;
-      }
-      box.innerHTML='';
-      list.forEach(function(it,ix){
-        var c=document.createElement('div');
-        c.className='shared-card';
-        c.style.setProperty('--i',ix);   /* лёгкий шаг появления карточек */
-        c.setAttribute('role','button');
-        c.setAttribute('tabindex','0');
-        var dia=document.createElement('span');dia.className='cv-dia';
-        var st=document.createElement('div');st.className='st';st.textContent=it.title||'';
-        var sa=document.createElement('div');sa.className='sa';sa.textContent=it.author||'';
-        var sf=document.createElement('div');sf.className='sf';
-        var sd=document.createElement('div');sd.className='sd';sd.textContent=timeAgo(it.updated)||'';
-        var so=document.createElement('span');so.className='so';so.textContent='открыть →';
-        sf.appendChild(sd);sf.appendChild(so);
-        c.appendChild(dia);c.appendChild(st);c.appendChild(sa);c.appendChild(sf);
-        var open=function(){openSharedBook(it.id,null)};
-        c.addEventListener('click',open);
-        c.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
-        box.appendChild(c);
-      });
+      sharedAll=(d&&Array.isArray(d.books))?d.books:[];
+      sharedAdmin=!!(d&&d.admin);
+      renderShared();
     })
     .catch(function(){
       if(n!==sharedReq)return;
       box.innerHTML='<div class="shared-empty">сервер недоступен</div>';
     });
+}
+
+/* фильтры и порядок — по уже загруженному каталогу, мгновенно */
+function renderShared(){
+  var box=$('#sharedList');if(!box)return;
+  var now=Date.now();
+  var cut=sharedPeriod==='week'?now-7*864e5:(sharedPeriod==='month'?now-30*864e5:0);
+  var list=sharedAll.filter(function(it){
+    if(cut&&(it.updated||0)<cut)return false;
+    if(sharedScope==='mine'&&!it.mine)return false;
+    if(sharedScope==='other'&&it.mine)return false;
+    return true;
+  });
+  if(sharedSort==='title')list.sort(function(a,b){return (a.title||'').localeCompare(b.title||'','ru')});
+  else if(sharedSort==='author')list.sort(function(a,b){return (a.author||'').localeCompare(b.author||'','ru')});
+  else list.sort(function(a,b){return (b.updated||0)-(a.updated||0)});
+  if(!list.length){
+    var msg=sharedQ?'ничего не найдено':'пока пусто — никто не публикует книги';
+    if(!sharedQ&&(sharedScope!=='all'||sharedPeriod!=='all'))msg='под фильтры ничего не подошло';
+    box.innerHTML='<div class="shared-empty">'+msg+'</div>';
+    sharedHead(0);
+    return;
+  }
+  box.innerHTML='';
+  list.forEach(function(it,ix){
+    var c=document.createElement('div');
+    c.className='shared-card';
+    c.style.setProperty('--i',ix);   /* лёгкий шаг появления карточек */
+    c.setAttribute('role','button');
+    c.setAttribute('tabindex','0');
+    var dia=document.createElement('span');dia.className='cv-dia';
+    var st=document.createElement('div');st.className='st';st.textContent=it.title||'';
+    var sa=document.createElement('div');sa.className='sa';sa.textContent=it.author||'';
+    var sf=document.createElement('div');sf.className='sf';
+    var sd=document.createElement('div');sd.className='sd';sd.textContent=timeAgo(it.updated)||'';
+    var so=document.createElement('span');so.className='so';so.textContent='открыть →';
+    sf.appendChild(sd);sf.appendChild(so);
+    if(sharedAdmin&&!it.mine){
+      var del=document.createElement('button');
+      del.type='button';del.className='sh-del';del.textContent='убрать из общих';
+      del.setAttribute('aria-label','Убрать книгу «'+(it.title||'Без названия')+'» из общих книг');
+      del.addEventListener('click',function(e){
+        e.stopPropagation();e.preventDefault();     /* клик по кнопке не открывает книгу */
+        sharedUnpublish(it.id);
+      });
+      sf.appendChild(del);
+    }
+    c.appendChild(dia);c.appendChild(st);c.appendChild(sa);c.appendChild(sf);
+    var open=function(){openSharedBook(it.id,null)};
+    c.addEventListener('click',open);
+    c.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}});
+    box.appendChild(c);
+  });
+  sharedHead(list.length);
+}
+
+/* снять с публикации: книга уходит из каталога, но остаётся у владельца */
+function sharedUnpublish(id){
+  if(!id)return;
+  if(!window.confirm('Убрать эту книгу из общих книг? Она останется у владельца, но исчезнет из каталога.'))return;
+  fetch('api/moderate.php',{
+    method:'POST',credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:id})
+  })
+  .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j}})})
+  .then(function(res){
+    if(!res.ok||!res.j||!res.j.ok){
+      toast('Не получилось: '+((res.j&&res.j.error)?res.j.error:'сервер ответил ошибкой'));
+      return;
+    }
+    toast('Книга убрана из общих книг');
+    discoverShared(sharedQ);            /* каталог перечитывается — книга исчезает */
+  })
+  .catch(function(){toast('Сервер недоступен')});
 }
 
 /* ==========================================================================
@@ -389,6 +471,25 @@ window.addEventListener('hashchange',function(){
       timer=setTimeout(function(){discoverShared(ss.value.trim())},300);
     });
   }
+  var fbox=document.getElementById('sharedFilters');
+  if(fbox)fbox.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('.sf-chip'):null;
+    if(!b)return;
+    var p=b.getAttribute('data-p'),s=b.getAttribute('data-s');
+    if(p)sharedPeriod=p;else if(s)sharedScope=s;else return;
+    var chips=b.parentNode.querySelectorAll('.sf-chip');
+    for(var i=0;i<chips.length;i++){
+      var on=chips[i]===b;
+      chips[i].classList.toggle('on',on);
+      chips[i].setAttribute('aria-pressed',on?'true':'false');
+    }
+    renderShared();
+  });
+  var ssort=document.getElementById('sharedSort');
+  if(ssort)ssort.addEventListener('change',function(){
+    sharedSort=(ssort.value==='title'||ssort.value==='author')?ssort.value:'date';
+    renderShared();
+  });
   var vis=document.getElementById('bvVis');
   if(vis)vis.addEventListener('click',function(e){
     var b=e.target&&e.target.closest?e.target.closest('button[data-v]'):null;

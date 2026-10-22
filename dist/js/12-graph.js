@@ -227,8 +227,14 @@ function buildGraphData(){
   var maxDepth=graphState.depth|0;
   var adj={};nodes.forEach(function(n){adj[n.id]=[]});
   links.forEach(function(l){adj[l.s.id].push(l.t.id);adj[l.t.id].push(l.s.id)});
-  var reach={},q=[mainId],seen={mainId:1},lvl={mainId:0};
-  reach[mainId]=1;
+  /* ВАЖНО: ключи кладём ПО id главного узла. Раньше здесь стояло
+     seen={mainId:1},lvl={mainId:0} — это буквальный ключ «mainId», а не
+     идентификатор узла: lvl[cur] у всех был undefined, проверка глубины
+     (lvl[cur]>=maxDepth) никогда не срабатывала, и ползунок «Глубина»
+     ничего не резал — показывались все связи без исключений (просьба).
+     Теперь обход честный: узлы дальше глубины отсекаются. */
+  var reach={},q=[mainId],seen={},lvl={};
+  seen[mainId]=1;lvl[mainId]=0;reach[mainId]=1;
   while(q.length){
     var cur=q.shift();
     if(lvl[cur]>=maxDepth)continue;
@@ -757,14 +763,16 @@ function paintGraph(){
       sw=isRel?(1.5+2.1*ratio):0.8;
       color=isRel?V.accent:V.ink3;
     }else if(showAll){
-      o=0.16+0.4*ratio;
-      sw=0.8+1.4*ratio;
-      color=V.ink3;
+      /* вес виден сразу: сильные нити плотнее и темнее (ink2),
+         слабые — почти шёпот, поэтому паутина не сливается в кашу */
+      o=(ratio>0.55?0.3:0.12)+0.34*ratio;
+      sw=0.7+1.5*ratio;
+      color=ratio>0.55?V.ink2:V.ink3;
       if(l.s.id===mainId||l.t.id===mainId){o+=0.12;sw+=0.25}
     }else{
-      o=0.22+0.36*ratio;
-      sw=0.7+1.6*ratio;
-      color=V.ink3;
+      o=(ratio>0.55?0.34:0.2)+0.3*ratio;
+      sw=0.65+1.7*ratio;
+      color=ratio>0.55?V.ink2:V.ink3;
     }
     var cls='glink'+(isRel?' grel':'')+(dimAnim&&focusId&&!isRel?' gdim':'')+(enter?' gdraw':'');
     var a=l.s,b=l.t;
@@ -774,7 +782,9 @@ function paintGraph(){
     var dxb=Math.max(26,Math.abs(x2-x1)*0.46);
     var path='M '+x1.toFixed(1)+' '+y1.toFixed(1)+
       ' C '+(x1+dxb).toFixed(1)+' '+y1.toFixed(1)+' '+(x2-dxb).toFixed(1)+' '+y2.toFixed(1)+' '+x2.toFixed(1)+' '+y2.toFixed(1);
-    s+='<path class="'+cls+'" pathLength="1" d="'+path+'" fill="none" stroke="'+color+'" stroke-width="'+sw.toFixed(2)+'" stroke-linecap="round" opacity="'+o.toFixed(2)+'"/>';
+    /* data-s/data-t — концы нити: по ним наведение на карточку подсвечивает
+       ровно её связи (класс .gnbr) */
+    s+='<path class="'+cls+'" data-s="'+escAttr(l.s.id)+'" data-t="'+escAttr(l.t.id)+'" pathLength="1" d="'+path+'" fill="none" stroke="'+color+'" stroke-width="'+sw.toFixed(2)+'" stroke-linecap="round" opacity="'+o.toFixed(2)+'"/>';
   });
 
   /* Узлы — карточки как ноды Blender: цветная шапка с именем, тело со
@@ -1184,6 +1194,20 @@ $('#gpWeight').addEventListener('change',function(){
   }
 
   var nodeTipTimer=null,nodeTipId=null;
+  /* Наведение на карточку подсвечивает ЕЁ нити: по data-s/data-t нити
+     находим связанные пути и вешаем класс .gnbr (стили — в 06-graph.css) */
+  var hoverLinkId=null;
+  function setHoverLinks(id){
+    if(hoverLinkId===id||!svg)return;
+    hoverLinkId=id;
+    var ps=svg.querySelectorAll('path.glink.gnbr');
+    for(var i=0;i<ps.length;i++)ps[i].classList.remove('gnbr');
+    if(!id)return;
+    ps=svg.querySelectorAll('path.glink');
+    for(var j=0;j<ps.length;j++){
+      if(ps[j].getAttribute('data-s')===id||ps[j].getAttribute('data-t')===id)ps[j].classList.add('gnbr');
+    }
+  }
   function positionNodeTip(clientX,clientY){
     var r=canvas.getBoundingClientRect();
     var x=clientX-r.left, y=clientY-r.top;
@@ -1210,6 +1234,7 @@ $('#gpWeight').addEventListener('change',function(){
   function hideNodeTip(){
     if(nodeTipTimer){clearTimeout(nodeTipTimer);nodeTipTimer=null}
     nodeTipId=null;
+    setHoverLinks(null);
     if(nodeTip)nodeTip.classList.remove('on');
   }
   graphTipHide=hideNodeTip;
@@ -1221,6 +1246,7 @@ $('#gpWeight').addEventListener('change',function(){
       return;
     }
     nodeTipId=n.id;
+    setHoverLinks(n.id);
     if(nodeTipTimer)clearTimeout(nodeTipTimer);
     nodeTipTimer=setTimeout(function(){
       nodeTipTimer=null;

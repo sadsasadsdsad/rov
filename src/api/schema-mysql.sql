@@ -56,3 +56,16 @@ CREATE TABLE IF NOT EXISTS login_attempts(
   KEY idx_att_login(login, ts),
   KEY idx_att_ts(ts)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- журнал: статьи разработчиков, пишет только админ (см. news.php)
+CREATE TABLE IF NOT EXISTS news_articles(
+  id VARCHAR(40) NOT NULL PRIMARY KEY,
+  title VARCHAR(140) NOT NULL DEFAULT '',
+  tag VARCHAR(30) NOT NULL DEFAULT '',
+  body MEDIUMTEXT NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'published',
+  author VARCHAR(32) NOT NULL DEFAULT '',
+  created BIGINT NOT NULL,
+  updated BIGINT NOT NULL,
+  KEY idx_news_updated(updated)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

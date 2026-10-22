@@ -43,7 +43,6 @@ function startApp(user){
   setWorkspaceVisible(false);
   bookView.hidden=true;
   renderLibrary();
-  bindChartHover();
   saveTxt.textContent='Сохранено';
   updatePanelTabs();
   if(typeof a11yPass==='function')a11yPass(document);
