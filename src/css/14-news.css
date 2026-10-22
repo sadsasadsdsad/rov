@@ -1,0 +1,187 @@
+/* ==========================================================================
+ * 14-news.css — СТРАНИЦА «ЖУРНАЛ»: обновления сайта и статьи разработчиков
+ * Проект: «Черновик» — веб-редактор рукописей. tests/ — разобранная копия
+ *   src/index.html: 14 CSS-файлов, порядок правил = каскаду оригинала.
+ * Что описывает: полноэкранный оверлей #newsPage (плотная бумага, без
+ *   стекла — блюр только у модалок, z-index 55 — под нижним таббаром
+ *   библиотеки, z 60, чтобы навигация «Мои / Общие / Журнал» оставалась
+ *   на виду и в журнале): шапка с брендом и кнопкой «Новая статья»
+ *   (только админ), табы «Обновления / Статьи разработчиков», записи
+ *   обновлений — клоны строк панели «Что нового» (один источник данных),
+ *   карточки статей с лидом и админ-действиями, читалка статьи и форма
+ *   редактора. Входы: кнопка «Журнал →» в панели «Что нового» (.np-open
+ *   ниже), пункт в меню настроек и кнопка в таббаре (26-settings.js /
+ *   27-news.js — клики таббара там же закрывают/открывают страницу).
+ * Ключевое: .np-open, #newsPage, .np-top, .np-tabs, .np-list,
+ *   #npUpdates (записи обновлений), .np-card, .np-read, .np-edit, npSlide.
+ * Шкала скруглений — из 01-base: --r-sm/--r-md/--r-lg/--r-pill.
+ * ========================================================================== */
+
+/* ── кнопка-вход «Журнал →» в шапке панели «Что нового» ─────────────────── */
+.np-open{
+  border:1px solid var(--line2);background:var(--card-glass);border-radius:var(--r-pill);
+  padding:7px 15px;font-family:var(--f-ui);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink2);cursor:pointer;white-space:nowrap;
+  transition:color .12s,border-color .12s,background .12s
+}
+.np-open:hover{border-color:var(--accent);color:var(--accent);background:var(--sel)}
+.np-open span{font-size:12px;letter-spacing:0}
+
+/* ── сама страница ──────────────────────────────────────────────────────── */
+#newsPage{
+  position:fixed;inset:0;z-index:55;      /* под таббаром (60) — навигация видна снизу */
+  background:var(--bg);display:flex;flex-direction:column;overflow:hidden;
+  opacity:0;visibility:hidden;transform:translateY(12px);
+  transition:opacity .3s,visibility .3s,transform .34s cubic-bezier(.16,1,.3,1)
+}
+#newsPage.on{opacity:1;visibility:visible;transform:none}
+/* ── шапка: как .lib-top, плюс кнопка «Новая статья» справа ─────────────── */
+.np-top{
+  height:54px;flex:0 0 54px;display:flex;align-items:center;gap:12px;
+  padding:0 20px;border-bottom:1px solid var(--line2);
+  background:var(--bg);user-select:none
+}
+.np-top .dia{width:10px;height:10px;background:var(--accent);transform:rotate(45deg);flex:0 0 auto}
+.np-top .brand b{letter-spacing:.24em}
+.np-top .brand small{letter-spacing:.14em}
+.np-top .sp{flex:1}
+.np-new{cursor:pointer}
+.np-new[hidden]{display:none}
+.np-back{color:var(--ink2);transition:color .12s,background .12s}
+.np-back:hover{color:var(--accent);background:var(--sel)}
+/* ── табы разделов: пилюли-сегменты ─────────────────────────────────────── */
+.np-tabs{
+  display:flex;gap:6px;flex-wrap:wrap;
+  padding:18px 0 0;width:min(760px,100% - 32px);margin:0 auto
+}
+.np-tab{
+  border:1px solid var(--line2);background:transparent;
+  border-radius:var(--r-pill);padding:8px 16px;cursor:pointer;
+  font-family:var(--f-ui);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink3);transition:color .12s,background .12s,border-color .12s,transform .2s
+}
+.np-tab:hover{color:var(--ink);border-color:var(--ink3)}
+.np-tab:active{transform:scale(.97)}
+.np-tab.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+/* ── тело страницы: одна колонка, скролл как везде (скроллбары спрятаны) ── */
+.np-body{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  width:min(760px,100% - 32px);margin:0 auto;
+  padding:20px 0 96px                     /* 96 — нижний таббар не прячет хвост */
+}
+.np-body>*[hidden]{display:none!important}
+.np-list{list-style:none;margin:0;padding:0}
+.np-list li{position:relative}
+.np-list li+li{margin-top:7px;padding-top:7px;border-top:1px dashed var(--line2)}
+.np-list li:hover .chg-row{background:var(--hover)}
+/* строки — те же, что в панели «Что нового», но без отрицательных margin
+   (там они уходят за край списка, здесь — ровно по колонке; просьба:
+   «в элементах наезжают») и с типографикой описаний как в панели */
+.np-list .chg-row{align-items:flex-start;margin:0;padding:4px 6px;border-radius:var(--r-md);transition:background .12s}
+.np-list p{margin:4px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink2)}
+.np-empty{
+  text-align:center;color:var(--ink3);
+  font-family:var(--f-ui);font-size:12px;letter-spacing:.06em;padding:56px 12px
+}
+.np-empty b{display:block;margin-bottom:8px;color:var(--ink2);letter-spacing:.14em;text-transform:uppercase;font-size:10px}
+/* ── карточка статьи ────────────────────────────────────────────────────── */
+.np-cards{display:flex;flex-direction:column;gap:12px}
+.np-card{
+  background:var(--card-glass);border:1px solid var(--line2);
+  border-radius:var(--r-lg);padding:16px 18px;
+  transition:border-color .18s,box-shadow .18s,transform .18s
+}
+.np-card:hover{border-color:var(--line);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+.np-card-main{
+  display:block;width:100%;text-align:left;border:0;background:transparent;
+  cursor:pointer;padding:0;color:inherit
+}
+.np-meta{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink3)
+}
+.np-draft{
+  border:1px solid var(--accent);color:var(--accent);
+  border-radius:var(--r-pill);padding:1px 8px;letter-spacing:.08em
+}
+.np-h{
+  display:block;margin-top:8px;font-family:var(--f-disp);
+  font-size:18px;font-weight:600;color:var(--ink);
+  transition:color .12s
+}
+.np-card:hover .np-h{color:var(--accent)}
+.np-lead{
+  display:block;margin-top:6px;font-family:var(--f-ui);font-size:12px;
+  line-height:1.65;color:var(--ink2)
+}
+.np-card-adm{
+  display:flex;gap:6px;margin-top:13px;padding-top:11px;
+  border-top:1px dashed var(--line2)
+}
+.np-mini{
+  border:1px solid var(--line);border-radius:var(--r-md);
+  background:transparent;color:var(--ink2);cursor:pointer;
+  font-family:var(--f-ui);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  padding:5px 10px;transition:border-color .12s,color .12s,background .12s
+}
+.np-mini:hover{border-color:var(--ink3);color:var(--ink);background:var(--hover)}
+.np-mini.danger:hover{border-color:var(--accent);color:var(--accent);background:var(--sel)}
+/* ── читалка статьи ─────────────────────────────────────────────────────── */
+.np-read{position:relative}
+.np-rd-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.np-read h1{
+  margin:6px 0 0;font-family:var(--f-disp);font-size:28px;
+  font-weight:600;line-height:1.22;color:var(--ink)
+}
+.np-read h1:before{
+  content:'';display:inline-block;width:9px;height:9px;margin:0 14px 4px 0;
+  background:var(--accent);transform:rotate(45deg)
+}
+.np-read .np-rd-body{margin-top:20px;border-top:1px solid var(--line2);padding-top:18px}
+.np-read .np-rd-body p{
+  margin:0 0 15px;font-family:var(--f-ui);font-size:14.5px;
+  line-height:1.78;color:var(--ink)
+}
+.np-read .np-rd-body p:first-child{font-size:15.5px}
+.np-rd-foot{
+  display:flex;gap:8px;align-items:center;
+  margin-top:22px;padding-top:14px;border-top:1px dashed var(--line2)
+}
+/* ── форма редактора (только админ) ─────────────────────────────────────── */
+.np-edit{display:flex;flex-direction:column;gap:13px}
+.np-f label{
+  display:block;margin-bottom:6px;font-family:var(--f-ui);font-size:9.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink3)
+}
+.np-f input,.np-f textarea{
+  width:100%;box-sizing:border-box;background:var(--card-glass);
+  border:1px solid var(--line);border-radius:var(--r-md);
+  padding:10px 13px;font-family:var(--f-ui);font-size:13.5px;color:var(--ink);
+  transition:border-color .15s
+}
+.np-f input:focus,.np-f textarea:focus{outline:none;border-color:var(--ink3)}
+.np-f textarea{min-height:260px;resize:vertical;line-height:1.65}
+.np-f-chk{
+  display:flex;align-items:center;gap:9px;cursor:pointer;
+  font-family:var(--f-ui);font-size:12px;color:var(--ink2)
+}
+.np-f-chk input{accent-color:var(--accent);width:15px;height:15px}
+.np-acts{display:flex;gap:8px;align-items:center;margin-top:4px}
+.np-acts .sp{flex:1}
+.np-acts .m-btn{cursor:pointer}
+/* ── въезд вкладки/чипа: как у разделов библиотеки, но мягче ───────────── */
+@keyframes npSlide{from{opacity:0;transform:translateX(3%)}to{opacity:1;transform:none}}
+.np-in{animation:npSlide .3s cubic-bezier(.16,1,.3,1) both}
+@media (prefers-reduced-motion:reduce){
+  #newsPage{transition:none}
+  .np-in{animation:none}
+  .np-card:hover{transform:none}
+}
+/* ── телефон: шапка и табы теснее ──────────────────────────────────────── */
+@media (max-width:720px){
+  .np-top{padding:0 12px;gap:8px}
+  .np-top .brand small{display:none}
+  .np-tabs{padding-top:12px}
+  .np-read h1{font-size:22px}
+}

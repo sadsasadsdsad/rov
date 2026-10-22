@@ -1,0 +1,260 @@
+/* ==========================================================================
+ * 13-ui.css — ПРИМИТИВЫ ИНТЕРФЕЙСА — подсказка, тема, главная, таббар
+ * Проект: «Черновик» — веб-редактор рукописей. tests/ — разобранная копия
+ *   src/index.html: 13 CSS-файлов, порядок правил = каскаду оригинала.
+ * Что описывает: плавающая подсказка .ui-tip (по образцу unlumen-ui Floating
+ *   Tooltip), иконка и круговое раскрытие темы (.btn-theme, ::view-transition),
+ *   сетка главной «график слева — что нового справа» (.stats-row, .chg-*),
+ *   нижний таббар разделов библиотеки (.tabbar — Motion Tab Menu; смена
+ *   вкладок — пружина ширины + въезд контента).
+ *   БЛЮР: убран со всего сайта (просьба «удали блюр») — везде плотная
+ *   бумага, без стекла — КРОМЕ фона модалок, где вернули по просьбе
+ *   «верни блюр на фон модалок»: сила блюра живёт в токене --modal-blur
+ *   (16px по умолчанию, регулируется ползунком в меню настроек).
+ *   МЕНЮ НАСТРОЕК — #slideMenu (Motion Slide Menu по образцу unlumen-ui):
+ *   многоуровневое слайд-меню (профиль, настройки вида), большие карточки
+ *   модалок — body[data-msize="large"].
+ * Ключевое: .ui-tip, .stats-row, .tabbar, #slideMenu,
+ *   ::view-transition-new(root), --r-xs/--r-pill в паре с 01-base.
+ * Порядок: последний — всё, что он описывает, подключено раньше.
+ * Шкала скруглений (все значения берутся отсюда же, из 01-base):
+ *   --r-xs 2px · --r-sm 6px · --r-md 10px · --r-lg 14px · --r-xl 18px ·
+ *   --r-pill 99px (пилюли) и 50% (круги) — единственные исключения.
+ * ========================================================================== */
+/* ══ ФОН МОДАЛОК — единственный блюр на сайте (просьба: «верни блюр на фон
+   модалок») ══════════════════════════════════════════════════════════════
+   За полупрозрачной вуалью (--veil-glass) страница мягко размывается —
+   модалка отделяется от фона стеклом, а не только затемнением. Сами
+   модалки и всё остальное остаются плотной бумагой: blur живёт только
+   на оверлеях-вушках (#veil — фон панели энциклопедии). Всё в ОДНОМ
+   правиле и в ОДНУ строку — verify-dist следит, что блюр не разбредётся */
+#dayModal,#wikiViewModal,#wikiModal,#askModal,#aiSetModal,#aiResModal,#veil{backdrop-filter:blur(var(--modal-blur,16px));-webkit-backdrop-filter:blur(var(--modal-blur,16px))}
+/* ══ Главная: график в левой половине, «что нового» — в правой ══════════ */
+.stats-row{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;
+  margin-top:36px;min-width:0
+}
+.stats-row .stats-panel{margin-top:0;min-width:0}
+.chg-panel{
+  display:flex;flex-direction:column;min-width:0;
+  background:var(--card-glass);border:1px solid var(--line2);border-radius:var(--r-lg);
+  padding:20px 22px 12px;
+  box-shadow:var(--shadow-sm);position:relative;overflow:hidden
+}
+.chg-panel .stats-head{margin-bottom:10px}
+.chg-list{
+  flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+  margin:0 -9px;padding:2px 9px;list-style:none;scrollbar-width:none;-ms-overflow-style:none
+}
+.chg-list::-webkit-scrollbar{width:0;height:0;display:none}
+.chg-list li{position:relative;padding-left:0}
+.chg-list li + li{margin-top:13px;padding-top:13px;border-top:1px dashed var(--line2)}
+.chg-row{display:flex;align-items:flex-start;gap:10px;padding:7px 9px;margin:-7px -9px;border-radius:var(--r-md);transition:background .18s}
+.chg-list li:hover .chg-row{background:var(--hover)}
+.chg-v{
+  flex:0 0 auto;margin-top:1px;font-family:var(--f-ui);font-size:8.5px;font-weight:500;
+  letter-spacing:.1em;color:var(--accent);border:1px solid var(--accent);
+  border-radius:var(--r-pill);padding:3px 8px;line-height:1;white-space:nowrap
+}
+.chg-t{font-family:var(--f-ui);font-size:12px;font-weight:600;color:var(--ink);letter-spacing:.01em}
+.chg-list p{margin:4px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink2)}
+.chg-foot{
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--line2);
+  font-family:var(--f-ui);font-size:9.5px;letter-spacing:.06em;color:var(--ink3);text-align:right
+}
+@media (max-width:980px){
+  .stats-row{grid-template-columns:1fr}
+  .chg-list{max-height:320px}
+}
+/* ══ Плавающая подсказка (Floating Tooltip) ═════════════════════════════ */
+.ui-tip{
+  position:fixed;left:0;top:0;z-index:400;pointer-events:none;
+  max-width:270px;padding:9px 12px;
+  background:var(--ink);color:var(--bg);border-radius:var(--r-md);
+  box-shadow:0 16px 36px -16px rgba(0,0,0,.55);
+  font-family:var(--f-ui);font-size:11px;line-height:1.4;letter-spacing:.02em;
+  opacity:0;visibility:hidden;will-change:transform;
+  transition:opacity .16s ease,visibility .16s
+}
+.ui-tip.on{opacity:1;visibility:visible}
+.ui-tip .ut-t{display:block;font-weight:500}
+.ui-tip .ut-sub{
+  display:block;margin-top:3px;font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;opacity:.62;white-space:nowrap
+}
+.ui-tip .ut-sub[hidden]{display:none}
+/* ══ Переключатель темы (Theme Switch): пружинный своп иконки ═══════════ */
+.btn-theme{transition:transform .18s ease}
+.btn-theme:active{transform:scale(.9)}
+.ui-twist .btn-theme svg{animation:uiIcTwist .6s cubic-bezier(.34,1.56,.64,1)}
+@keyframes uiIcTwist{
+  0%{transform:scale(.25) rotate(-90deg);opacity:0}
+  55%{opacity:1}
+  100%{transform:none;opacity:1}
+}
+/* круговое раскрытие новой темы из точки клика (View Transition API) */
+@media (prefers-reduced-motion:no-preference){
+  ::view-transition-old(root),::view-transition-new(root){mix-blend-mode:normal}
+  ::view-transition-old(root){animation:none;z-index:0}
+  ::view-transition-new(root){
+    z-index:1;animation:uiVtOpen .5s cubic-bezier(.22,.61,.36,1) forwards;
+    clip-path:circle(0px at var(--vt-x,50%) var(--vt-y,50%))
+  }
+}
+@keyframes uiVtOpen{
+  to{clip-path:circle(var(--vt-r,150vmax) at var(--vt-x,50%) var(--vt-y,50%))}
+}
+/* Сетка-календарь (GitHub Graph) убрана по фидбеку — панель статистики
+   снова линейный график; его стили живут в 02-library.css (.chart-*). */
+/* ══ Motion Tab Menu: плавающий нижний таббар разделов библиотеки ═══════
+   По образцу unlumen-ui Motion Tabs Menu: пилюля с иконками разворачи-
+   вается в подпись активной вкладки (точный замер ширины из JS), тап
+   пружинно сплющивается (scaleY .8), клик мимо сворачивает всё обратно
+   в иконки. Клики setLibTab (21-shared.js) не тронуты — анимация сверху.
+   Смена разделов — БЕЗ ЗАДЕРЖЕК и всегда с анимацией: контент и кнопки
+   меняются сразу по клику; подпись пилюли меняется мгновенно, но её
+   ширина доезжает пружиной от старого значения к новому
+   (.tabbar-lbl: своп и разворот — один transition width, от нуля по замеру;
+   свёрнутая подпись гасит gap через margin-left — отступы симметричны), а новый раздел въезжает
+   длинной пружиной в сторону переключения (.tb-in-r/.tb-in-l) —
+   View Transition не нужен (снимок старой пилюли совпадал с новой,
+   морф не запускался и анимация пропадала). Выделение — ОДНА круглая
+   «точка» .tabbar-ind под кнопками: она не прыгает фоном, а плавно
+   перекатывается на кликнутую кнопку (просьба: «точка плавно до туда
+   двигается»); на открытом журнале точка встаёт на «Журнал» —
+   это держит js/27-news.js. Стекла (backdrop-filter)
+   у пилюли больше нет — блюр убран целиком (кроме фона модалок —
+    см. блок «Фон модалок» в начале файла). */
+.tabbar{
+  position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:60;
+  display:flex;align-items:center;gap:4px;padding:6px;
+  background:var(--card-glass);border:1px solid var(--line2);border-radius:var(--r-pill);
+  box-shadow:0 18px 40px -18px rgba(0,0,0,.45),var(--shadow-sm)
+}
+.tabbar-b{
+  width:38px;height:38px;flex:0 0 auto;display:grid;place-items:center;padding:0;
+  border:0;border-radius:var(--r-pill);background:transparent;color:var(--ink3);cursor:pointer;
+  transition:color .18s,background .18s,transform .34s cubic-bezier(.34,1.56,.64,1)
+}
+.tabbar-b svg{width:18px;height:18px;display:block}
+.tabbar-b:hover{color:var(--ink)}
+.tabbar-b.on{color:var(--accent)}     /* фон-выделение — у .tabbar-ind (точка едет) */
+.tabbar-b:active{transform:scaleY(.8)}      /* «сплющивание» тапа, отскок — пружиной */
+.tabbar-b:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* «точка»-выделение: одна на всю пилюлю, лежит под кнопками
+   (z-index:-1 — над фоном пилюли, под иконками), плавно перекатывается
+   на активную кнопку. Координаты (left/top по offsetLeft/offsetTop
+   кнопки) ставит JS: window.tabbarIndTo — 25-ui.js, 27-news.js */
+.tabbar-ind{
+  position:absolute;top:6px;left:6px;width:38px;height:38px;
+  border-radius:var(--r-pill);background:color-mix(in srgb,var(--accent) 10%,transparent);
+  pointer-events:none;z-index:-1;
+  transition:left .55s cubic-bezier(.3,1.25,.4,1)
+}
+/* кнопка журнала — без своих margin: все иконки на одинаковом расстоянии
+   (просьба: «все иконки расположены на одинаковом расстоянии») */
+/* свёрнутая подпись не должна занимать места — иначе gap справа даёт
+   на 4px больший отступ, чем слева, и иконки уходят влево (просьба:
+   «сравни отступ»). Хомут гасит gap, в открытом состоянии — +2px
+   воздуха между иконкой и текстом, как и раньше (итого 6px). */
+.tabbar-lbl{
+  max-width:0;opacity:0;overflow:hidden;white-space:nowrap;
+  font-family:var(--f-ui);font-size:10px;font-weight:500;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink2);
+  transition:max-width .55s cubic-bezier(.3,1.25,.4,1),width .55s cubic-bezier(.3,1.25,.4,1),
+             margin-left .55s cubic-bezier(.3,1.25,.4,1),opacity .35s ease .1s
+}
+.tabbar.on .tabbar-lbl{opacity:1;margin-left:2px}   /* ширина — по замеру, из JS */
+.tabbar:not(.on) .tabbar-lbl{margin-left:-4px}       /* свёрнута: ноль места */
+/* пилюля живёт на уровне body (перенос — см. комментарий в index.html:
+   stacking context у #library) — вне библиотеки видимость привязана к её
+   состоянию напрямую: книга и редактор держат library[hidden], и таббар
+   скрыт там так же, как и раньше, когда лежал внутри #library */
+body:has(#library[hidden]) .tabbar{display:none}
+#library{padding-bottom:96px}               /* пилюля не прячет последний ряд полки */
+/* вкладка «Общие книги»: каталог — без панели статистики и «Что нового»
+   (data-tab ставит setLibTab, 21-shared.js) */
+#library[data-tab="shared"] .stats-row{display:none}
+@media (max-width:880px){
+  .tabbar{bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+}
+/* въезд нового раздела: длинная пружина в сторону переключения;
+   уходящий раздел не задерживает отклик — его место занимает новый
+   сразу, наезжая сбоку. Старт одновременно с пружиной ширины пилюли.
+   Селекторы с #id — иначе перебивает .shared-box:viewFadeIn (11-access) */
+@keyframes tbSlideR{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+@keyframes tbSlideL{from{opacity:0;transform:translateX(-26px)}to{opacity:1;transform:none}}
+#shelf.tb-in-r,#sharedBox.tb-in-r{animation:tbSlideR .55s cubic-bezier(.16,1,.3,1)}
+#shelf.tb-in-l,#sharedBox.tb-in-l{animation:tbSlideL .55s cubic-bezier(.16,1,.3,1)}
+@media (prefers-reduced-motion:reduce){
+  #shelf.tb-in-r,#shelf.tb-in-l,#sharedBox.tb-in-r,#sharedBox.tb-in-l{animation:none}
+  .tabbar-ind{transition:none}
+}
+/* ══ Motion Slide Menu — меню настроек (по образцу unlumen-ui) ════════════
+   Многоуровневое меню под шапкой: уровень уезжает влево на 60%, новый
+   въезжает справа с лёгким подъёмом (та же пружина, что у Motion Tabs
+   Menu); шапка уровня — «морф» выбранного пункта: иконка кроссфейдится
+   в шеврон «назад» в фиксированном слоте; цвета строк — 75мс; высота
+   панели следует за уровнем; при prefers-reduced-motion — только смена
+   состояний. Панель — плотная бумага, без стекла (блюр только у модалок). */
+#slideMenu{
+  position:fixed;z-index:350;width:300px;
+  background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-lg);
+  box-shadow:var(--shadow);overflow:hidden;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transform:translateY(-6px) scale(.97);transform-origin:top right;
+  transition:opacity .22s,visibility .22s,transform .3s cubic-bezier(.3,1.25,.4,1)
+}
+#slideMenu.on{opacity:1;visibility:visible;pointer-events:auto;transform:none}
+.sm-head{display:none;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line2);background:var(--hover)}
+#slideMenu[data-depth]:not([data-depth="0"]) .sm-head{display:flex}
+.sm-back{width:24px;height:24px;flex:0 0 auto;display:grid;place-items:center;border:0;background:transparent;color:var(--ink2);border-radius:var(--r-sm);cursor:pointer;transition:color .075s,background .075s}
+.sm-back:hover{color:var(--ink);background:var(--line2)}
+.sm-title{font-family:var(--f-ui);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);transition:opacity .16s}
+.sm-body{position:relative;overflow:hidden;transition:height .28s cubic-bezier(.23,1,.32,1)}
+.sm-level{padding:6px}
+.sm-level.sl-abs{position:absolute;inset:0 0 auto 0;width:100%;pointer-events:none}
+@keyframes smFwdOut{from{transform:none;opacity:1}to{transform:translateX(-60%);opacity:0}}
+@keyframes smFwdIn{from{transform:translate(60%,8px);opacity:0}to{transform:none;opacity:1}}
+@keyframes smBackOut{from{transform:none;opacity:1}to{transform:translate(60%,8px);opacity:0}}
+@keyframes smBackIn{from{transform:translateX(-60%);opacity:0}to{transform:none;opacity:1}}
+.sm-level.sl-fwd-out{animation:smFwdOut .28s cubic-bezier(.23,1,.32,1) both}
+.sm-level.sl-fwd-in{animation:smFwdIn .28s cubic-bezier(.23,1,.32,1) both}
+.sm-level.sl-back-out{animation:smBackOut .28s cubic-bezier(.23,1,.32,1) both}
+.sm-level.sl-back-in{animation:smBackIn .28s cubic-bezier(.23,1,.32,1) both}
+.sm-item{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;background:transparent;border-radius:var(--r-md);cursor:pointer;text-align:left;color:var(--ink2);font-family:var(--f-ui);font-size:12.5px;letter-spacing:.01em;transition:color .075s,background .075s}
+.sm-item:hover{color:var(--ink);background:var(--hover)}
+.sm-item .ic{flex:0 0 auto;width:18px;height:18px;display:grid;place-items:center;color:var(--ink3);transition:color .075s}
+.sm-item:hover .ic{color:var(--ink)}
+.sm-item .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sm-item .ch{flex:0 0 auto;color:var(--ink3);font-size:11px}
+.sm-item.danger{color:var(--accent)}
+.sm-item.danger .ic{color:var(--accent)}
+.sm-item.danger:hover{background:var(--sel)}
+.sm-prof{padding:8px 10px 6px}
+.sm-prof .nm{font-family:var(--f-disp);font-size:15px;color:var(--ink)}
+.sm-prof .lg{font-family:var(--f-ui);font-size:10px;color:var(--ink3);letter-spacing:.04em;margin-top:2px}
+.sm-stats{display:flex;flex-wrap:wrap;gap:3px 14px;padding:2px 10px 8px;font-family:var(--f-ui);font-size:10px;color:var(--ink3);letter-spacing:.04em}
+.sm-stats b{color:var(--ink);font-weight:500}
+.sm-sep{margin:6px 10px;border-top:1px dashed var(--line2)}
+.sm-set{display:flex;align-items:center;gap:10px;padding:8px 10px}
+.sm-set .lb{flex:1;min-width:0;font-family:var(--f-ui);font-size:12px;color:var(--ink2)}
+.sm-seg{display:inline-flex;gap:3px;padding:3px;background:var(--hover);border:1px solid var(--line2);border-radius:var(--r-pill)}
+.sm-seg button{border:0;background:transparent;font-family:var(--f-ui);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);padding:3px 9px;border-radius:var(--r-pill);cursor:pointer;transition:color .075s,background .075s}
+.sm-seg button:hover{color:var(--ink)}
+.sm-seg button.on{background:var(--accent);color:var(--bg)}
+.sm-range{display:flex;align-items:center;gap:10px;padding:2px 10px 10px}
+.sm-range input[type=range]{flex:1;min-width:0;accent-color:var(--accent);height:16px}
+.sm-range output{font-family:var(--f-ui);font-size:10px;color:var(--ink3);font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
+@media (prefers-reduced-motion:reduce){
+  #slideMenu,.sm-item,.sm-back,.sm-title{transition:none}
+  .sm-level{animation:none!important}
+}
+/* настройка «модалки по умолчанию»: большие карточки
+   (data-msize ставит26-settings.js) */
+body[data-msize="large"] .dm-card{width:min(1040px,96vw)}
+body[data-msize="large"] .am-card{width:min(560px,94vw)}
+body[data-msize="large"] .wm-card{width:min(920px,96vw)}
+body[data-msize="large"] .wv-inner{width:min(1400px,97vw)}
+body[data-msize="large"] .ai-res-card{width:min(940px,96%)}
+body[data-msize="large"] .ai-set-card{width:min(760px,96%)}
