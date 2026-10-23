@@ -74,14 +74,15 @@ function setPanelTab(t){
   $('#paneGraph').hidden=(t!=='graph');
   $('#paneAi').hidden=(t!=='ai');
   $('#wpAdd').style.display=(t==='world')?'':'none';
+  $('#wpAuto').style.display=(t==='world')?'':'none';
   $('#wpTitleText').textContent=(t==='world')?'Энциклопедия':(t==='notes')?'Заметки':(t==='ai')?'ИИ-ассистент':'Карта связей';
   $('#wpCount').textContent='';
   updatePanelTabs();
   requestAnimationFrame(function(){ updatePanelTabs(); });
   setTimeout(updatePanelTabs, 480);
-  if(t==='world'){renderWikiFilters();renderWiki()}
+  if(t==='world'){if(typeof wikiMergeAuto==='function')wikiMergeAuto();renderWikiFilters();renderWiki()}
   else if(t==='notes'){renderNotes()}
-  else if(t==='graph'){scheduleGraph()}
+  else if(t==='graph'){if(typeof wikiMergeAuto==='function')wikiMergeAuto();scheduleGraph()}
   else if(t==='ai'&&typeof aiRender==='function'){   /* чат — раздел панели */
     aiRender();aiRenderCtx();
     setTimeout(function(){
@@ -138,6 +139,7 @@ $('#wpFull').addEventListener('click',function(){
   });
 });
 $('#wpAdd').addEventListener('click',function(){openWikiModal(null)});
+$('#wpAuto').addEventListener('click',wikiAutoPersons);
 $('#wpSearch').addEventListener('input',function(){
   wikiFilter=this.value;
   /* дебаунс: renderWiki для каждой статьи сканирует все главы (nameStats) */

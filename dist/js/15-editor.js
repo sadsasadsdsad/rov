@@ -548,16 +548,121 @@ function moveChapter(id,dir){
   toast('Глава перемещена на '+(j+1)+'-е место');
 }
 
+/* ===== Раунд I: фоновые порции счётчиков и цитат =====
+   Текст главы разбираем только когда он нужен: открытая глава, глаз
+   включён (без счётчиков нечем фильтровать пустые), поиск/связи/заметки
+   по кнопке. Всё прочее — счётчики строк, итоги книги и полки, цитаты
+   обложек и превью глав — считается порциями в фоне: экран собирается
+   сразу, числа доезжают за доли секунды. При подсчёте текст не
+   удерживается в памяти (chapterWordsBg). */
+var _wcQ={};                                  /* глава уже в очереди — не дублируем */
+function queueWc(ch){
+  if(!ch||ch._wcSrc===ch.html&&typeof ch._wc==='number')return;
+  if(_wcQ[ch.id])return;
+  _wcQ[ch.id]=1;
+  bgJob(function(){
+    delete _wcQ[ch.id];
+    chapterWordsBg(ch);
+    patchWc(ch);                              /* строка ленты и её копия-кольцо */
+    patchListTotals();
+    patchChapterAgg(ch);                      /* обложка на полке и карточка книги */
+  });
+}
+function patchWc(ch){
+  var b=book();                    /* главу могли заменить — не чиним чужую строку */
+  if(!b||b.chapters.indexOf(ch)<0)return;
+  var rows=list.querySelectorAll('.ch[data-ch="'+ch.id+'"] .wc');
+  if(!rows.length)return;
+  var w=ch._wcSrc===ch.html&&typeof ch._wc==='number'?ch._wc:chapterWords(ch);
+  for(var i=0;i<rows.length;i++)rows[i].textContent=fmt(w);
+}
+/* итоги книги в шапке ленты — из готовых счётчиков, без чужого текста */
+function patchListTotals(){
+  var b=book();if(!b)return;
+  var total=0;
+  b.chapters.forEach(function(ch){
+    if(isNotesCh(ch)||isPamatka(ch))return;
+    if(ch._wcSrc===ch.html&&typeof ch._wc==='number')total+=ch._wc;
+  });
+  $('#totalWords').textContent=fmt(total)+' '+plural(total,'слово','слова','слов');
+  $('#totalRead').textContent=total?('≈ '+Math.ceil(total/180)+' мин'):'';
+}
+/* глава посчитана — дозаписать её обложку на полке и карточку в книге */
+function patchChapterAgg(ch){
+  for(var i=0;i<state.books.length;i++){
+    var b=state.books[i];
+    if(b.chapters.indexOf(ch)<0)continue;
+    patchCoverWc(b);                        /* слова — когда книга посчитана целиком */
+    patchBvCard(ch);
+    return;
+  }
+}
+/* обложка полки: число слов — когда все главы книги посчитаны */
+function patchCoverWc(b){
+  if(library.hidden||shelf.hidden)return;   /* полку закрыли или открыли другой раздел */
+  var w=bookWordsCached(b);if(w==null)return;
+  var els=shelf.querySelectorAll('.cover[data-b="'+b.id+'"] .cv-words');
+  if(!els.length)return;
+  for(var i=0;i<els.length;i++)els[i].textContent=fmt(w)+' '+plural(w,'слово','слова','слов');
+  patchLibStats();
+}
+/* цитата обложки — первая строка первой главы, порцией в фоне */
+function queueCoverExc(b){
+  bgJob(function(){
+    if(library.hidden||shelf.hidden)return;
+    var els=shelf.querySelectorAll('.cover[data-b="'+b.id+'"] .cv-exc');
+    if(!els.length)return;
+    var exc=bookExcerpt(b);                 /* DOM-разбор — порцией, не в момент клика */
+    for(var i=0;i<els.length;i++){
+      if(exc){els[i].hidden=false;els[i].textContent=exc}else els[i].hidden=true;
+    }
+  });
+}
+/* все главы книги — в фоновые порции (слова обложки, итог полки) */
+function queueBookWc(b){
+  if(!b||!Array.isArray(b.chapters))return;
+  b.chapters.forEach(function(ch){if(!isNotesCh(ch)&&!isPamatka(ch))queueWc(ch)});
+}
+/* все главы всех книг — на старте: полка, статистика дня, итоги */
+function queueAllWc(){state.books.forEach(queueBookWc)}
+/* подпись полки: сколько книг и слов; дозаписывается по мере готовности */
+function libStatsHtml(n,total){
+  return n
+    ? fmt(n)+' '+plural(n,'книга','книги','книг')+'<br>'+fmt(total)+' '+plural(total,'слово','слова','слов')+' во всех рукописях'
+    : 'полка пуста —<br>начните первую книгу';
+}
+function patchLibStats(){
+  if(library.hidden||shelf.hidden)return;
+  var n=state.books.length,total=0;
+  for(var i=0;i<n;i++){var w=bookWordsCached(state.books[i]);if(w!=null)total+=w}
+  $('#libStats').innerHTML=libStatsHtml(n,total);
+}
+
+var CH_EMPTY_MAX=100;   /* «пустая» глава ≈ треть страницы (стр. ~300 слов) */
 function renderList(animate){
   var b=book();if(!b)return;
   var keepScroll=list.scrollTop;        /* пересборка строк сбрасывает скролл —
      позицию сохраняем: клик по главе не дёргает список, а центрирование
      ниже доводит его плавно */
   list.innerHTML='';
-  var total=0;
+  var total=0,hide=!!b.hideEmpty,hiddenN=0,purgeN=0;
+  /* Раунд I: чужие тексты в ленту не читаем — строка собирается сразу,
+     счётчик долетает фоновой порцией (… в углу). Глаз включён — нужны все
+     счётчики сразу (без них нечем фильтровать), считаем как раньше. */
+  var bg=!hide;
   b.chapters.forEach(function(ch,i){
     var isNotes=isNotesCh(ch);
-    var w=(isNotes||isPamatka(ch))?0:chapterWords(ch);total+=w;
+    var w=0,wcPend=false;
+    if(!isNotes&&!isPamatka(ch)){
+      if(!bg||ch.id===b.current||ch._wcSrc===ch.html&&typeof ch._wc==='number')w=chapterWords(ch);
+      else{queueWc(ch);wcPend=true}
+    }
+    total+=w;
+    /* глаз в шапке: пустые/почти пустые главы прячутся из ленты; активная
+       глава и служебные (Памятка/Заметки) не прячутся никогда */
+    var empty=!isNotes&&!isPamatka(ch)&&w<CH_EMPTY_MAX;
+    if(empty)purgeN++;                     /* кандидат на «удалить все» (в т.ч. активная) */
+    if(hide&&empty&&ch.id!==b.current){hiddenN++;return}
     var el=mk('div');
     el.className='ch'+(ch.id===b.current?' active':'')+(animate?' boot':'')+(isNotes?' notes-ch':'');
     el.setAttribute('data-ch',ch.id);         /* адрес для копий-колец и поиска */
@@ -567,58 +672,10 @@ function renderList(animate){
     el.innerHTML='<button type="button" class="ch-open"><span class="num">'+(isNotes?nbIc:String(i+1).padStart(2,'0'))+'</span><span class="ttl"></span><span class="wc"></span></button>'+
       (isNotes||isReadOnly()?'':'<button type="button" class="del" title="Удалить главу" aria-label="Удалить главу">×</button>');
     el.querySelector('.ttl').textContent=chapterTitle(ch);
-    el.querySelector('.wc').textContent=isNotes?'—':fmt(w);
-    el.addEventListener('click',function(){openChapter(ch.id)});
-    var openBtn=el.querySelector('.ch-open');
-    /* клавиатурная альтернатива перетаскиванию: Alt+↑ / Alt+↓ */
-    openBtn.addEventListener('keydown',function(e){
-      if(!e.altKey||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;
-      e.preventDefault();e.stopPropagation();
-      moveChapter(ch.id,e.key==='ArrowUp'?-1:1);
-    });
-    var delBtn=el.querySelector('.del');
-    if(delBtn){
-      delBtn.addEventListener('click',function(e){
-        e.stopPropagation();
-        if(b.chapters.length===1)return;
-        uiConfirm('Удалить главу?','«'+chapterTitle(ch)+'» будет удалена безвозвратно.',true).then(function(ok){
-          if(!ok)return;
-          b.chapters=b.chapters.filter(function(x){return x.id!==ch.id});
-          b.updated=Date.now();               /* H5: без бампа правка не уезжает на сервер */
-          if(b.current===ch.id)openChapter(b.chapters[0].id,true);
-          persist();invalidateCo();renderList(true);
-        });
-      });
-    }
-    el.addEventListener('dragstart',function(e){
-      dragChId=ch.id;el.classList.add('drag');
-      e.dataTransfer.effectAllowed='move';
-      try{e.dataTransfer.setData('text/plain',ch.id)}catch(err){}
-    });
-    el.addEventListener('dragend',function(){el.classList.remove('drag');dragChId=null;clearDropMarks()});
-    el.addEventListener('dragover',function(e){
-      if(!dragChId||dragChId===ch.id)return;
-      e.preventDefault();e.stopPropagation();
-      e.dataTransfer.dropEffect='move';
-      var r=el.getBoundingClientRect();
-      var before=(e.clientY-r.top)<r.height/2;
-      clearDropMarks();
-      el.classList.add(before?'drop-before':'drop-after');
-    });
-    el.addEventListener('drop',function(e){
-      e.preventDefault();e.stopPropagation();
-      if(!dragChId||dragChId===ch.id)return;
-      var before=el.classList.contains('drop-before');
-      var arr=b.chapters;
-      var from=arr.findIndex(function(x){return x.id===dragChId});
-      if(from<0)return;
-      var item=arr.splice(from,1)[0];
-      var to=arr.findIndex(function(x){return x.id===ch.id});
-      arr.splice(before?to:to+1,0,item);
-      dragChId=null;clearDropMarks();
-      b.updated=Date.now();                  /* H5 */
-      persist();invalidateCo();renderList(false);updateStats();
-    });
+    el.querySelector('.wc').textContent=isNotes?'—':(wcPend?'…':fmt(w));
+    /* события строк — делегированием на #chlist: одна привязка вместо шести
+       на каждую строку (на большой книге это сотни слушателей на каждый
+       пересбор) — см. bindChList() */
     list.appendChild(el);
 
     if(ch.marks&&ch.marks.length){
@@ -654,30 +711,19 @@ function renderList(animate){
     cl.setAttribute('aria-hidden','true');
     list.appendChild(cl);
   }
-  /* копии без своих слушателей: клик и перетаскивание — делегированием */
-  if(!list.__dupeBound){
-    list.__dupeBound=true;
-    list.addEventListener('click',function(e){
-      var row=e.target&&e.target.closest?e.target.closest('.ch.dupe'):null;
-      if(!row)return;
-      e.stopPropagation();
-      openChapter(row.getAttribute('data-ch'));
-    });
-    list.addEventListener('dragstart',function(e){
-      var row=e.target&&e.target.closest?e.target.closest('.ch.dupe'):null;
-      if(!row)return;
-      dragChId=row.getAttribute('data-ch');
-      e.dataTransfer.effectAllowed='move';
-      try{e.dataTransfer.setData('text/plain',dragChId)}catch(err){}
-    });
-    list.addEventListener('dragend',function(e){
-      if(e.target&&e.target.closest&&e.target.closest('.ch.dupe')){dragChId=null;clearDropMarks()}
-    });
-  }
+  bindChList();   /* оригиналы и копии-кольца — одним делегированием */
   /* копии скрываем, если список с ними помещается — иначе дубли по центру */
   loopFit();
   list.scrollTop=keepScroll;            /* позиция восстановлена после пересборки */
-  $('#chCount').textContent=b.chapters.length+' шт.';
+  $('#chCount').textContent=(hide&&hiddenN)?(b.chapters.length-hiddenN)+' из '+b.chapters.length+' шт.':b.chapters.length+' шт.';
+  var eye=$('#chHideEmpty');
+  if(eye){eye.classList.toggle('on',!!hide);eye.setAttribute('aria-pressed',hide?'true':'false')}
+  var purge=$('#chPurgeEmpty');
+  if(purge){                               /* кнопка сноса — только пока глаз включён */
+    purge.classList.toggle('on',hide&&!isReadOnly());
+    purge.textContent='Удалить пустые ('+purgeN+')';
+    purge.disabled=!purgeN;
+  }
   $('#totalWords').textContent=fmt(total)+' '+plural(total,'слово','слова','слов');
   $('#totalRead').textContent=total?('≈ '+Math.ceil(total/180)+' мин'):'';
   renderMarksRail();
@@ -689,6 +735,83 @@ function renderList(animate){
 /* кольцо копий скрывается, если блок оригиналов помещается в экран (с тем
    же запасом, что и цикл в «колесе») — иначе в узкой рейке с центрированием
    были бы видны дубли */
+/* Один слушатель на весь список глав: клик/удаление/Alt+стрелки/
+   перетаскивание — строк и их колец-копий. Привязка живёт одна на сессию —
+   пересборка ленты не создаёт и не сжигает слушатели (было 6 на строку:
+   на книге в 300 глав — ~1800 listeners на каждый автосейв). */
+function bindChList(){
+  if(!list||list.__rowBound)return;
+  list.__rowBound=true;
+  list.addEventListener('click',function(e){
+    if(!e.target||!e.target.closest)return;
+    var row=e.target.closest('.ch');if(!row)return;
+    var chId=row.getAttribute('data-ch');
+    if(e.target.closest('.del')){
+      var bb=book();if(!bb)return;
+      var chx=bb.chapters.find(function(x){return x.id===chId});
+      if(!chx||bb.chapters.length===1)return;
+      uiConfirm('Удалить главу?','«'+chapterTitle(chx)+'» будет удалена безвозвратно.',true).then(function(ok){
+        if(!ok)return;
+        bb.chapters=bb.chapters.filter(function(x){return x.id!==chId});
+        bb.updated=Date.now();               /* H5: без бампа правка не уезжает на сервер */
+        if(bb.current===chId)openChapter(bb.chapters[0].id,true);
+        persist();invalidateCo();renderList(true);
+      });
+      return;
+    }
+    e.stopPropagation();
+    openChapter(chId);
+  });
+  /* клавиатурная альтернатива перетаскиванию: Alt+↑ / Alt+↓ */
+  list.addEventListener('keydown',function(e){
+    if(!e.altKey||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;
+    var btn=e.target&&e.target.closest?e.target.closest('.ch-open'):null;
+    if(!btn)return;
+    var row=btn.closest('.ch');if(!row)return;
+    e.preventDefault();e.stopPropagation();
+    moveChapter(row.getAttribute('data-ch'),e.key==='ArrowUp'?-1:1);
+  });
+  list.addEventListener('dragstart',function(e){
+    var row=e.target&&e.target.closest?e.target.closest('.ch'):null;
+    if(!row)return;
+    dragChId=row.getAttribute('data-ch');
+    row.classList.add('drag');
+    e.dataTransfer.effectAllowed='move';
+    try{e.dataTransfer.setData('text/plain',dragChId)}catch(err){}
+  });
+  list.addEventListener('dragend',function(e){
+    var row=e.target&&e.target.closest?e.target.closest('.ch'):null;
+    if(row)row.classList.remove('drag');
+    dragChId=null;clearDropMarks();
+  });
+  list.addEventListener('dragover',function(e){
+    var row=e.target&&e.target.closest?e.target.closest('.ch'):null;
+    if(!row||!dragChId||row.getAttribute('data-ch')===dragChId)return;
+    e.preventDefault();e.stopPropagation();
+    e.dataTransfer.dropEffect='move';
+    var r=row.getBoundingClientRect();
+    var before=(e.clientY-r.top)<r.height/2;
+    clearDropMarks();
+    row.classList.add(before?'drop-before':'drop-after');
+  });
+  list.addEventListener('drop',function(e){
+    var row=e.target&&e.target.closest?e.target.closest('.ch'):null;
+    if(!row||!dragChId||row.getAttribute('data-ch')===dragChId)return;
+    e.preventDefault();e.stopPropagation();
+    var bb=book();if(!bb)return;
+    var before=row.classList.contains('drop-before');
+    var arr=bb.chapters;
+    var from=arr.findIndex(function(x){return x.id===dragChId});
+    if(from<0)return;
+    var item=arr.splice(from,1)[0];
+    var to=arr.findIndex(function(x){return x.id===row.getAttribute('data-ch')});
+    arr.splice(before?to:to+1,0,item);
+    dragChId=null;clearDropMarks();
+    bb.updated=Date.now();                  /* H5 */
+    persist();invalidateCo();renderList(false);updateStats();
+  });
+}
+
 function loopFit(){
   var l=$('#chlist');if(!l)return;
   var chs=l.querySelectorAll('.ch:not(.dupe)');
@@ -1034,6 +1157,32 @@ $('#addCh').addEventListener('click',function(){
   persist();openChapter(n.id,true);
   editor.focus();caretStart(editor.querySelector('h1'));
 });
+$('#chHideEmpty').addEventListener('click',function(){
+  if(isReadOnly())return;                  /* чужая книга — только чтение */
+  var b=book();if(!b)return;
+  b.hideEmpty=!b.hideEmpty;
+  b.updated=Date.now();                    /* настройка книги уезжает на сервер (H5) */
+  persist();renderList(false);
+});
+/* «удалить пустые» — появляется только при включённом глазе: сносит те же
+   главы, что он прячет (пустые/почти пустые, кроме Памятки/Заметок) */
+$('#chPurgeEmpty').addEventListener('click',function(){
+  if(isReadOnly())return;
+  var b=book();if(!b)return;
+  var del=b.chapters.filter(function(ch){
+    return !isNotesCh(ch)&&!isPamatka(ch)&&chapterWords(ch)<CH_EMPTY_MAX;
+  });
+  if(!del.length)return;
+  if(del.length>=visibleChapters(b).length){toast('Нельзя удалить все главы — не останется ни одной');return}
+  uiConfirm('Удалить пустые главы?','Будет удалено глав: '+del.length+'. Это необратимо.',true).then(function(ok){
+    if(!ok)return;
+    var ids={};del.forEach(function(ch){ids[ch.id]=1});
+    b.chapters=b.chapters.filter(function(x){return !ids[x.id]});
+    b.updated=Date.now();                  /* H5: без бампа правка не уезжает на сервер */
+    if(ids[b.current])openChapter(b.chapters[0].id,true);
+    persist();invalidateCo();renderList(true);updateStats();
+  });
+});
 $('#bookTitle').addEventListener('input',function(){
   if(isReadOnly())return;
   var b=book();if(!b)return;
@@ -1067,6 +1216,76 @@ function openBookOverview(id){
   renderBookView();persist();
   renderMarksRail();
 }
+/* пилюли над сеткой глав: счёт глав — сразу, слова/минуты — когда книга
+   посчитана, число заметок — фоновой порцией (сбор заметок разбирает все
+   главы через DOM, в момент клика его не делаем) */
+function bvPills(){
+  var b=book();if(!b)return;
+  var nch=visibleChapters(b).length;
+  var pills='<span class="bv-pill"><b>'+nch+'</b> '+plural(nch,'глава','главы','глав')+'</span>';
+  var w=bookWordsCached(b);
+  if(w==null)pills+='<span class="bv-pill"><b>…</b> слов</span>';
+  else{
+    pills+='<span class="bv-pill"><b>'+fmt(w)+'</b> '+plural(w,'слово','слова','слов')+'</span>';
+    var min=Math.ceil(w/180);
+    if(w)pills+='<span class="bv-pill">≈ <b>'+min+'</b> '+plural(min,'минута','минуты','минут')+' чтения</span>';
+  }
+  var nc=b._notesN;                         /* кэш non-enumerable — в данные не попадает */
+  if(typeof nc==='number'&&nc)pills+='<span class="bv-pill">✎ <b>'+nc+'</b> '+plural(nc,'заметка','заметки','заметок')+'</span>';
+  $('#bvDesc').innerHTML=pills;
+}
+/* слова главы и её строка «≈ N мин / пустая глава» в карточке книги */
+function patchBvCard(ch){
+  if(bookView.hidden)return;
+  var cards=bvGrid.querySelectorAll('.bv-card[data-ch="'+ch.id+'"]');
+  if(!cards.length)return;
+  var isNotes=isNotesCh(ch);
+  var w=isNotes?0:chapterWordsBg(ch);
+  for(var i=0;i<cards.length;i++){
+    var bEl=cards[i].querySelector('.bv-ch b');
+    if(bEl)bEl.textContent=isNotes?'—':fmt(w);
+    var mn=cards[i].querySelector('.bv-min');
+    if(mn)mn.textContent=isNotes?'не печатается и не считается':(w?('≈ '+Math.ceil(w/180)+' мин чтения'):'пустая глава');
+  }
+}
+/* цитаты превью карточки — DOM-разбор главы, только порцией в фоне */
+function patchBvEx(ch){
+  if(bookView.hidden)return;
+  var cards=bvGrid.querySelectorAll('.bv-card[data-ch="'+ch.id+'"]');
+  if(!cards.length)return;
+  var boxes=chapterExcerpt(ch,2);
+  for(var i=0;i<cards.length;i++){
+    var exEl=cards[i].querySelector('.bv-ex');
+    if(!exEl)continue;
+    exEl.innerHTML='';
+    if(!boxes.length){
+      var eb=mk('div');eb.className='bv-box';eb.style.fontStyle='italic';
+      eb.textContent=isNotesCh(ch)?'свободные записи':'в главе пока нет текста';
+      exEl.appendChild(eb);
+    }
+    for(var j=0;j<boxes.length;j++){
+      var bx=boxes[j],d2=mk('div');
+      d2.className='bv-box'+(bx.sep?' sep':'');d2.textContent=bx.text;
+      exEl.appendChild(d2);
+    }
+  }
+}
+/* сетка «Главы и их начало»: цитаты превью и число заметок — порциями
+   в фоне; счётчики глав ставит в очередь сама сборка карточек */
+function queueBookViewFill(b){
+  bgJob(function(){
+    if(bookView.hidden||book()!==b)return;
+    chCachePut(b,'_notesN',collectNotes().length);
+    bvPills();
+  });
+  b.chapters.forEach(function(ch){
+    bgJob(function(){
+      if(bookView.hidden||book()!==b)return;
+      patchBvCard(ch);
+      patchBvEx(ch);
+    });
+  });
+}
 function renderBookView(){
   var b=book();if(!b)return;
   $('#bvTitle').textContent=b.title||'Без названия';
@@ -1077,15 +1296,7 @@ function renderBookView(){
     ba.placeholder=isReadOnly()?'автор не указан':'Автор — как подписывать книгу';
     ba.value=isForeign()?((foreignMeta&&foreignMeta.author)||''):((typeof b.author==='string')?b.author:'');
   }
-  var w=bookWords(b),min=Math.ceil(w/180);
-  var vis=visibleChapters(b);
-  var nch=vis.length;
-  var notesCount=collectNotes().length;
-  var pills='<span class="bv-pill"><b>'+nch+'</b> '+plural(nch,'глава','главы','глав')+'</span>'+
-            '<span class="bv-pill"><b>'+fmt(w)+'</b> '+plural(w,'слово','слова','слов')+'</span>';
-  if(w)pills+='<span class="bv-pill">≈ <b>'+min+'</b> '+plural(min,'минута','минуты','минут')+' чтения</span>';
-  if(notesCount)pills+='<span class="bv-pill">✎ <b>'+notesCount+'</b> '+plural(notesCount,'заметка','заметки','заметок')+'</span>';
-  $('#bvDesc').innerHTML=pills;
+  bvPills();   /* главы — сразу; слова/минуты/заметки — фоновой порцией */
   $('#bvStats').innerHTML=isReadOnly()
     ? '<span class="ro-badge">чтение</span>'+esc((foreignMeta&&foreignMeta.line)||'автор не указан')
     :(b.updated?esc('изменено '+timeAgo(b.updated)):'');
@@ -1096,27 +1307,22 @@ function renderBookView(){
   b.chapters.forEach(function(ch,i){
     var isNotes=isNotesCh(ch);
     if(!isNotes)displayIdx++;
-    var cw=isNotes?0:chapterWords(ch);
+    var cw=null;                        /* null — счётчик главы ещё в пути */
+    if(isNotes)cw=0;
+    else if(ch._wcSrc===ch.html&&typeof ch._wc==='number')cw=ch._wc;
+    else queueWc(ch);
     var card=mk('div');
     card.className='bv-card'+(ch.id===b.current?' cur':'')+(isNotes?' sys':'');
     card.style.animationDelay=(Math.min(i,7)*45)+'ms';
     card.setAttribute('role','button');card.tabIndex=0;
     var label=isNotes?'✎ Заметки':('Глава '+displayIdx);
-    card.innerHTML='<div class="bv-ch"><span>'+label+'</span><b>'+(isNotes?'—':fmt(cw))+'</b></div>'+
+    card.setAttribute('data-ch',ch.id); /* адрес карточки для фоновой дозаписи */
+    card.innerHTML='<div class="bv-ch"><span>'+label+'</span><b>'+(isNotes?'—':(cw==null?'…':fmt(cw)))+'</b></div>'+
       '<div class="bv-ct"></div>'+
       '<div class="bv-ex"></div>'+
-      '<div class="bv-meta">'+(isNotes?'не печатается и не считается':(cw?('≈ '+Math.ceil(cw/180)+' мин чтения'):'пустая глава'))+(ch.id===b.current?' · <span class="here">вы остановились здесь</span>':'')+'</div>';
+      '<div class="bv-meta"><span class="bv-min">'+(isNotes?'не печатается и не считается':(cw==null?'…':(cw?('≈ '+Math.ceil(cw/180)+' мин чтения'):'пустая глава')))+'</span>'+(ch.id===b.current?' · <span class="here">вы остановились здесь</span>':'')+'</div>';
     card.querySelector('.bv-ct').textContent=chapterTitle(ch);
-    var exEl=card.querySelector('.bv-ex');
-    var boxes=chapterExcerpt(ch,2);
-    if(!boxes.length){
-      var eb=mk('div');eb.className='bv-box';eb.style.fontStyle='italic';eb.textContent=isNotes?'свободные записи':'в главе пока нет текста';
-      exEl.appendChild(eb);
-    }
-    boxes.forEach(function(bx){
-      var d2=mk('div');d2.className='bv-box'+(bx.sep?' sep':'');d2.textContent=bx.text;
-      exEl.appendChild(d2);
-    });
+    /* цитаты превью — порцией в фоне (patchBvEx); карточка собирается сразу */
     card.addEventListener('click',function(){enterEditor(ch.id)});
     card.addEventListener('keydown',function(e){if(e.key==='Enter')enterEditor(ch.id)});
     bvGrid.appendChild(card);
@@ -1137,6 +1343,7 @@ function renderBookView(){
     });
     bvGrid.appendChild(nc);
   }
+  queueBookViewFill(b);   /* цитаты превью и число заметок — порциями в фоне */
   document.title=(b.title||'Без названия')+' — Черновик';
   if(typeof renderBookAccess==='function')renderBookAccess();
 }
@@ -1209,9 +1416,12 @@ function renderLibrary(){
   var sorted=state.books.slice().sort(function(a,b){return (b.updated||0)-(a.updated||0)});
   var total=0;
   sorted.forEach(function(b,i){
-    var w=bookWords(b);total+=w;
+    var w=bookWordsCached(b),pendW=(w==null);
+    if(pendW){w=0;queueBookWc(b);queueCoverExc(b)}   /* слова и цитата — порциями в фоне */
+    total+=w;
     var el=mk('div');
     el.className='cover boot';el.setAttribute('role','button');el.tabIndex=0;
+    el.setAttribute('data-b',b.id);         /* адрес обложки для фоновой дозаписи */
     el.style.setProperty('--c',b.color||COLORS[0]);
     el.style.animationDelay=(Math.min(i,7)*50)+'ms';
     el.innerHTML=
@@ -1224,8 +1434,9 @@ function renderLibrary(){
       '<span class="cv-exc"></span>'+
       '<span class="cv-time"></span>';
     el.querySelector('.cv-title').textContent=b.title||'Без названия';
-    var exc=bookExcerpt(b),excEl=el.querySelector('.cv-exc');
-    if(exc)excEl.textContent=exc;else excEl.hidden=true;
+    var excEl=el.querySelector('.cv-exc');
+    if(pendW)excEl.hidden=true;
+    else{var exc=bookExcerpt(b);if(exc)excEl.textContent=exc;else excEl.hidden=true}
     var author=(typeof b.author==='string'&&b.author.trim())?b.author.trim():((currentUser&&(currentUser.name||currentUser.login))||'');
     var av=el.querySelector('.cv-author');
     av.textContent=author;
@@ -1239,7 +1450,7 @@ function renderLibrary(){
     for(var vi=0;vi<visList.length;vi++){if(visList[vi].id===b.current){curIdx=vi+1;break}}
     /* объём книги — в правый верхний угол обложки (при наведении его
        сменяют инструменты; см. .cv-words/.cv-tools в 02-library.css) */
-    el.querySelector('.cv-words').textContent=fmt(w)+' '+plural(w,'слово','слова','слов');
+    el.querySelector('.cv-words').textContent=(pendW?'…':fmt(w))+' '+plural(w,'слово','слова','слов');
     var timeTxt=b.updated?('изменено '+timeAgo(b.updated)):'';
     var prog=(curIdx>1&&visN>1)?('гл. '+curIdx+' из '+visN):'';
     /* нижняя строка: сколько глав, где остановка, когда писали */
@@ -1278,10 +1489,7 @@ function renderLibrary(){
   shelf.appendChild(nc);
   /* 24-import.js: карточка «Импорт книги» рядом с «Новая книга» */
   if(typeof impShelfCard==='function')impShelfCard(shelf,(sorted.length+1)*50);
-  var n=state.books.length;
-  $('#libStats').innerHTML=n
-    ? fmt(n)+' '+plural(n,'книга','книги','книг')+'<br>'+fmt(total)+' '+plural(total,'слово','слова','слов')+' во всех рукописях'
-    : 'полка пуста —<br>начните первую книгу';
+  $('#libStats').innerHTML=libStatsHtml(state.books.length,total);
 
   renderStats();
   if(typeof a11yPass==='function')a11yPass(shelf);

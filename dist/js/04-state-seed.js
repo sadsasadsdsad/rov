@@ -85,8 +85,14 @@ function dedupeChapters(b,bump){
 }
 function isPamatka(ch){
   if(!ch||typeof ch.html!=='string')return false;
-  var h=tmp(ch.html).querySelector('h1');
-  return !!(h&&/^\s*памятка\s*$/i.test(h.textContent));
+  if(ch._pkSrc===ch.html&&typeof ch._pk==='boolean')return ch._pk;
+  /* строка вместо DOM: visibleChapters дёргает это на каждый чих (энц,
+     поиск, связи), кэш — по самой строке html */
+  var m=/<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(ch.html),t=m?htmlText(m[1]):'';
+  if(!m&&/<h1/i.test(ch.html)){var h=tmp(ch.html).querySelector('h1');t=h?h.textContent:''}
+  var res=/^\s*памятка\s*$/i.test(t);
+  chCachePut(ch,'_pk',res);chCachePut(ch,'_pkSrc',ch.html);
+  return res;
 }
 function isNotesCh(ch){return !!(ch&&ch.kind==='notes')}
 function visibleChapters(b){
@@ -220,8 +226,66 @@ var foreignDoc=null,foreignMeta={};
 var editorOwned=false;
 function book(){if(foreignDoc)return foreignDoc;return state.books.find(function(b){return b.id===state.activeBookId})}
 function currentCh(){var b=book();if(!b||!b.chapters.length)return null;return b.chapters.find(function(c){return c.id===b.current})||b.chapters[0]}
-function chapterTitle(ch){var h=tmp(ch.html).querySelector('h1');var t=h?h.textContent.trim():'';return t||(isNotesCh(ch)?'Заметки':'Без названия')}
-function chapterWords(ch){return countWords(tmp(ch.html).textContent)}
+/* Кэш разбора главы: раньше каждая пересборка ленты и каждый автосейв заново
+   парсили HTML каждой главы каждой книги (tmp + textContent/querySelector) —
+   на большой книге это сотни разборов за секунду. Кэш — невидимые для
+   JSON.stringify свойства (non-enumerable): книга в localStorage/на сервер
+   не раздувается, инвалидация — по самой строке html (строки неизменяемы). */
+function chCachePut(ch,field,val){
+  try{Object.defineProperty(ch,field,{value:val,enumerable:false,writable:true,configurable:true})}
+  catch(e){ch[field]=val}
+}
+/* Текст главы с кэшем: правка главы сбрасывает только её строку, все
+   остальные главы отдаются без единого разбора. Для связей — вариант
+   с '\n' вместо блоков (nl=true), для прочего — как textContent. */
+function chText(ch,nl){
+  if(!ch)return '';
+  var html=String(ch.html==null?'':ch.html);
+  var k=nl?'_txtNl':'_txt';
+  if(ch[k+'Src']===html&&typeof ch[k]==='string')return ch[k];
+  var t=htmlText(html,nl);
+  chCachePut(ch,k,t);chCachePut(ch,k+'Src',html);
+  return t;
+}
+function chapterTitle(ch){
+  if(ch._ttlSrc===ch.html&&typeof ch._ttl==='string')return ch._ttl;
+  var html=String(ch.html==null?'':ch.html);
+  var m=/<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(html);
+  var t=m?htmlText(m[1]).trim():'';
+  if(!m&&/<h1/i.test(html)){              /* битый заголовок без </h1> — как раньше, через DOM */
+    var h=tmp(html).querySelector('h1');t=h?h.textContent.trim():'';
+  }
+  t=t||(isNotesCh(ch)?'Заметки':'Без названия');
+  chCachePut(ch,'_ttl',t);chCachePut(ch,'_ttlSrc',ch.html);
+  return t;
+}
+function chapterWords(ch){
+  if(ch._wcSrc===ch.html&&typeof ch._wc==='number')return ch._wc;
+  var w=countWords(chText(ch));           /* текст из строки — документ не разбираем */
+  chCachePut(ch,'_wc',w);chCachePut(ch,'_wcSrc',ch.html);
+  return w;
+}
+/* Раунд I: тот же счёт слов, но текст главы не удерживается — для
+   фонового заполнения счётчиков (списку/полке/превью нужны числа,
+   сам текст главы нужен только открытой главе). */
+function chapterWordsBg(ch){
+  if(ch._wcSrc===ch.html&&typeof ch._wc==='number')return ch._wc;
+  var w=countWords(htmlText(ch.html));   /* та же строка, что у chText(ch) */
+  chCachePut(ch,'_wc',w);chCachePut(ch,'_wcSrc',ch.html);
+  return w;
+}
+function bookWordsBg(b){return visibleChapters(b).reduce(function(a,c){return a+chapterWordsBg(c)},0)}
+function totalWordsAllBg(){return state.books.reduce(function(s,b){return s+bookWordsBg(b)},0)}
+/* слово-счёт книги из кэша глав: null — если глава ещё не посчитана */
+function bookWordsCached(b){
+  if(!b)return null;
+  var s=0,chs=visibleChapters(b);
+  for(var i=0;i<chs.length;i++){
+    var c=chs[i];
+    if(c._wcSrc===c.html&&typeof c._wc==='number')s+=c._wc;else return null;
+  }
+  return s;
+}
 function bookWords(b){return visibleChapters(b).reduce(function(a,c){return a+chapterWords(c)},0)}
 function totalWordsAll(){return state.books.reduce(function(s,b){return s+bookWords(b)},0)}
 
@@ -230,8 +294,8 @@ function snapshotStats(){
   var entry=state.stats[today];
   if(typeof entry==='number'){entry={__all:entry};state.stats[today]=entry}
   if(!entry||typeof entry!=='object')entry=state.stats[today]={};
-  state.books.forEach(function(b){entry[b.id]=bookWords(b)});
-  entry.__all=totalWordsAll();
+  state.books.forEach(function(b){entry[b.id]=bookWordsBg(b)});
+  entry.__all=totalWordsAllBg();
   takeSnapshot();
   return entry.__all;
 }

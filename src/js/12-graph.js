@@ -764,14 +764,15 @@ function paintGraph(){
       color=isRel?V.accent:V.ink3;
     }else if(showAll){
       /* вес виден сразу: сильные нити плотнее и темнее (ink2),
-         слабые — почти шёпот, поэтому паутина не сливается в кашу */
-      o=(ratio>0.55?0.3:0.12)+0.34*ratio;
-      sw=0.7+1.5*ratio;
+         слабые — тише, но не пропадают: пол по прозрачности и толщине,
+         иначе на тёмной теме паутина выглядит пустой */
+      o=(ratio>0.55?0.34:0.2)+0.3*ratio;
+      sw=0.85+1.5*ratio;
       color=ratio>0.55?V.ink2:V.ink3;
       if(l.s.id===mainId||l.t.id===mainId){o+=0.12;sw+=0.25}
     }else{
-      o=(ratio>0.55?0.34:0.2)+0.3*ratio;
-      sw=0.65+1.7*ratio;
+      o=(ratio>0.55?0.38:0.26)+0.3*ratio;
+      sw=0.9+1.6*ratio;
       color=ratio>0.55?V.ink2:V.ink3;
     }
     var cls='glink'+(isRel?' grel':'')+(dimAnim&&focusId&&!isRel?' gdim':'')+(enter?' gdraw':'');

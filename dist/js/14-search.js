@@ -51,7 +51,7 @@ function spRun(){
   var chHits=[],wkHits=[],noteHits=[];
   visibleChapters(b).forEach(function(ch){
     var i=b.chapters.indexOf(ch);
-    var text=tmp(ch.html).textContent,lower=text.toLowerCase();
+    var text=chText(ch),lower=text.toLowerCase();
     var idx=lower.indexOf(ql);
     while(idx>=0&&chHits.length<60){
       var from=Math.max(0,idx-46);

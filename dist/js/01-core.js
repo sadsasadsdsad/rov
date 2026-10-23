@@ -53,6 +53,56 @@ function fmt(n){return n.toLocaleString('ru-RU')}
 function countWords(s){s=(s||'').trim();return s?s.split(/\s+/).length:0}
 function mk(t){return document.createElement(t)}
 function tmp(html){var d=mk('div');d.innerHTML=html;return d}
+/* Текст из HTML-строки БЕЗ DOM: раньше каждая глава гонялась через
+   tmp() (innerHTML) при рендере ленты, открытии энциклопедии, поиске и
+   построении связей — на «Войне и мир» это сотни разборов документа.
+   Результат совпадает с textContent: комментарии и теги исчезают,
+   сущности декодируются так же, как это сделал бы браузер. */
+var HTML_ENT={nbsp:'\u00a0',NonBreakingSpace:'\u00a0',shy:'\u00ad',amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",
+  mdash:'—',ndash:'–',hellip:'…',laquo:'«',raquo:'»',bull:'•',middot:'·',
+  minus:'−',times:'×',copy:'©',reg:'®',deg:'°',plusmn:'±',sect:'§',
+  para:'¶',euro:'€',trade:'™',
+  lsquo:'‘',rsquo:'’',ldquo:'“',rdquo:'”',bdquo:'„',dagger:'†',
+  thinsp:'\u2009',ensp:'\u2000',emsp:'\u2003',zwnj:'\u200c',zwj:'\u200d'};
+function entChr(c){
+  if(!(c>=0))return '';
+  if(c<0x10000)return String.fromCharCode(c);
+  c-=0x10000;
+  return String.fromCharCode(0xD800+(c>>10),0xDC00+(c&0x3FF));   /* суррогатная пара — как fromCodePoint, но ES5 */
+}
+function htmlDecode(s){
+  return s.replace(/&(?:#x([0-9a-f]+)|#(\d+)|([a-z]+));/gi,function(m,h,d,n){
+    if(h!=null)return entChr(parseInt(h,16));
+    if(d!=null)return entChr(parseInt(d,10));
+    if(n){var v=HTML_ENT[n.toLowerCase()];if(v!==undefined)return v}
+    return m;                              /* неизвестная сущность — браузер оставляет строкой */
+  });
+}
+function htmlText(html,nl){
+  var s=String(html==null?'':html);
+  if(nl)s=s.replace(/<\/(p|h[1-6]|div|li|blockquote)>/gi,'\n');
+  s=s.replace(/<!--[\s\S]*?-->/g,'');      /* как textContent: комментарии — не текст */
+  s=s.replace(/<[^>]*>/g,'');
+  return htmlDecode(s);
+}
+/* Раунд I: фоновые порции. Тяжёлые производные (счётчики слов глав,
+   цитаты превью, статистика полки) считаются порциями уже после отрисовки —
+   открытие книги/главы не ждёт разбора чужих текстов. Порция ≈10 мс,
+   между порциями управление возвращается браузеру. */
+var _bgq=[],_bgOn=false;
+function bgJob(fn){
+  if(typeof fn!=='function')return;
+  _bgq.push(fn);
+  if(!_bgOn){_bgOn=true;setTimeout(_bgRun,0)}
+}
+function _bgRun(){
+  var t0=Date.now();
+  while(_bgq.length&&Date.now()-t0<10){
+    var f=_bgq.shift();
+    try{f()}catch(e){}
+  }
+  if(_bgq.length)setTimeout(_bgRun,0);else _bgOn=false;
+}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function escAttr(s){return esc(s).replace(/"/g,'&quot;')}
 function escRe(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}

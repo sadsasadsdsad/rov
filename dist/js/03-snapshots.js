@@ -106,9 +106,8 @@ function openDayModal(key){
       var words=0,chs={};
       (b.chapters||[]).forEach(function(c){
         if(c.kind==='notes')return;
-        var h=tmp(c.html).querySelector('h1');
-        var t=h?(h.textContent.trim()||'Без названия'):'Без названия';
-        var w=countWords(tmp(c.html).textContent);
+        var t=chapterTitle(c);            /* строка + кэш, без разбора документа */
+        var w=chapterWords(c);
         words+=w;chs[c.id]={title:t,words:w};
       });
       return {id:b.id,title:b.title||'Без названия',words:words,chapters:chs};

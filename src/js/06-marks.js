@@ -28,7 +28,7 @@ function showMarkTip(dotEl,label,chapterNum,flip){
 }
 function hideMarkTip(){var tip=$('#markTip');if(tip)tip.classList.remove('on')}
 function resolveMarkPos(ch,mark){
-  var text=tmp(ch.html).textContent;
+  var text=chText(ch);
   if(mark.snippet && mark.pos>=0 && text.substr(mark.pos,mark.snippet.length)===mark.snippet)return mark.pos;
   if(mark.snippet){
     var idx=text.indexOf(mark.snippet);if(idx>=0)return idx;
@@ -47,7 +47,7 @@ function createMarkAtCursor(){
   }
   if(pos==null)pos=lastCaretOffset;
   if(pos==null)pos=0;
-  var text=tmp(ch.html).textContent;
+  var text=chText(ch);
   var snippet=text.slice(pos,pos+60).replace(/\s+/g,' ').trim();
   var suggested='';
   var after=text.slice(pos,pos+40).replace(/\s+/g,' ').trim();
@@ -84,7 +84,7 @@ function jumpToMark(chapterId,markId){
   var mark=(ch.marks||[]).find(function(m){return m.id===markId});if(!mark)return;
   if(b.current!==ch.id)openChapter(ch.id);
   setTimeout(function(){
-    var text=tmp(ch.html).textContent;
+    var text=chText(ch);
     var pos=resolveMarkPos(ch,mark);
     var len=Math.min(24,Math.max(8,text.length-pos));
     if(pos>=0&&pos<text.length)flashRange(pos,len,2200);

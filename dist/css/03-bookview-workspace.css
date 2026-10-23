@@ -46,6 +46,17 @@ aside .brand{padding:20px 18px 6px}
 #bookTitle{width:100%;margin-top:7px;background:transparent;border:0;border-bottom:1px solid var(--line2);outline:none;font-family:var(--f-serif);font-weight:600;font-size:15.5px;color:var(--ink);padding:5px 2px;transition:border-color .25s}
 #bookTitle:focus{border-color:var(--accent)}
 .chapters-label{padding:12px 18px 6px;display:flex;justify-content:space-between;align-items:baseline}
+/* глаз «прятать пустые главы» — справа от счётчика «N шт.» */
+.ch-lbl-right{display:flex;align-items:center;gap:2px}
+.ch-eye{width:24px;height:24px;display:grid;place-items:center;color:var(--ink3);border:0;background:transparent;padding:0;cursor:pointer;transition:color .18s;flex:0 0 auto}
+.ch-eye svg{width:14px;height:14px;display:block}
+.ch-eye:hover{color:var(--ink2)}
+.ch-eye.on{color:var(--accent)}
+/* «удалить все пустые» — появляется только при включённом глазе */
+.ch-purge{display:none;margin:2px 18px 8px;padding:6px 8px;border:1px solid var(--line2);background:transparent;color:var(--ink3);font-size:11px;letter-spacing:.03em;cursor:pointer;border-radius:var(--r-xs);transition:color .18s,border-color .18s}
+.ch-purge.on{display:block}
+.ch-purge:hover:not(:disabled){color:var(--accent);border-color:var(--accent)}
+.ch-purge:disabled{opacity:.5;cursor:default}
 /* базовый список: скроллбар скрыт, затемнения-маски нет — в раскрытом
    виде панель чистая, маска-edge живёт только в рейке (ниже) */
 /* «колесо»: ряды съезжают по горизонтали волной (--wx, JS) и срезаются краем

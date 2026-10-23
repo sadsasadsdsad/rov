@@ -107,40 +107,89 @@ function impIsHead(s){
   return false;
 }
 
-/* мусор страниц: «- 15 -», «15» одиночные абзацы */
-function impJunk(s){return /^[-–—]?\s*\d{1,3}\s*[-–—]?$/.test(s)}
+/* чистка входного текста: переносы строк, невидимые и управляющие
+   символы — всё, что мешает ставить абзацы («лишнее» уходит на входе).
+   Переносы-дефисы внутри строк разбираются при склейке — см. impParas */
+function impCleanText(text){
+  return String(text||'')
+    .replace(/\r\n?/g,'\n')
+    .replace(/\uFEFF/g,'')
+    .replace(/\f/g,'\n\n')                                 /* разрыв страницы — как пустая строка */
+    .replace(/[\u00AD\u200B\u200C\u200D\u2060\u180E]/g,'') /* мягкие и нулевые переносы */
+    .replace(/[\u200E\u200F\u202A-\u202E\u202C]/g,'')      /* метки направления письма */
+    .replace(/[\x00-\x08\x0B\x0E-\x1F]/g,'')               /* управляющие (перевод строки оставили) */
+    .replace(/\t/g,' ')
+    .replace(/\u00A0/g,' ');
+}
 
-/* текст → абзацы; каждая строка-заголовок — отдельный абзац */
+/* мусор страниц и разделители: «- 15 -», «15», «15/16», «стр. 15», «***» */
+function impJunk(s){
+  s=String(s||'').replace(/\s+/g,' ').trim();
+  if(!s)return true;
+  if(/^[-–—]?\s*\d{1,4}\s*[-–—]?$/.test(s))return true;             /* номер страницы */
+  if(/^\d{1,4}\s*[/\\.,;:]\s*\d{1,4}$/.test(s))return true;         /* «15/16» */
+  if(/^(стр|страница|страницы|страницу|с|page|p|pp)\.?\s*\d{1,4}(\s*[-–—]\s*\d{1,4})?$/i.test(s))return true;
+  if(/^№\s*\d{1,4}$/.test(s))return true;
+  return !/[0-9A-Za-zА-Яа-яЁё]/.test(s);                            /* без букв: «---», «***», «...» */
+}
+
+/* текст → абзацы: ставятся сами, лишнее удаляется (правила — внутри impParas):
+   пустая строка = граница абзаца; строки-мусор (номера страниц, «стр. 15»,
+   «***») выпадают до разбора; блок без пустых строк, где почти каждая строка —
+   готовое предложение, разбирается построчно («строка = абзац»); иначе строки
+   склеиваются — это переносы строк внутри абзаца, дефис-перенос в конце строки
+   склеивается; реплика с тире начинает новый абзац; стихи и пьесы — строка = абзац */
 function impParas(text){
-  text=String(text||'').replace(/\r\n?/g,'\n').replace(/\u00A0/g,' ').replace(/\uFEFF/g,'');
-  var lines=text.split('\n'),i;
-  /* стихи и скрипты: много коротких строк подряд — строка = абзац */
-  var nLetters=0,nShort=0;
-  for(i=0;i<lines.length;i++){
-    var t=lines[i].trim();
-    if(t.length){nLetters++;if(t.length<=45)nShort++}
+  text=impCleanText(text);
+  var raw=text.split('\n'),blocks=[],cur=[],i,j;
+  for(i=0;i<raw.length;i++){
+    var t=raw[i].replace(/ {2,}/g,' ').trim();
+    if(!t){if(cur.length){blocks.push(cur);cur=[]}continue}
+    if(impJunk(t))continue;
+    cur.push(t);
   }
-  var lineMode=nLetters>=12&&nShort>nLetters*0.75;
+  if(cur.length)blocks.push(cur);
+  /* стихи и пьесы: много коротких строк без точек — строка = абзац */
+  var n=0,nShort=0,nPunct=0;
+  for(i=0;i<blocks.length;i++)for(j=0;j<blocks[i].length;j++){
+    var sm=blocks[i][j];
+    n++;
+    if(sm.length<=45)nShort++;
+    if(/[.!?…]$/.test(sm))nPunct++;
+  }
+  var lineMode=n>=12&&nShort>n*0.75&&nPunct<n*0.4;
+
   var out=[],buf=[];
   function flush(){
-    var s=buf.join(' ').replace(/[ \t]+/g,' ').trim();
-    if(s)out.push({text:s});
+    if(!buf.length)return;
+    var s='',k;
+    for(k=0;k<buf.length;k++){
+      var l=buf[k];
+      if(!s)s=l;
+      else if(/[-\u2010]$/.test(s)&&/^[а-яёa-z]/.test(l))s=s.replace(/[-\u2010]$/,'')+l;  /* перенос слова */
+      else s+=' '+l;
+    }
+    s=s.replace(/ {2,}/g,' ').replace(/\s+([,.;:!?…])/g,'$1').trim();
+    if(/[0-9A-Za-zА-Яа-яЁё]/.test(s))out.push({text:s});
     buf=[];
   }
-  for(i=0;i<lines.length;i++){
-    var l=lines[i].trim();
-    if(!l){flush();continue}
-    if(impIsHead(l)){flush();out.push({text:l});flush();continue}
-    if(lineMode){flush();out.push({text:l});continue}
-    buf.push(l);
+  for(i=0;i<blocks.length;i++){
+    var b=blocks[i],heads=0,ends=0;
+    for(j=0;j<b.length;j++){
+      if(impIsHead(b[j]))heads++;
+      else if(/[.!?…»"”’]$/.test(b[j]))ends++;
+    }
+    /* каждая строка блока — готовый абзац? (в файле не было пустых строк) */
+    var asPara=b.length>=2&&ends>=Math.ceil((b.length-heads)*0.6);
+    for(j=0;j<b.length;j++){
+      var l=b[j];
+      if(impIsHead(l)||lineMode||asPara){flush();out.push({text:l});continue}
+      if(/^[—–-]\s*\S/.test(l))flush();                 /* реплика — новый абзац */
+      buf.push(l);
+    }
+    flush();
   }
-  flush();
-  var res=[],k;
-  for(k=0;k<out.length;k++){
-    if(k>0&&k<out.length-1&&impJunk(out[k].text))continue;   /* номера страниц посередине */
-    res.push(out[k]);
-  }
-  return res;
+  return out;
 }
 
 /* главы из массива абзацев {text,bold,html} */
@@ -191,6 +240,7 @@ function impParasHtml(items){
   for(i=0;i<items.length;i++){
     var p=items[i];
     if(p.block){h+=p.html;continue}   /* готовый блок (цитата) — без обёртки */
+    if(!p.text||impJunk(p.text))continue;   /* лишнее (номера страниц) не печатаем */
     var x=p.html?p.html:esc(p.text);
     h+='<p>'+x.replace(/\n/g,'<br>')+'</p>';
   }
@@ -313,10 +363,15 @@ function impBlocksHtml(items,level){
       if(lvl<2)lvl=2;
       if(lvl>6)lvl=6;
       h+='<h'+lvl+'>'+esc(b.text)+'</h'+lvl+'>';
-    }else if(b.html){
-      h+='<p>'+b.html.replace(/\n/g,'<br>')+'</p>';
     }else{
-      h+='<p>'+esc(b.text).replace(/\n/g,'<br>')+'</p>';
+      if(impJunk(b.text))continue;   /* номера страниц из источника */
+      /* пустая строка внутри блока источника («<br><br>», «\n\n») — новый абзац */
+      var segs=b.html?b.html.split(/(?:<br\s*\/?>\s*|\s*\n\s*\n\s*){2,}/i):[b.html||esc(b.text)];
+      var q;
+      for(q=0;q<segs.length;q++){
+        var x=segs[q].replace(/\r/g,'').replace(/^\s+|\s+$/g,'').replace(/\n/g,'<br>');
+        if(x)h+='<p>'+x+'</p>';
+      }
     }
   }
   return h;
@@ -438,10 +493,10 @@ function impFb2Paras(node){
     if(nm==='title'||nm==='section')continue;
     if(nm==='p'){
       var t=(e.textContent||'').replace(/\s+/g,' ').trim();
-      if(t)items.push({text:t});
+      if(t&&!impJunk(t))items.push({text:t});
     }else if(nm==='subtitle'){
       var st=(e.textContent||'').replace(/\s+/g,' ').trim();
-      if(st)items.push({text:st,html:'<strong>'+esc(st)+'</strong>'});
+      if(st&&!impJunk(st))items.push({text:st,html:'<strong>'+esc(st)+'</strong>'});
     }else if(nm==='epigraph'||nm==='cite'){
       var ps=e.getElementsByTagName('p'),j,qs=[];
       for(j=0;j<ps.length;j++){
@@ -461,7 +516,7 @@ function impFb2Paras(node){
       }
     }else if(nm==='table'){
       var tt=(e.textContent||'').replace(/\s+/g,' ').trim();
-      if(tt)items.push({text:tt});
+      if(tt&&!impJunk(tt))items.push({text:tt});
     }
   }
   return items;
@@ -547,7 +602,7 @@ function impRtf(text){
       var p={text:bufText.replace(/\s+/g,' ').trim(),bold:paraBold,html:''};
       buf=buf.replace(/[ \t\r\n]+$/,'');   /* хвостовые переводы строк — не <br> */
       p.html=(buf+wClose(wOpen)).replace(/\n/g,'<br>');
-      if(p.text)paras.push(p);
+      if(p.text&&!impJunk(p.text))paras.push(p);
     }
     buf='';bufText='';wOpen='';paraBold=true;paraHas=false;pend=0;
   }
@@ -1090,7 +1145,8 @@ function impPdfText(pages,meta){
 
 /* --- Сборка книги и полка ------------------------------------------------- */
 
-var IMP_MAX=3500000;
+/* Лимитов на размер книги больше нет: «Война и мир» и любые другие тома
+   импортируются целиком — ни по числу знаков, ни по размеру файла. */
 
 function impParse(name,buf){
   var kind=impKind(name,buf);
@@ -1117,11 +1173,7 @@ function impChapterHtml(c){
 }
 
 function impAddBook(data){
-  var chapters=[],first=null,i,total=0;
-  for(i=0;i<data.chapters.length;i++){
-    total+=String(data.chapters[i].title||'').length+String(data.chapters[i].html||'').length;
-  }
-  if(total>IMP_MAX)throw new Error('Книга слишком большая для локального хранилища (лимит '+fmt(IMP_MAX)+' знаков)');
+  var chapters=[],first=null,i;
   for(i=0;i<data.chapters.length;i++){
     var c=data.chapters[i];
     var ch={id:uid(),html:impChapterHtml(c),pos:0,marks:[]};
@@ -1158,7 +1210,6 @@ function impAddBook(data){
 
 function impFile(file){
   var name=file.name||'';
-  if(file.size>150*1024*1024){toast('Файл больше 150 МБ — слишком большая книга');return}
   toast('Читаю «'+name+'»…');
   var r=new FileReader();
   r.onerror=function(){toast('Не удалось прочитать файл')};

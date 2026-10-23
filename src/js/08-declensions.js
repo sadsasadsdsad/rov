@@ -126,7 +126,7 @@ function declFormsSingle(w){
   }else if((last==='о'||last==='е')&&w.length>2){stem=w.slice(0,-1);add(stem+'о');add(stem+'е');add(stem+'а');add(stem+'у');add(stem+'ом');add(stem+'ем');
   }else if(last==='й'&&w.length>2){stem=w.slice(0,-1);add(stem+'я');add(stem+'ю');add(stem+'ем');add(stem+'е');
   }else if(last==='ь'&&w.length>2){stem=w.slice(0,-1);add(stem+'и');add(stem+'ю');add(stem+'ью');add(stem+'е');
-  }else if(hard.indexOf(last)>=0&&w.length>1){add(w+'а');add(w+'у');add(w+'е');add(w+'ом');add(w+'ем');add(w+'ы');add(w+'и')}
+  }else if(hard.indexOf(last)>=0&&w.length>1){add(w+'а');add(w+'у');add(w+'е');add(w+'ом');add(w+'ем');add(w+'ым');add(w+'ы');add(w+'и')}
   /* плюс падежные слоты: «городе» уже есть, а «городах/городов» не хватало */
   declNounSlots(w).forEach(function(opts){opts.forEach(add)});
   return Object.keys(f);
@@ -166,15 +166,31 @@ function namesOf(enOrName,aliases){
   else{list.push(enOrName);(aliases||[]).forEach(function(a){list.push(a)})}
   return list.map(function(s){return String(s||'').trim()}).filter(Boolean);
 }
+var NAME_ALTS_MEM={};
 function buildNameAltsAll(enOrName,aliases){
   var names=namesOf(enOrName,aliases);
+  var key=names.join('|');
+  var hit=NAME_ALTS_MEM[key];
+  if(hit!=null)return hit;   /* формы имени не меняются — считаем один раз */
   var seen={},out=[];
+  function push(f){
+    if(!f||seen[f])return;
+    seen[f]=1;out.push(escRe(f));
+    /* ё/е: одна книга пишет «Гринёв» и «Гринёвым», другая — «Гринев» и
+       «Гриневым»; без пары вариантов персонаж не находился и связи рвались */
+    var e=f.replace(/ё/g,'е'),yo=f.replace(/е/g,'ё');
+    if(!seen[e]){seen[e]=1;out.push(escRe(e))}
+    if(yo!==f&&!seen[yo]){seen[yo]=1;out.push(escRe(yo))}
+  }
   names.forEach(function(n){
-    declForms(n).forEach(function(f){if(!seen[f]){seen[f]=1;out.push(escRe(f))}});
-    if(!seen[n]){seen[n]=1;out.push(escRe(n))}
+    declForms(n).forEach(push);
+    push(n);
   });
   out.sort(function(a,b){return b.length-a.length});
-  return out.join('|');
+  var res=out.join('|');
+  if(Object.keys(NAME_ALTS_MEM).length>600)NAME_ALTS_MEM={};
+  NAME_ALTS_MEM[key]=res;
+  return res;
 }
 function buildNameRegexAll(enOrName,aliases){
   var a=buildNameAltsAll(enOrName,aliases);
@@ -189,7 +205,7 @@ function nameStats(enOrName,aliases){
        «гл. N» и цитаты уже считают по ней; по visible-индексам таймлайн и
        «главы» в карточке расходились с цитатами на ≥2 (Памятка/Заметки) */
     visibleChapters(b).forEach(function(ch){
-      var m=tmp(ch.html).textContent.match(re);
+      var m=chText(ch).match(re);
       var c=m?m.length:0;
       if(c>0){appear.push(b.chapters.indexOf(ch));totalMatches+=c}
     });
@@ -203,7 +219,7 @@ function findContexts(enOrName,aliases){
   var testRe=new RegExp('(^|[^а-яёa-z0-9])('+alts+')(?![а-яёa-z0-9])','i');
   visibleChapters(b).forEach(function(ch){
     var i=b.chapters.indexOf(ch);
-    var text=tmp(ch.html).textContent;
+    var text=chText(ch);
     var parts=text.match(/[^.!?\n]+[.!?…]*/g)||[];
     parts.forEach(function(s){
       s=s.replace(/\s+/g,' ').trim();

@@ -43,9 +43,12 @@ var Sync = {
 /* ---------- низкоуровневый fetch с таймаутом ---------- */
 function syncFetch(path, opt) {
   opt = opt || {};
-  var ctrl = ('AbortController' in window) ? new AbortController() : null;
-  var to = ctrl ? setTimeout(function () { try { ctrl.abort() } catch (e) {} }, 9000) : null;
   var body = opt.body ? JSON.stringify(opt.body) : null;
+  /* Большие книги едут дольше: таймаут растёт от размера тела, чтобы
+     «Война и мир» (~3 МБ) не обрывалась на средней линии. */
+  var toMs = opt.timeout || (body && body.length > 500000 ? 60000 : 9000);
+  var ctrl = ('AbortController' in window) ? new AbortController() : null;
+  var to = ctrl ? setTimeout(function () { try { ctrl.abort() } catch (e) {} }, toMs) : null;
   return fetch(Sync.base + path, {
     method: opt.method || 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : {},

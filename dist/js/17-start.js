@@ -38,7 +38,10 @@ function startApp(user){
   setTheme(state.theme||'light');
   if(state.zen){document.body.classList.add('zen');$('#btnZen').classList.add('on')}
   if(typeof applyReaderMode==='function')applyReaderMode();
-  snapshotStats();persist();
+  /* Раунд I: счётчики всех книг и статистика дня — порциями в фоне,
+     первый кадр не ждёт разбора чужих текстов */
+  queueAllWc();
+  bgJob(function(){snapshotStats();persist();if(typeof renderStats==='function')renderStats()});
   library.hidden=false;
   setWorkspaceVisible(false);
   bookView.hidden=true;

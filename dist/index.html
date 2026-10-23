@@ -207,6 +207,11 @@
           </select>
         </label>
       </div>
+      <div class="find-row" id="findRow">
+        <input id="findInput" type="search" placeholder="Найти книгу по названию — все источники" aria-label="Поиск книги по всем источникам" autocomplete="off">
+        <button type="button" class="find-btn" id="findBtn">Искать</button>
+      </div>
+      <div class="shared-list find-list" id="findList" hidden></div>
       <div class="shared-list" id="sharedList"></div>
     </div>
     <div class="shelf" id="shelf"></div>
@@ -264,7 +269,8 @@
       <label class="lbl" for="bookTitle">Книга</label>
       <input id="bookTitle" autocomplete="off" spellcheck="false">
     </div>
-    <div class="chapters-label"><span class="lbl">Главы</span><span class="lbl" id="chCount"></span></div>
+    <div class="chapters-label"><span class="lbl">Главы</span><span class="ch-lbl-right"><span class="lbl" id="chCount"></span><button type="button" id="chHideEmpty" class="ch-eye" title="Прятать пустые главы" data-ftip="Прятать пустые главы" aria-label="Прятать пустые главы" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></span></div>
+    <button type="button" id="chPurgeEmpty" class="ch-purge">Удалить пустые</button>
     <div id="chlist"></div>
     <button id="addCh">+&nbsp;&nbsp;НОВАЯ ГЛАВА</button>
     <div class="side-foot"><span id="totalWords">0 слов</span><span id="totalRead"></span></div>
@@ -344,6 +350,9 @@
   <div class="wp-head">
     <span class="wp-title"><span class="dia"></span><span id="wpTitleText">Энциклопедия</span> <span class="wp-count" id="wpCount"></span></span>
     <button class="lbl lbl-btn" id="wpAdd">+ статья</button>
+    <button class="sibtn" id="wpAuto" data-ftip="Найти персонажей" data-ftip-sub="добавит в энциклопедию без описания" aria-label="Найти персонажей в тексте">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.5" cy="7.5" r="3"/><path d="M3.5 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><path d="M18.5 12.5v6M15.5 15.5h6"/></svg>
+    </button>
     <button class="sibtn" id="wpFull" title="Маленький режим — встроить между хидером и строкой статуса">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
     </button>
@@ -820,5 +829,6 @@
 <script src="js/25-ui.js?v=27"></script>
 <script src="js/26-settings.js?v=27"></script>
 <script src="js/27-news.js?v=27"></script>
+<script src="js/28-findbook.js?v=27"></script>
 </body>
 </html>
