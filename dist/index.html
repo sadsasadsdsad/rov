@@ -185,7 +185,13 @@
     </div>
     </div>
     <div class="shared-box" id="sharedBox" hidden>
-      <input id="sharedSearch" type="search" placeholder="Поиск по названию или автору" aria-label="Поиск по общим книгам" autocomplete="off">
+      <div class="search-row">
+        <input id="sharedSearch" type="search" placeholder="Поиск по названию или автору" aria-label="Поиск по общим книгам" autocomplete="off">
+        <div class="find-row" id="findRow">
+          <input id="findInput" type="search" placeholder="Найти книгу по названию — все источники" aria-label="Поиск книги по всем источникам" autocomplete="off">
+          <button type="button" class="find-btn" id="findBtn">Искать</button>
+        </div>
+      </div>
       <div class="shared-filters" id="sharedFilters">
         <div class="sf-rows">
           <div class="sf-row" role="group" aria-label="Период обновления">
@@ -206,10 +212,6 @@
             <option value="author">по автору</option>
           </select>
         </label>
-      </div>
-      <div class="find-row" id="findRow">
-        <input id="findInput" type="search" placeholder="Найти книгу по названию — все источники" aria-label="Поиск книги по всем источникам" autocomplete="off">
-        <button type="button" class="find-btn" id="findBtn">Искать</button>
       </div>
       <div class="shared-list find-list" id="findList" hidden></div>
       <div class="shared-list" id="sharedList"></div>

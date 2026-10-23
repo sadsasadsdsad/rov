@@ -26,10 +26,12 @@ $host = strtolower((string)parse_url($url, PHP_URL_HOST));
 if ($scheme !== 'https') json_err(400, 'https only');
 
 /* белый список источников: Гутенберг (тексты), его зеркало PGLAF и
-   Internet Archive (сканы djvu.txt, на которые ведут Открытая библиотека) */
+   Internet Archive (метаданные и сканы djvu.txt — в т.ч. узлы ia*.us.
+   archive.org, на которые ведут данные Открытой библиотеки) */
 $allow = ['www.gutenberg.org', 'gutenberg.org', 'gutenberg.pglaf.org',
           'archive.org', 'www.archive.org'];
-if (!in_array($host, $allow, true)) json_err(400, 'host not allowed');
+$iaNode = (bool)preg_match('#^ia\d+\.[a-z0-9-]+\.archive\.org$#', $host);
+if (!in_array($host, $allow, true) && !$iaNode) json_err(400, 'host not allowed');
 
 /** Заброс одной страницы: [тело, HTTP-статус]; при сетевом сбое статус 0 */
 function proxy_get(string $url): array
@@ -62,9 +64,12 @@ function proxy_get(string $url): array
         'ignore_errors' => true,        /* статус читаем ниже, тело — целиком */
     ]]);
     $raw = @file_get_contents($url, false, $ctx);
+    /* за редиректами (Архив всегда отвечает 302 → 200) в массиве несколько
+       блоков заголовков: важен ПОСЛЕДНИЙ статус, иначе готовый текст
+       браковался по «302» первого ответа */
     $status = 0;
-    if (isset($http_response_header[0]) && preg_match('#HTTP/\S+\s+(\d{3})#', $http_response_header[0], $mm)) {
-        $status = (int)$mm[1];
+    foreach ((array)($http_response_header ?? []) as $hline) {
+        if (preg_match('#HTTP/\S+\s+(\d{3})#', $hline, $mm)) $status = (int)$mm[1];
     }
     return [$raw === false ? '' : (string)$raw, $status];
 }

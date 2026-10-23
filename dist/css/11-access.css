@@ -49,9 +49,12 @@
 }
 #sharedSearch:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--sel)}
 #sharedSearch::placeholder{color:var(--ink3)}
+/* два поиска в одном ряду: слева каталог сайта, справа — по всем источникам */
+.search-row{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.search-row #sharedSearch{flex:1 1 300px;max-width:520px}
 /* новый поиск: строка «найти книгу по названию — все источники» и её выдача
    (карточки переиспользуют .shared-card каталога) */
-.find-row{display:flex;gap:8px;margin-top:12px;max-width:520px}
+.find-row{flex:1 1 340px;max-width:640px;display:flex;gap:8px}
 #findInput{
   flex:1;min-width:0;
   font-family:var(--f-ui);font-size:13px;color:var(--ink);

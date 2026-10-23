@@ -82,7 +82,7 @@ function fbOpenLib(q){
         out.push({src:'openlib',id:'ol'+ia[0],title:doc.title||'',
                   author:(doc.author_name&&doc.author_name[0])||'',
                   extra:(doc.first_publish_year||'')+(langs.indexOf('rus')>=0?' · ru':''),
-                  ia:ia[0],text:'https://archive.org/download/'+ia[0]+'/'+ia[0]+'_djvu.txt'});
+                  ia:ia[0]});        /* текст найдёт fbLoadText по метаданным */
       });
       return out.slice(0,FB_MAX);
     })
@@ -184,22 +184,50 @@ function fbForeignBook(data){
   return roNormalize(b);
 }
 
+/* текст внешней книги через белый прокси. У Архива ссылка /download/ всегда
+   отвечает редиректом на узел хранения (не все хостинги его пропускают) —
+   поэтому сначала метаданные, там server/dir и имя djvu.txt: качаем живую
+   прямую ссылку без редиректов */
+function fbLoadText(it){
+  var direct;
+  if(it.src==='openlib'&&it.ia){
+    direct=fbFetch('api/proxy.php?u='+encodeURIComponent('https://archive.org/metadata/'+it.ia),30000,true)
+      .then(function(r){
+        if(!r.ok)throw new Error('метаданные Архива недоступны');
+        return r.json();
+      })
+      .then(function(j){
+        var files=(j&&Array.isArray(j.files))?j.files:[],f='',i;
+        for(i=0;i<files.length;i++){
+          var n=String((files[i]&&files[i].name)||'');
+          if(/_djvu\.txt$/i.test(n)){f=n;break}       /* полный текст скана */
+        }
+        if(!f||!j.server||!j.dir)throw new Error('в скане нет полного текста');
+        return 'https://'+j.server+j.dir+'/'+f;
+      });
+  }else{
+    direct=Promise.resolve(it.text);
+  }
+  return direct.then(function(u){
+    return fbFetch('api/proxy.php?u='+encodeURIComponent(u),60000,true);
+  }).then(function(r){
+    if(!r.ok){
+      /* прокси отвечает JSON {error:…} — покажем причину, а не «не получилось» */
+      return r.json().catch(function(){return null}).then(function(e){
+        throw new Error((e&&e.error)?e.error:('http '+r.status));
+      });
+    }
+    return r.arrayBuffer();
+  });
+}
+
 function fbOpen(it){
   if(!it)return;
   if(it.src==='own'){openBookOverview(it.id);return}
   if(it.src==='catalog'){openSharedBook(it.id,null);return}
   /* внешняя книга: текст через белый прокси → импорт-парсер → читалка */
   toast('Загружаю «'+(it.title||'книга')+'»…');
-  fbFetch('api/proxy.php?u='+encodeURIComponent(it.text),30000,true)
-    .then(function(r){
-      if(!r.ok){
-        /* прокси отвечает JSON {error:…} — покажем причину, а не «не получилось» */
-        return r.json().catch(function(){return null}).then(function(e){
-          throw new Error((e&&e.error)?e.error:('http '+r.status));
-        });
-      }
-      return r.arrayBuffer();
-    })
+  fbLoadText(it)
     .then(function(buf){
       var text=fbGutenbergStrip(impDec(buf));
       var data=impTxt((it.title||'book')+'.txt',text);   /* главы — как при импорте TXT */
